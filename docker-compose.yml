@@ -1,14 +1,37 @@
+version: "3.9"
+
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_DISABLE_FONT_DOWNLOAD: "1"
+    container_name: flower-app
+    env_file:
+      - .env
+    ports:
+      - "${PORT}:3000"
+    volumes:
+      - uploads-data:/app/public/uploads
+    depends_on:
+      - mongodb
+    networks:
+      - flower-network
+
   mongodb:
     image: mongo:latest
     container_name: flower-mongodb
     restart: always
+    env_file:
+      - .env
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: floweradmin
-      MONGO_INITDB_ROOT_PASSWORD: flowerpassword
-      MONGO_INITDB_DATABASE: flowerdb
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
     volumes:
       - mongodb-data:/data/db
     networks:
@@ -18,12 +41,15 @@ services:
     image: mongo-express:latest
     container_name: flower-mongo-admin
     restart: always
+    env_file:
+      - .env
     ports:
       - "8081:8081"
     environment:
-      ME_CONFIG_MONGODB_ADMINUSERNAME: floweradmin
-      ME_CONFIG_MONGODB_ADMINPASSWORD: flowerpassword
-      ME_CONFIG_MONGODB_URL: mongodb://floweradmin:flowerpassword@mongodb:27017/
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_PASSWORD}
+      PORT: 8081
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
       ME_CONFIG_MONGODB_SERVER: mongodb
       ME_CONFIG_BASICAUTH_USERNAME: admin
       ME_CONFIG_BASICAUTH_PASSWORD: admin123
@@ -34,9 +60,24 @@ services:
     networks:
       - flower-network
 
+  seed:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - .:/app:ro
+    command: ["node", "seed-data.js"]
+    env_file:
+      - .env
+    depends_on:
+      - mongodb
+    networks:
+      - flower-network
+
 volumes:
   mongodb-data:
     name: flower-mongodb-data
+  uploads-data:
+    name: flower-uploads-data
 
 networks:
   flower-network:

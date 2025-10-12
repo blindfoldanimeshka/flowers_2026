@@ -61,13 +61,17 @@
    - Логин: admin
    - Пароль: admin123
 
-## Доступы к MongoDB
+## Доступы и учетные данные
 
 - **MongoDB URL**: `mongodb://floweradmin:flowerpassword@localhost:27017/flowerdb?authSource=admin`
 - **Администратор БД**: `floweradmin`
 - **Пароль БД**: `flowerpassword`
 - **Mongo Admin логин**: `admin`
 - **Mongo Admin пароль**: `admin123`
+
+- Вход в админ-панель приложения:
+  - Логин: `AdminFlows`
+  - Пароль: `KMFlAdmin`
 
 ## Структура проекта
 

@@ -3,18 +3,158 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
 
+// Компонент для выбора времени
+interface TimePickerProps {
+  value: string;
+  onChange: (time: string) => void;
+  label: string;
+}
+
+const TimePicker: React.FC<TimePickerProps> = ({ value, onChange, label }) => {
+  // Парсим значение из пропсов без локального состояния
+  const [hour, minute] = value ? value.split(':') : ['09', '00'];
+
+  const handleHourChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, ''); // Только цифры
+    
+    // Не форматируем сразу, позволяем пользователю ввести значение
+    if (val === '' || (val.length <= 2 && parseInt(val) >= 0 && parseInt(val) <= 23)) {
+      onChange(`${val}:${minute}`);
+    }
+  };
+
+  const handleMinuteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, ''); // Только цифры
+    
+    // Не форматируем сразу, позволяем пользователю ввести значение
+    if (val === '' || (val.length <= 2 && parseInt(val) >= 0 && parseInt(val) <= 59)) {
+      onChange(`${hour}:${val}`);
+    }
+  };
+
+  const handleHourBlur = () => {
+    const currentHour = hour === '' || hour === '0' ? '00' : hour;
+    const num = Math.min(23, Math.max(0, parseInt(currentHour) || 0));
+    const formattedHour = num.toString().padStart(2, '0');
+    onChange(`${formattedHour}:${minute}`);
+  };
+
+  const handleMinuteBlur = () => {
+    const currentMinute = minute === '' || minute === '0' ? '00' : minute;
+    const num = Math.min(59, Math.max(0, parseInt(currentMinute) || 0));
+    const formattedMinute = num.toString().padStart(2, '0');
+    onChange(`${hour}:${formattedMinute}`);
+  };
+
+  return (
+    <div className="flex flex-col">
+      <label className="text-xs text-gray-600 mb-1">{label}</label>
+      <div className="flex gap-2 items-center">
+        <input
+          type="text"
+          value={hour}
+          onChange={handleHourChange}
+          onBlur={handleHourBlur}
+          className="w-12 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-200 outline-none bg-white text-sm text-center"
+          placeholder="00"
+          maxLength={2}
+        />
+        <span className="text-gray-500">:</span>
+        <input
+          type="text"
+          value={minute}
+          onChange={handleMinuteChange}
+          onBlur={handleMinuteBlur}
+          className="w-12 px-2 py-1 border rounded focus:ring-2 focus:ring-blue-200 outline-none bg-white text-sm text-center"
+          placeholder="00"
+          maxLength={2}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Компонент для выбора диапазона времени
+interface TimeRangePickerProps {
+  value: string;
+  onChange: (timeRange: string) => void;
+}
+
+const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ value, onChange }) => {
+  // Парсим значение из пропсов без локального состояния
+  const [startTime, endTime] = value && value.includes('-') 
+    ? value.split('-') 
+    : ['09:00', '21:00'];
+
+  const handleStartTimeChange = (newStartTime: string) => {
+    onChange(`${newStartTime}-${endTime}`);
+  };
+
+  const handleEndTimeChange = (newEndTime: string) => {
+    onChange(`${startTime}-${newEndTime}`);
+  };
+
+  return (
+    <div className="flex gap-4 items-end">
+      <TimePicker
+        value={startTime}
+        onChange={handleStartTimeChange}
+        label="Открытие"
+      />
+      <div className="pb-2">
+        <span className="text-gray-400 text-lg">—</span>
+      </div>
+      <TimePicker
+        value={endTime}
+        onChange={handleEndTimeChange}
+        label="Закрытие"
+      />
+    </div>
+  );
+};
+
+// Функция форматирования российского номера телефона
+const formatPhoneNumber = (value: string): string => {
+  // Убираем все нецифровые символы кроме +
+  const numbers = value.replace(/[^\d+]/g, '');
+  
+  // Если строка пустая, возвращаем пустую строку
+  if (!numbers) return '';
+  
+  // Начинаем с +7
+  let formatted = '+7';
+  
+  // Берем только цифры после +7
+  const digits = numbers.replace(/^\+?7?/, '').slice(0, 10);
+  
+  if (digits.length >= 1) {
+    formatted += ' (' + digits.slice(0, 3);
+  }
+  if (digits.length >= 4) {
+    formatted += ') ' + digits.slice(3, 6);
+  }
+  if (digits.length >= 7) {
+    formatted += '-' + digits.slice(6, 8);
+  }
+  if (digits.length >= 9) {
+    formatted += '-' + digits.slice(8, 10);
+  }
+  
+  return formatted;
+};
+
 // Гарантирует, что все поля формы имеют определенное значение (хотя бы пустую строку)
-const getInitialFormState = (settings) => ({
+const getInitialFormState = (settings: any) => ({
   address: settings?.address ?? '',
   contactPhone: settings?.contactPhone ?? '',
-  workingHours: settings?.workingHours ?? '',
+  workingHours: settings?.workingHours ?? '09:00-21:00',
   instagram: settings?.socialLinks?.instagram ?? '',
   vk: settings?.socialLinks?.vk ?? '',
   telegram: settings?.socialLinks?.telegram ?? '',
   whatsapp: settings?.socialLinks?.whatsapp ?? '',
 });
 
-export default function SettingsForm({ initialSettings }) {
+export default function SettingsForm({ initialSettings }: { initialSettings: any }) {
   const [form, setForm] = useState(getInitialFormState(initialSettings));
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -25,12 +165,24 @@ export default function SettingsForm({ initialSettings }) {
     setForm(getInitialFormState(initialSettings));
   }, [initialSettings]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+    
+    let formattedValue = value;
+    
+    // Форматирование для полей телефонов
+    if (name === 'contactPhone' || name === 'whatsapp') {
+      formattedValue = formatPhoneNumber(value);
+    }
+    
+    setForm(f => ({ ...f, [name]: formattedValue }));
   };
 
-  const handleSave = async (e) => {
+  const handleTimeRangeChange = (timeRange: string) => {
+    setForm(f => ({ ...f, workingHours: timeRange }));
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setMessage("");
@@ -63,7 +215,7 @@ export default function SettingsForm({ initialSettings }) {
       toast.success("Настройки успешно сохранены!");
       router.refresh();
 
-    } catch (err) {
+    } catch (err: any) {
       toast.error(err.message);
     } finally {
       setIsLoading(false);
@@ -82,9 +234,11 @@ export default function SettingsForm({ initialSettings }) {
             value={form.address}
             onChange={handleChange}
             className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="г. Москва, ул. Примерная, д. 1"
             required
           />
         </div>
+        
         <div>
           <label className="block mb-1 font-medium text-gray-700">Телефон</label>
           <input
@@ -93,50 +247,25 @@ export default function SettingsForm({ initialSettings }) {
             value={form.contactPhone}
             onChange={handleChange}
             className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="+7 (999) 123-45-67"
             required
           />
+          <p className="text-xs text-gray-500 mt-1">Формат: +7 (xxx) xxx-xx-xx</p>
         </div>
+        
         <div>
-          <label className="block mb-1 font-medium text-gray-700">Часы работы</label>
-          <input
-            type="text"
-            name="workingHours"
-            value={form.workingHours}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
-            required
-          />
+          <label className="block mb-3 font-medium text-gray-700">Часы работы</label>
+          <div className="p-4 border rounded-lg bg-gray-50">
+            <TimeRangePicker
+              value={form.workingHours}
+              onChange={handleTimeRangeChange}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              Текущее время: <span className="font-medium">{form.workingHours}</span>
+            </p>
+          </div>
         </div>
-        <div>
-          <label className="block mb-1 font-medium text-gray-700">Instagram</label>
-          <input
-            type="text"
-            name="instagram"
-            value={form.instagram}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 font-medium text-gray-700">ВКонтакте</label>
-          <input
-            type="text"
-            name="vk"
-            value={form.vk}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
-          />
-        </div>
-        <div>
-          <label className="block mb-1 font-medium text-gray-700">Telegram</label>
-          <input
-            type="text"
-            name="telegram"
-            value={form.telegram}
-            onChange={handleChange}
-            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
-          />
-        </div>
+        
         <div>
           <label className="block mb-1 font-medium text-gray-700">WhatsApp</label>
           <input
@@ -145,14 +274,66 @@ export default function SettingsForm({ initialSettings }) {
             value={form.whatsapp}
             onChange={handleChange}
             className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="+7 (999) 123-45-67"
           />
+          <p className="text-xs text-gray-500 mt-1">Формат: +7 (xxx) xxx-xx-xx</p>
         </div>
+        
+        <div>
+          <label className="block mb-1 font-medium text-gray-700">Instagram</label>
+          <input
+            type="url"
+            name="instagram"
+            value={form.instagram}
+            onChange={handleChange}
+            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="https://instagram.com/username"
+          />
+          <p className="text-xs text-gray-500 mt-1">Ссылка на профиль Instagram</p>
+        </div>
+        
+        <div>
+          <label className="block mb-1 font-medium text-gray-700">ВКонтакте</label>
+          <input
+            type="url"
+            name="vk"
+            value={form.vk}
+            onChange={handleChange}
+            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="https://vk.com/username"
+          />
+          <p className="text-xs text-gray-500 mt-1">Ссылка на страницу ВКонтакте</p>
+        </div>
+        
+        <div>
+          <label className="block mb-1 font-medium text-gray-700">Telegram</label>
+          <input
+            type="url"
+            name="telegram"
+            value={form.telegram}
+            onChange={handleChange}
+            className="w-full border rounded-lg px-3 py-2 bg-gray-50 focus:ring-2 focus:ring-blue-200 outline-none"
+            placeholder="https://t.me/username"
+          />
+          <p className="text-xs text-gray-500 mt-1">Ссылка на канал/чат Telegram</p>
+        </div>
+        
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors duration-200 font-medium disabled:bg-gray-400"
+          className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow transition-colors duration-200 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
-          {isLoading ? 'Сохранение...' : 'Сохранить'}
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Сохранение...
+            </div>
+          ) : (
+            'Сохранить'
+          )}
         </button>
       </form>
     </div>

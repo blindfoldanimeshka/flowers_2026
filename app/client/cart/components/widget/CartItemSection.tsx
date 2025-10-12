@@ -5,6 +5,7 @@ import CartItem from "../element/CartItem";
 import CartItemSkeleton from "../element/CartItemSkeleton";
 import { useCart } from "../../../../context/CartContext";
 import { products } from "../../../../data/products";
+import { motion, AnimatePresence } from "framer-motion";
 
 const CartItemSection = () => {
     const { cartItems, clearCart } = useCart();
@@ -18,7 +19,7 @@ const CartItemSection = () => {
         const timer = setTimeout(() => {
             setDisplayedItems(cartItems);
             setLoading(false);
-        }); // Небольшая задержка для плавной анимации
+        }, 100); // Небольшая задержка для плавной анимации
         
         return () => clearTimeout(timer);
     }, [cartItems]);
@@ -50,27 +51,38 @@ const CartItemSection = () => {
     // Мемоизируем список товаров
     const itemsList = useMemo(() => (
         <div className="grid gap-4 pb-4">
-            <div className="bg-[#FFE9E9] rounded-[15px] p-3 shadow-sm">
+            <motion.div 
+                className="bg-[#FFE9E9] rounded-[15px] p-3 shadow-sm"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+            >
                 <h2 className="text-lg font-bold mb-3">Товары в корзине</h2>
-                <div className="grid gap-3">
-                    {displayedItems.map((item, index) => (
-                        <div 
-                            key={item.id} 
-                            className="opacity-0 animate-fadeIn"
-                            style={{ animationDelay: `${index * 0.1}s` }}
-                        >
-                            <CartItem item={item} />
-                        </div>
-                    ))}
-                </div>
+                <AnimatePresence mode="wait">
+                    <motion.div className="grid gap-3">
+                        {displayedItems.map((item, index) => (
+                            <motion.div 
+                                key={item.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                                transition={{ duration: 0.3, delay: index * 0.05 }}
+                            >
+                                <CartItem item={item} />
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                </AnimatePresence>
                 {/* Кнопка очистки корзины */}
-                <button
+                <motion.button
                   onClick={clearCart}
                   className="mt-6 w-full bg-[#FFB6B6] text-white font-bold py-3 px-4 rounded-[15px] hover:bg-[#ff9e9e] transition-colors duration-300 text-base sm:text-lg shadow-md"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   Очистить корзину
-                </button>
-            </div>
+                </motion.button>
+            </motion.div>
         </div>
     ), [displayedItems, clearCart]);
     

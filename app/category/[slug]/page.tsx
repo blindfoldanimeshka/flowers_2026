@@ -4,6 +4,7 @@ import { useParams, notFound } from 'next/navigation';
 import Catalog from '../../client/components/catalog/Catalog';
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/models/Product';
+import { motion } from 'framer-motion';
 
 async function getProducts(categoryId: string, subcategoryId?: string): Promise<IProduct[]> {
   try {
@@ -61,7 +62,16 @@ export default function CategoryPage() {
   }, [slug]);
 
   if (loading) {
-    return <div className="flex justify-center p-10">Загрузка...</div>;
+    return (
+      <motion.div 
+        className="flex justify-center p-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+      >
+        Загрузка...
+      </motion.div>
+    );
   }
   
   if (!category) {
@@ -69,13 +79,18 @@ export default function CategoryPage() {
   }
   
   return (
-    <div className="mt-40">
+    <motion.div 
+      className="mt-40"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       <div className="max-w-screen-xl mx-auto px-4 pb-12">
         <Catalog 
           title={`Все товары в категории ${category.name}`} 
           categoryId={category._id}
         />
       </div>
-    </div>
+    </motion.div>
   );
 } 

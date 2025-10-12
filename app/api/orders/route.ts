@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
@@ -12,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
     const status = searchParams.get('status');
+    const deliveryType = searchParams.get('deliveryType'); // Новый параметр фильтрации
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     
@@ -28,6 +30,7 @@ export async function GET(request: NextRequest) {
     const filters = {
       email,
       status,
+      deliveryType, // Добавляем новый фильтр
       page,
       limit
     };
@@ -35,7 +38,7 @@ export async function GET(request: NextRequest) {
     // Получаем заказы из кэша
     const result = await getCachedOrders(filters);
     
-    console.log(`Получено заказов из кэша: ${result.orders.length}`);
+    console.log(`Получено заказов из кэша: ${result.orders.length}${deliveryType ? ` (тип: ${deliveryType})` : ''}`);
     
     return NextResponse.json(result, { status: 200 });
     
@@ -116,6 +119,12 @@ export async function POST(request: NextRequest) {
 
     await newOrder.save();
 
+    // Инвалидируем кэш заказов для обновления данных в real-time
+    invalidateOrdersCache();
+    invalidateOrderStatsCache();
+
+    console.log(`[НОВЫЙ ЗАКАЗ] Создан заказ #${orderNumber} на сумму ${totalAmount} ₽ для ${customer.name}`);
+
     return NextResponse.json({ 
       message: 'Заказ успешно создан', 
       order: newOrder 
@@ -123,10 +132,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Ошибка при создании заказа:', error);
-    if (error.name === 'ValidationError') {
-      return NextResponse.json({ error: error.message }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера', details: error.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Ошибка при создании заказа', details: error.message },
+      { status: 500 });
   }
 }
 

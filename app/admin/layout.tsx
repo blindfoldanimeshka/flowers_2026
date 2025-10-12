@@ -1,10 +1,12 @@
-'use client'
+'use client';
+export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import AdminNotifications from '@/components/AdminNotifications';
 
 export default function AdminLayout({
   children,
@@ -86,6 +88,9 @@ export default function AdminLayout({
         </div>
         <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
       </main>
+
+      {/* Компонент уведомлений для администратора */}
+      <AdminNotifications pollingInterval={30000} />
     </div>
   );
 } 

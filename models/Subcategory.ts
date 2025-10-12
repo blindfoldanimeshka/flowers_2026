@@ -10,7 +10,6 @@ const subcategorySchema = new mongoose.Schema({
   },
   slug: {
     type: String,
-    unique: true,
     lowercase: true,
     trim: true,
   },
@@ -18,6 +17,10 @@ const subcategorySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Category',
     required: [true, 'ID категории обязателен']
+  },
+  categoryNumId: {
+    type: Number,
+    required: [true, 'Числовой ID категории обязателен']
   },
   description: {
     type: String,

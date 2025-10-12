@@ -7,6 +7,11 @@ const ADMIN_DASHBOARD_PATH = '/admin/orders';
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  console.log('\n=== MIDDLEWARE DEBUG ===');
+  console.log('Pathname:', pathname);
+  console.log('Method:', request.method);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  
   // 1. Сначала ищем токен в cookie
   let token = request.cookies.get('auth_token')?.value;
 
@@ -50,8 +55,20 @@ export async function middleware(request: NextRequest) {
 
   // Защита API роутов
   if (pathname.startsWith('/api/')) {
+    // Временно пропускаем все запросы к категориям и подкатегориям
+    if (pathname.startsWith('/api/categories') || pathname.startsWith('/api/subcategories')) {
+      console.log('MIDDLEWARE: Allowing access to', pathname);
+      return NextResponse.next();
+    }
+    
     const isPublicApiRoute =
-      (request.method === 'GET' && (pathname.startsWith('/api/products') || pathname.startsWith('/api/categories') || pathname.startsWith('/api/settings'))) ||
+      (
+        request.method === 'GET' && (
+          pathname.startsWith('/api/products') ||
+          pathname.startsWith('/api/categories') ||
+          pathname.startsWith('/api/settings')
+        )
+      ) ||
       (request.method === 'POST' && pathname.startsWith('/api/orders'));
 
     if (isPublicApiRoute) {

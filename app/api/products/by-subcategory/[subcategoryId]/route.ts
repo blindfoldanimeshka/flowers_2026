@@ -1,30 +1,66 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import connect from '@/lib/db';
 import { Product } from '@/app/models/Product';
+import Subcategory from '@/models/Subcategory';
 
 // GET запрос для получения товаров по ID подкатегории
 export async function GET(request: NextRequest, { params }: { params: { subcategoryId: string } }) {
   try {
     await connect();
     
-    const subcategoryId = Number(params.subcategoryId);
+    const { subcategoryId } = params;
     
-    // Проверка валидности subcategoryId
-    if (isNaN(subcategoryId)) {
+    // Проверка валидности subcategoryId (ObjectId)
+    if (!mongoose.Types.ObjectId.isValid(subcategoryId)) {
       return NextResponse.json(
-        { error: 'Неверный формат ID подкатегории' },
+        { 
+          success: false,
+          error: 'Неверный формат ID подкатегории' 
+        },
         { status: 400 }
       );
     }
     
-    // Получаем все товары в подкатегории
-    const products = await Product.find({ subcategoryId });
+    // Проверяем, существует ли подкатегория
+    const subcategory = await Subcategory.findById(subcategoryId).populate('categoryId', 'name slug');
+    if (!subcategory) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Подкатегория не найдена' 
+        },
+        { status: 404 }
+      );
+    }
     
-    return NextResponse.json({ products }, { status: 200 });
-  } catch (error: any) {
+    // Получаем все товары в подкатегории
+    const products = await Product.find({ subcategoryId: new mongoose.Types.ObjectId(subcategoryId) })
+      .populate('categoryId', 'name slug')
+      .populate('subcategoryId', 'name slug')
+      .lean();
+    
+    return NextResponse.json({ 
+      success: true,
+      products,
+      subcategory: {
+        id: subcategory._id,
+        name: subcategory.name,
+        slug: subcategory.slug,
+        category: subcategory.categoryId
+      },
+      count: products.length
+    }, { status: 200 });
+  } catch (error: unknown) {
     console.error('Ошибка при получении товаров подкатегории:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return NextResponse.json(
-      { error: 'Ошибка при получении товаров подкатегории', details: error.message },
+      { 
+        success: false,
+        error: 'Ошибка при получении товаров подкатегории', 
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     );
   }

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
@@ -11,10 +12,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     const subcategoryId = searchParams.get('subcategoryId');
+    const categoryNumId = searchParams.get('categoryNumId');
+    const subcategoryNumId = searchParams.get('subcategoryNumId');
 
     const query: any = {};
+    
+    // Фильтрация по ObjectId категории
     if (categoryId) query.categoryId = categoryId;
+    
+    // Фильтрация по ObjectId подкатегории
     if (subcategoryId) query.subcategoryId = subcategoryId;
+    
+    // Фильтрация по числовому ID категории
+    if (categoryNumId) {
+      const numId = parseInt(categoryNumId, 10);
+      if (!isNaN(numId)) {
+        query.categoryNumId = numId;
+      }
+    }
+    
+    // Фильтрация по числовому ID подкатегории
+    if (subcategoryNumId) {
+      const numId = parseInt(subcategoryNumId, 10);
+      if (!isNaN(numId)) {
+        query.subcategoryNumId = numId;
+      }
+    }
+    
     console.log('PRODUCTS API QUERY:', query);
     const products = await Product.find(query).lean();
     console.log('PRODUCTS API RESULT:', products);
@@ -31,16 +55,30 @@ export async function POST(request: NextRequest) {
     await connect();
     const body = await request.json();
 
-    // Удаляем subcategoryId если оно пустое или null
-    if (!body.subcategoryId) {
-      delete body.subcategoryId;
-    } else {
-      body.subcategoryId = new mongoose.Types.ObjectId(body.subcategoryId);
-    }
-    
-    // Преобразуем categoryId
+    // Получаем категорию для числового ID
     if (body.categoryId) {
+      const category = await mongoose.model('Category').findById(body.categoryId);
+      if (!category) {
+        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      }
       body.categoryId = new mongoose.Types.ObjectId(body.categoryId);
+      body.categoryNumId = category.id; // Устанавливаем числовой ID категории
+    } else {
+      return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
+    }
+
+    // Обрабатываем подкатегорию, если она указана
+    if (body.subcategoryId) {
+      const subcategory = await mongoose.model('Subcategory').findById(body.subcategoryId);
+      if (!subcategory) {
+        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
+      }
+      body.subcategoryId = new mongoose.Types.ObjectId(body.subcategoryId);
+      body.subcategoryNumId = subcategory.categoryNumId; // Устанавливаем числовой ID подкатегории
+    } else {
+      // Удаляем subcategoryId если оно пустое или null
+      delete body.subcategoryId;
+      delete body.subcategoryNumId;
     }
 
     const newProduct = await Product.create(body);

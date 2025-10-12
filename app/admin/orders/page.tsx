@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import OrdersList from "./OrdersList";
 import { cookies } from 'next/headers';
 
@@ -5,7 +6,8 @@ async function getOrders() {
   const cookieStore = await cookies();
   const cookieString = typeof cookieStore.toString === 'function' ? cookieStore.toString() : '';
   
-  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`, {
+  const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/?api\/?$/, '');
+  const res = await fetch(`${baseUrl}/api/orders?limit=100`, {
     headers: {
       'Cookie': cookieString, // Передаем куки
     },
@@ -19,7 +21,7 @@ async function getOrders() {
   }
   
   const data = await res.json();
-  return data.orders; // Возвращаем именно массив заказов
+  return data.orders || []; // Возвращаем именно массив заказов
 }
 
 export default async function OrdersPage() {

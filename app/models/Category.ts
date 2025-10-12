@@ -1,43 +1,15 @@
-import mongoose, { Schema, models } from 'mongoose';
-
-// Интерфейс для подкатегории
-export interface ISubcategory {
-  _id?: string;
-  id: number;
-  name: string;
-  slug: string;
-  categoryId: number;
-}
-
-// Схема подкатегории
-const subcategorySchema = new Schema<ISubcategory>({
-  id: { 
-    type: Number, 
-    required: [true, 'ID подкатегории обязателен']
-  },
-  name: { 
-    type: String, 
-    required: [true, 'Название подкатегории обязательно'] 
-  },
-  slug: { 
-    type: String, 
-    required: [true, 'Slug подкатегории обязателен'],
-    unique: true
-  },
-  categoryId: { 
-    type: Number, 
-    required: [true, 'ID категории обязателен'] 
-  }
-});
+import mongoose, { Schema, Document, Types } from 'mongoose';
 
 // Интерфейс для категории
-export interface ICategory {
-  _id?: string;
+export interface ICategory extends Document<Types.ObjectId> {
+  _id: Types.ObjectId;
   id: number;
   name: string;
   slug: string;
   image?: string;
-  subcategories: ISubcategory[];
+  subcategories: Types.ObjectId[]; // Массив ID подкатегорий
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Схема категории
@@ -45,7 +17,14 @@ const categorySchema = new Schema<ICategory>(
   {
     id: {
       type: Number,
-      required: [true, 'ID категории обязателен']
+      required: [true, 'ID категории обязателен'],
+      unique: true,
+      validate: {
+        validator: function(v: any) {
+          return Number.isInteger(v) && v > 0;
+        },
+        message: (props: any) => `ID категории должен быть положительным целым числом, получено ${props.value}`
+      }
     },
     name: { 
       type: String, 
@@ -57,9 +36,13 @@ const categorySchema = new Schema<ICategory>(
       unique: true 
     },
     image: { 
-      type: String 
+      type: String,
+      default: ''
     },
-    subcategories: [subcategorySchema]
+    subcategories: [{ 
+      type: Schema.Types.ObjectId, 
+      ref: 'Subcategory' 
+    }] // Массив ObjectId с ref на 'Subcategory'
   },
   {
     timestamps: true
@@ -67,6 +50,7 @@ const categorySchema = new Schema<ICategory>(
 );
 
 // Экспорт модели категории
-export const Category = models.Category || mongoose.model('Category', categorySchema);
+const Category = mongoose.models.Category as mongoose.Model<ICategory> || mongoose.model<ICategory>('Category', categorySchema);
 
 export default Category;
+

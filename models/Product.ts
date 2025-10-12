@@ -5,7 +5,9 @@ export interface IProduct extends mongoose.Document {
   name: string;
   price: number;
   categoryId: mongoose.Types.ObjectId;
+  categoryNumId: number;
   subcategoryId?: mongoose.Types.ObjectId;
+  subcategoryNumId?: number;
   image: string;
   description: string;
   inStock: boolean;
@@ -30,9 +32,16 @@ const productSchema = new mongoose.Schema<IProduct>({
     ref: 'Category',
     required: [true, 'ID категории обязателен']
   },
+  categoryNumId: {
+    type: Number,
+    required: [true, 'Числовой ID категории обязателен']
+  },
   subcategoryId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Subcategory'
+  },
+  subcategoryNumId: {
+    type: Number
   },
   image: {
     type: String,
@@ -55,7 +64,9 @@ const productSchema = new mongoose.Schema<IProduct>({
 // Индексы для быстрого поиска
 productSchema.index({ name: 'text', description: 'text' });
 productSchema.index({ categoryId: 1 });
+productSchema.index({ categoryNumId: 1 });
 productSchema.index({ subcategoryId: 1 });
+productSchema.index({ subcategoryNumId: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ inStock: 1 });
 

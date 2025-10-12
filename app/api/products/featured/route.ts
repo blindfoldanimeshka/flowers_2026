@@ -3,6 +3,8 @@ import connect from '@/lib/db';
 import Product from '@/models/Product';
 import Subcategory from '@/models/Subcategory';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     await connect();
@@ -29,5 +31,4 @@ export async function GET() {
   }
 }
 
-// Этот маршрут может использовать только GET
-export const dynamic = 'force-dynamic'; 
+// Этот маршрут может использовать только GET 

@@ -4,6 +4,9 @@ import "./globals.css";
 import { CartProvider } from "./context/CartContext";
 import { StageWiseInit } from "./components/Stagewise";
 import CartButton from "./client/components/layout/CartButton";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import AdminNotifications from '@/components/AdminNotifications';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -16,6 +19,8 @@ export const metadata: Metadata = {
   title: "Floramix",
   description: "Цветы на любой вкус",
 };
+
+export const dynamic = 'force-dynamic';
 
 export default function RootLayout({
   children,
@@ -38,6 +43,21 @@ export default function RootLayout({
           <StageWiseInit />
           <CartButton />
           {children}
+          
+          {/* Toast контейнер для глобальных уведомлений */}
+          <ToastContainer 
+            position="top-right" 
+            autoClose={5000} 
+            hideProgressBar={false} 
+            newestOnTop 
+            closeOnClick 
+            pauseOnFocusLoss 
+            draggable 
+            pauseOnHover 
+          />
+          
+          {/* Уведомления для администраторов на всех страницах */}
+          <AdminNotifications pollingInterval={45000} />
         </CartProvider>
       </body>
     </html>

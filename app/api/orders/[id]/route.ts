@@ -1,6 +1,8 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
+import { invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 
 // GET запрос для получения конкретного заказа
 export async function GET(
@@ -57,20 +59,17 @@ export async function PATCH(
   context: { params: { id: string } }
 ) {
   try {
-    // Получаем информацию о пользователе из middleware
+    await dbConnect();
+    const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
     
+    // Только админы могут обновлять заказы
     if (userRole !== 'admin') {
       return NextResponse.json(
         { error: 'Доступ запрещен - требуется роль администратора' },
         { status: 403 }
       );
     }
-
-    await dbConnect();
-    
-    const { id } = await context.params;
-    const body = await request.json();
     
     if (!id) {
       return NextResponse.json(
@@ -79,6 +78,7 @@ export async function PATCH(
       );
     }
     
+    const body = await request.json();
     const updatedOrder = await Order.findByIdAndUpdate(
       id,
       body,
@@ -92,21 +92,14 @@ export async function PATCH(
       );
     }
     
+    // Инвалидируем кэш заказов
+    invalidateOrdersCache();
+    invalidateOrderStatsCache();
+    
     return NextResponse.json({ order: updatedOrder }, { status: 200 });
     
   } catch (error: any) {
     console.error('Ошибка при обновлении заказа:', error);
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return NextResponse.json(
-        { error: 'Ошибка валидации', details: validationErrors },
-        { status: 400 }
-      );
-    }
-    
     return NextResponse.json(
       { error: 'Ошибка при обновлении заказа', details: error.message },
       { status: 500 }
@@ -120,19 +113,17 @@ export async function DELETE(
   context: { params: { id: string } }
 ) {
   try {
-    // Получаем информацию о пользователе из middleware
+    await dbConnect();
+    const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
     
+    // Только админы могут удалять заказы
     if (userRole !== 'admin') {
       return NextResponse.json(
         { error: 'Доступ запрещен - требуется роль администратора' },
         { status: 403 }
       );
     }
-
-    await dbConnect();
-    
-    const { id } = await context.params;
     
     if (!id) {
       return NextResponse.json(
@@ -150,10 +141,16 @@ export async function DELETE(
       );
     }
     
-    return NextResponse.json(
-      { message: 'Заказ успешно удален', order: deletedOrder },
-      { status: 200 }
-    );
+    // Инвалидируем кэш заказов
+    invalidateOrdersCache();
+    invalidateOrderStatsCache();
+    
+    console.log(`[УДАЛЕНИЕ ЗАКАЗА] Администратор удалил заказ #${deletedOrder.orderNumber}`);
+    
+    return NextResponse.json({ 
+      message: 'Заказ успешно удален',
+      orderNumber: deletedOrder.orderNumber 
+    }, { status: 200 });
     
   } catch (error: any) {
     console.error('Ошибка при удалении заказа:', error);

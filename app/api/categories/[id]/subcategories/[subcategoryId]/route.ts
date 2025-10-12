@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import connect from '@/lib/db';
-import Category from '@/app/models/Category';
+import Category from '@/models/Category';
+import { revalidatePath } from 'next/cache';
+import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
 // GET запрос для получения конкретной подкатегории
 export async function GET(
@@ -30,10 +33,15 @@ export async function GET(
     }
     
     return NextResponse.json(subcategory, { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Ошибка при получении подкатегории с ID ${params.subcategoryId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return NextResponse.json(
-      { error: 'Ошибка при получении подкатегории', details: error.message },
+      { 
+        success: false,
+        error: 'Ошибка при получении подкатегории', 
+        details: errorMessage 
+      },
       { status: 500 }
     );
   }
@@ -93,21 +101,40 @@ export async function PUT(
     await category.save();
     
     return NextResponse.json(category.subcategories[subcategoryIndex], { status: 200 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error(`Ошибка при обновлении подкатегории с ID ${params.subcategoryId}:`, error);
     
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
+    if (error instanceof Error) {
+      if ('name' in error && error.name === 'ValidationError' && 'errors' in error) {
+        const validationErrors = Object.values(error.errors as Record<string, { message: string }>).map(
+          (err) => err.message
+        );
+        return NextResponse.json(
+          { 
+            success: false,
+            error: 'Ошибка валидации', 
+            details: validationErrors 
+          },
+          { status: 400 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Ошибка валидации', details: validationErrors },
-        { status: 400 }
+        { 
+          success: false,
+          error: 'Ошибка при обновлении подкатегории', 
+          details: error.message 
+        },
+        { status: 500 }
       );
     }
     
     return NextResponse.json(
-      { error: 'Ошибка при обновлении подкатегории', details: error.message },
+      { 
+        success: false,
+        error: 'Ошибка при обновлении подкатегории', 
+        details: 'Неизвестная ошибка' 
+      },
       { status: 500 }
     );
   }
@@ -122,40 +149,96 @@ export async function DELETE(
     await connect();
     
     const { id, subcategoryId } = params;
+    console.log('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
+    
+    // Проверяем валидность ID категории и подкатегории
+    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(subcategoryId)) {
+      return NextResponse.json(
+        { success: false, error: 'Некорректный формат ID' },
+        { status: 400 }
+      );
+    }
     
     // Находим категорию
     const category = await Category.findById(id);
     
     if (!category) {
+      console.log('[CATEGORY SUBCATEGORY DELETE] Category not found:', id);
       return NextResponse.json(
-        { error: 'Категория не найдена' },
+        { success: false, error: 'Категория не найдена' },
         { status: 404 }
       );
     }
     
-    // Удаляем подкатегорию из массива
+    // Находим индекс подкатегории в массиве
     const subcategoryIndex = category.subcategories.findIndex(
       (sc: any) => sc._id.toString() === subcategoryId
     );
     
     if (subcategoryIndex === -1) {
+      console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory not found in category:', subcategoryId);
       return NextResponse.json(
-        { error: 'Подкатегория не найдена' },
+        { success: false, error: 'Подкатегория не найдена' },
         { status: 404 }
       );
     }
     
+    // Step 1: Удаляем подкатегорию из коллекции Subcategory
+    const deletedSubcategory = await mongoose.model('Subcategory').deleteOne(
+      { _id: new mongoose.Types.ObjectId(subcategoryId) }
+    );
+    
+    if (deletedSubcategory.deletedCount === 0) {
+      console.error('[CATEGORY SUBCATEGORY DELETE] Failed to delete subcategory from collection');
+      return NextResponse.json(
+        { success: false, error: 'Не удалось удалить подкатегорию из коллекции' },
+        { status: 500 }
+      );
+    }
+    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Subcategory deleted from collection');
+    
+    // Step 2: Удаляем подкатегорию из массива категории
     category.subcategories.splice(subcategoryIndex, 1);
-    await category.save();
+    const savedCategory = await category.save();
+    
+    if (!savedCategory) {
+      console.error('[CATEGORY SUBCATEGORY DELETE] Failed to update category');
+      return NextResponse.json(
+        { success: false, error: 'Не удалось обновить категорию' },
+        { status: 500 }
+      );
+    }
+    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Category updated successfully');
+    
+    // Инвалидируем кэш
+    console.log('[CATEGORY SUBCATEGORY DELETE] Invalidating caches...');
+    revalidatePath('/admin/categories');
+    invalidateCategoriesCache();
+    invalidateSubcategoriesCache();
+    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Caches invalidated');
     
     return NextResponse.json(
-      { success: true, message: 'Подкатегория успешно удалена' },
+      { 
+        success: true, 
+        message: 'Подкатегория успешно удалена',
+        data: {
+          deletedSubcategoryId: subcategoryId,
+          categoryId: id
+        }
+      },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error(`Ошибка при удалении подкатегории с ID ${params.subcategoryId}:`, error);
+    
+  } catch (error: unknown) {
+    console.error(`[CATEGORY SUBCATEGORY DELETE] ❌ Error deleting subcategory ${params.subcategoryId}:`, error);
+    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+    
     return NextResponse.json(
-      { error: 'Ошибка при удалении подкатегории', details: error.message },
+      { 
+        success: false,
+        error: 'Ошибка при удалении подкатегории', 
+        details: errorMessage 
+      },
       { status: 500 }
     );
   }

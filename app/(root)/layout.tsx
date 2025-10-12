@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import ClientLayout from "../client/layout";
 
 export default function RootLayout({

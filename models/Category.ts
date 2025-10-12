@@ -2,6 +2,7 @@ import mongoose, { Document, Model, Schema } from 'mongoose';
 import slugify from 'slugify';
 
 export interface ICategory extends Document {
+  id: number;
   name: string;
   slug: string;
   subcategories: mongoose.Types.ObjectId[];
@@ -9,6 +10,15 @@ export interface ICategory extends Document {
 
 const CategorySchema: Schema<ICategory> = new Schema(
   {
+    id: {
+      type: Number,
+      required: [true, 'ID категории обязателен'],
+      unique: true,
+      validate: {
+        validator: (v: number) => Number.isInteger(v) && v > 0,
+        message: (props: any) => `ID категории должен быть положительным целым числом, получено ${props.value}`,
+      },
+    },
     name: {
       type: String,
       required: [true, 'Название категории обязательно'],
@@ -31,13 +41,12 @@ const CategorySchema: Schema<ICategory> = new Schema(
   }
 );
 
+// Pre-save хук для генерации slug только если он не установлен
 CategorySchema.pre('save', function (next) {
-  if (!this.isModified('name')) {
-    next();
-    return;
+  // Генерируем slug только если он не установлен и имя изменилось
+  if (!this.slug && this.isModified('name')) {
+    this.slug = slugify(this.name, { lower: true, strict: true });
   }
-  // @ts-ignore
-  this.slug = slugify(this.name, { lower: true, strict: true });
   next();
 });
 

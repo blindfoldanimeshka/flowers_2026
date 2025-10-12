@@ -5,31 +5,66 @@ import { existsSync } from 'fs';
 
 // POST запрос для загрузки изображений
 export async function POST(request: NextRequest) {
-  const data = await request.formData();
-  const file: File | null = data.get('file') as unknown as File;
-
-  if (!file) {
-    return NextResponse.json({ error: 'No file uploaded.' }, { status: 400 });
-  }
-
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-
-  const uploadDir = join(process.cwd(), 'public/uploads');
-  const filename = `${Date.now()}-${file.name.replace(/\s/g, '_')}`;
-  const path = join(uploadDir, filename);
-  
   try {
+    const data = await request.formData();
+    const file: File | null = data.get('file') as unknown as File;
+
+    if (!file) {
+      return NextResponse.json({ error: 'Файл не найден' }, { status: 400 });
+    }
+
+    // Проверка типа файла
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      return NextResponse.json({ 
+        error: 'Неподдерживаемый тип файла. Разрешены: JPEG, PNG, WebP, GIF' 
+      }, { status: 400 });
+    }
+
+    // Проверка размера файла (максимум 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ 
+        error: 'Размер файла превышает 10MB' 
+      }, { status: 400 });
+    }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const uploadDir = join(process.cwd(), 'public/uploads');
+    
+    // Генерируем безопасное имя файла
+    const timestamp = Date.now();
+    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const filename = `${timestamp}-${sanitizedName}`;
+    const path = join(uploadDir, filename);
+    
     // Убедимся, что директория для загрузки существует
-    await mkdir(uploadDir, { recursive: true });
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
 
     await writeFile(path, buffer);
     
     const publicUrl = `/uploads/${filename}`;
-    return NextResponse.json({ success: true, url: publicUrl });
+    
+    console.log(`Файл успешно загружен: ${publicUrl}`);
+    
+    return NextResponse.json({ 
+      success: true, 
+      url: publicUrl,
+      filename: filename,
+      size: file.size,
+      type: file.type
+    });
+
   } catch (error) {
-    console.error('Error saving file:', error);
-    return NextResponse.json({ error: 'Error saving file' }, { status: 500 });
+    console.error('Ошибка при загрузке файла:', error);
+    return NextResponse.json({ 
+      error: 'Ошибка при сохранении файла',
+      details: error instanceof Error ? error.message : 'Неизвестная ошибка'
+    }, { status: 500 });
   }
 }
 
@@ -46,7 +81,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { readdir } = await import('fs/promises');
+    const { readdir, stat } = await import('fs/promises');
     const uploadsDir = join(process.cwd(), 'public', 'uploads');
     
     if (!existsSync(uploadsDir)) {
@@ -55,14 +90,21 @@ export async function GET(request: NextRequest) {
 
     const files = await readdir(uploadsDir);
     const imageFiles = files.filter(file => 
-      /\.(jpg|jpeg|png|webp)$/i.test(file)
+      /\.(jpg|jpeg|png|webp|gif)$/i.test(file)
     );
 
-    const fileList = imageFiles.map(file => ({
-      name: file,
-      url: `/uploads/${file}`,
-      uploadedAt: new Date().toISOString() // В реальном проекте нужно хранить метаданные
-    }));
+    const fileList = await Promise.all(
+      imageFiles.map(async (file) => {
+        const filePath = join(uploadsDir, file);
+        const stats = await stat(filePath);
+        return {
+          name: file,
+          url: `/uploads/${file}`,
+          size: stats.size,
+          uploadedAt: stats.mtime.toISOString(),
+        };
+      })
+    );
 
     return NextResponse.json({ files: fileList }, { status: 200 });
 

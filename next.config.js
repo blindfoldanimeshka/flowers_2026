@@ -1,10 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    formats: ['image/webp'],
+    formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
-    domains: ['images.unsplash.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+    ],
+    // Отключаем оптимизацию для uploads
+    unoptimized: process.env.NODE_ENV === 'production',
+    // Добавляем лоадер для статических изображений
+    loader: process.env.NODE_ENV === 'production' ? 'custom' : 'default',
+    loaderFile: process.env.NODE_ENV === 'production' ? './image-loader.js' : undefined,
   },
   experimental: {
     optimisticClientCache: true,
@@ -19,34 +29,34 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  webpack: (config) => {
-    config.module.rules.push({
-      test: /\.(png|jpe?g|gif|svg|webp)$/i,
-      use: [
-        {
-          loader: 'image-webpack-loader',
-          options: {
-            mozjpeg: {
-              progressive: true,
-              quality: 65,
-            },
-            optipng: {
-              enabled: true,
-            },
-            pngquant: {
-              quality: [0.65, 0.90],
-              speed: 4,
-            },
-            gifsicle: {
-              interlaced: false,
-            },
-            webp: {
-              quality: 75,
-            },
+  // Добавляем обработку статических файлов
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: '/api/uploads/:path*',
+      },
+    ];
+  },
+  // Настраиваем headers для изображений
+  async headers() {
+    return [
+      {
+        source: '/api/uploads/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
           },
-        },
-      ],
-    });
+        ],
+      },
+    ];
+  },
+  webpack: (config, { dev, isServer }) => {
+    // Отключаем image-webpack-loader в production для статических файлов
+    if (!dev && !isServer) {
+      // Убираем image-webpack-loader для лучшей производительности
+    }
     return config;
   },
 };

@@ -47,4 +47,34 @@ export function setAuthCookie(response: NextResponse, token: string) {
 export function clearAuthCookie(response: NextResponse): NextResponse {
   response.cookies.delete('auth_token');
   return response;
+}
+
+// Проверка прав администратора
+export async function requireAdmin(request: NextRequest): Promise<{ success: boolean; user?: JWTPayload }> {
+  try {
+    // Получаем токен из cookie или заголовка
+    let token = request.cookies.get('auth_token')?.value;
+    
+    if (!token) {
+      const authHeader = request.headers.get('authorization');
+      if (authHeader?.startsWith('Bearer ')) {
+        token = authHeader.substring(7);
+      }
+    }
+
+    if (!token) {
+      return { success: false };
+    }
+
+    // Верифицируем токен
+    const payload = await verifyToken(token);
+    if (!payload || payload.role !== 'admin') {
+      return { success: false };
+    }
+
+    return { success: true, user: payload };
+  } catch (error) {
+    console.error('Ошибка при проверке прав администратора:', error);
+    return { success: false };
+  }
 } 

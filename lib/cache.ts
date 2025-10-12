@@ -98,16 +98,61 @@ export async function getCachedCategories() {
       console.log('[CACHE MISS] Загружаем категории из БД');
       
       const { default: dbConnect } = await import('@/lib/db');
+      const { default: Category } = await import('@/models/Category');
       const { default: Subcategory } = await import('@/models/Subcategory');
       
       await dbConnect();
       
-      const categories = await Subcategory.find().sort({ name: 1 });
+      // Получаем все категории и подкатегории параллельно
+      const [categories, allSubcategories] = await Promise.all([
+        Category.find().sort({ name: 1 }).lean(),
+        Subcategory.find().lean(),
+      ]);
       
-      return categories.map(cat => ({
-        ...cat.toObject(),
-        cached: false // Помечаем как не из кэша
-      }));
+      console.log('[CACHE] Найдено категорий:', categories.length);
+      console.log('[CACHE] Найдено подкатегорий:', allSubcategories.length);
+      
+      // Логируем все категории
+      categories.forEach(cat => {
+        console.log(`[CACHE] Категория: ${cat.name}, ID: ${cat._id}, subcategories:`, 
+          Array.isArray(cat.subcategories) ? cat.subcategories.map(id => id.toString()) : []);
+      });
+      
+      // Логируем все подкатегории
+      allSubcategories.forEach(sub => {
+        console.log(`[CACHE] Подкатегория: ${sub.name}, ID: ${sub._id}, categoryId: ${sub.categoryId}`);
+      });
+      
+      // Создаем карту подкатегорий для быстрого доступа
+      const subcategoryMap = new Map(
+        allSubcategories.map(sub => [sub._id.toString(), sub])
+      );
+      
+      // Вручную наполняем категории подкатегориями
+      const populatedCategories = categories.map(category => {
+        const categorySubcategories = Array.isArray(category.subcategories)
+          ? category.subcategories
+              .map(subId => {
+                const subIdStr = subId.toString();
+                const sub = subcategoryMap.get(subIdStr);
+                if (!sub) {
+                  console.log(`[CACHE] Подкатегория с ID ${subIdStr} не найдена для категории ${category.name}`);
+                }
+                return sub;
+              })
+              .filter(Boolean) // Убираем null, если подкатегория не найдена
+          : [];
+          
+        console.log(`[CACHE] Категория ${category.name} после наполнения имеет ${categorySubcategories.length} подкатегорий`);
+        
+        return {
+          ...category,
+          subcategories: categorySubcategories,
+          cached: false // Помечаем как не из кэша
+        };
+      });
+      
+      return populatedCategories;
     },
     ['categories'],
     {
@@ -222,6 +267,7 @@ export async function getCachedOrderStats() {
 export async function getCachedOrders(filters: {
   email?: string;
   status?: string;
+  deliveryType?: string; // Новый фильтр по типу доставки
   page?: number;
   limit?: number;
 } = {}) {
@@ -244,6 +290,11 @@ export async function getCachedOrders(filters: {
       
       if (filters.email) {
         query['customer.email'] = filters.email;
+      }
+      
+      // Добавляем фильтр по типу доставки
+      if (filters.deliveryType) {
+        query.paymentMethod = filters.deliveryType;
       }
       
       const page = filters.page || 1;
@@ -279,6 +330,7 @@ export async function getCachedOrders(filters: {
 // Кэш для подкатегорий
 export async function getCachedSubcategories(filters: {
   categoryId?: string;
+  categoryNumId?: number;
   isActive?: boolean;
 } = {}) {
   const cacheKey = createCacheKey('subcategories', filters);
@@ -296,6 +348,10 @@ export async function getCachedSubcategories(filters: {
       
       if (filters.categoryId) {
         query.categoryId = filters.categoryId;
+      }
+      
+      if (filters.categoryNumId !== undefined) {
+        query.categoryNumId = filters.categoryNumId;
       }
       
       if (filters.isActive !== undefined) {

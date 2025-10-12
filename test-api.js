@@ -54,7 +54,7 @@ async function testAuth() {
   log('\n🔐 Тестирование аутентификации...');
   const res = await makeRequest(`${BASE_URL}/auth/login`, {
     method: 'POST',
-    body: JSON.stringify({ username: 'admin', password: 'admin123' }),
+    body: JSON.stringify({ username: 'AdminFlows', password: 'KMFlAdmin' }),
   });
 
   const token = res.data?.token;

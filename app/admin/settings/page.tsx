@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { getCachedSettings } from "@/lib/cache";
 import SettingsForm from "./SettingsForm";
 

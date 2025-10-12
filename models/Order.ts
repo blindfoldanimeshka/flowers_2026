@@ -58,7 +58,8 @@ const orderSchema = new mongoose.Schema<IOrder>({
   orderNumber: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    index: true
   },
   customer: {
     name: {
@@ -140,7 +141,6 @@ orderSchema.pre('save', async function(next) {
 });
 
 // Индексы для быстрого поиска
-orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ 'customer.email': 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
