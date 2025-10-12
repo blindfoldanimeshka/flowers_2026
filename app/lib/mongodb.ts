@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://floweradmin:flowerpassword@localhost:27017/flowerdb?authSource=admin';
+const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-  throw new Error('Пожалуйста, определите MONGODB_URI в .env файле');
+  throw new Error('Пожалуйста, определите MONGODB_URI в переменных окружения Vercel');
 }
 
 // Глобальная переменная для кэширования соединения
@@ -14,31 +14,28 @@ if (!cached.mongoose) {
 }
 
 /**
- * Функция для подключения к MongoDB
+ * Функция для подключения к MongoDB Atlas
  */
 async function connectDB() {
   if (cached.mongoose.conn) {
-    console.log('Используется существующее подключение к MongoDB');
+    console.log('Используется существующее подключение к MongoDB Atlas');
     return cached.mongoose.conn;
   }
 
   if (!cached.mongoose.promise) {
     const opts = {
       bufferCommands: false,
-      authSource: 'admin',
-      user: 'floweradmin',
-      pass: 'flowerpassword',
-      dbName: 'flowerdb'
+      // Для MongoDB Atlas не нужно указывать user/pass отдельно - они в URI
     };
 
-    console.log('Подключение к MongoDB...');
+    console.log('Подключение к MongoDB Atlas...');
     cached.mongoose.promise = mongoose.connect(MONGODB_URI, opts)
       .then((mongoose) => {
-        console.log('Подключение к MongoDB успешно установлено');
+        console.log('Подключение к MongoDB Atlas успешно установлено');
         return mongoose;
       })
       .catch((error) => {
-        console.error('Ошибка подключения к MongoDB:', error);
+        console.error('Ошибка подключения к MongoDB Atlas:', error);
         throw error;
       });
   }

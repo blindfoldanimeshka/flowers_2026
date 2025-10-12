@@ -10,18 +10,6 @@ const nextConfig = {
         hostname: 'images.unsplash.com',
       },
     ],
-    // Отключаем оптимизацию для uploads
-    unoptimized: process.env.NODE_ENV === 'production',
-    // Добавляем лоадер для статических изображений
-    loader: process.env.NODE_ENV === 'production' ? 'custom' : 'default',
-    loaderFile: process.env.NODE_ENV === 'production' ? './image-loader.js' : undefined,
-  },
-  experimental: {
-    optimisticClientCache: true,
-    serverMinification: true,
-  },
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
   },
   eslint: {
     ignoreDuringBuilds: true,
@@ -37,27 +25,6 @@ const nextConfig = {
         destination: '/api/uploads/:path*',
       },
     ];
-  },
-  // Настраиваем headers для изображений
-  async headers() {
-    return [
-      {
-        source: '/api/uploads/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-    ];
-  },
-  webpack: (config, { dev, isServer }) => {
-    // Отключаем image-webpack-loader в production для статических файлов
-    if (!dev && !isServer) {
-      // Убираем image-webpack-loader для лучшей производительности
-    }
-    return config;
   },
 };
 
