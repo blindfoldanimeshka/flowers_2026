@@ -23,7 +23,7 @@ if (MONGODB_URI && MONGODB_URI.includes('@mongodb:')) {
   }
 }
 
-console.log('MONGODB_URI:', MONGODB_URI);
+// MONGODB_URI скрыт для безопасности
 
 if (!MONGODB_URI) {
   throw new Error('Пожалуйста, определите MONGODB_URI в файле .env');
@@ -49,7 +49,7 @@ async function connect() {
       authSource: 'admin'
     };
     console.log('Connecting to MongoDB with options:', options);
-    console.log('Using MongoDB URI:', MONGODB_URI);
+    // MongoDB URI скрыт для безопасности
     cached.promise = mongoose.connect(MONGODB_URI as string, options).then((mongooseInstance) => {
       console.log('Подключено к MongoDB');
       return mongooseInstance;

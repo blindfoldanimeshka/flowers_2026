@@ -45,7 +45,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       return orders;
     }
     const currentTab = tabs.find(tab => tab.id === activeTab);
-    return orders.filter(order => order.paymentMethod === currentTab?.deliveryType);
+    return orders.filter(order => order.fulfillmentMethod === currentTab?.deliveryType);
   }, [orders, activeTab]);
 
   // Callback для обработки новых заказов
@@ -126,8 +126,8 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
   const orderCounts = useMemo(() => {
     return {
       all: orders.length,
-      delivery: orders.filter((order: Order) => order.paymentMethod === 'delivery').length,
-      pickup: orders.filter((order: Order) => order.paymentMethod === 'pickup').length,
+      delivery: orders.filter((order: Order) => order.fulfillmentMethod === 'delivery').length,
+      pickup: orders.filter((order: Order) => order.fulfillmentMethod === 'pickup').length,
     };
   }, [orders]);
 
@@ -235,11 +235,11 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                   </td>
                   <td className="p-3 border-t border-b border-gray-200">
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      order.paymentMethod === 'delivery' 
+                      order.fulfillmentMethod === 'delivery' 
                         ? 'bg-blue-100 text-blue-800' 
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {order.paymentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}
+                      {order.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}
                     </span>
                   </td>
                   <td className="p-3 border-t border-b border-gray-200 font-semibold text-gray-900">
@@ -330,7 +330,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                 <strong>Общая сумма:</strong> {selectedOrder.totalAmount} ₽
               </div>
               <div>
-                <strong>Способ получения:</strong> {selectedOrder.paymentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}
+                <strong>Способ получения:</strong> {selectedOrder.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}
               </div>
               <div>
                 <strong>Статус:</strong> {statuses[selectedOrder.status]}

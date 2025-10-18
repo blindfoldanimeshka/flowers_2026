@@ -17,8 +17,15 @@
 
 #### Шаг 3: Настрой доступ
 1. В разделе "Network Access" нажми "Add IP Address"
-2. Выбери "Allow Access from Anywhere" (0.0.0.0/0)
-3. Нажми "Confirm"
+2. **Для разработки:** Выбери "Allow Access from Anywhere" (0.0.0.0/0)
+3. **Для продакшена:** Добавь только IP-адреса Vercel и твоих серверов
+4. Нажми "Confirm"
+
+**⚠️ ВАЖНО ДЛЯ ПРОДАКШЕНА:**
+- 0.0.0.0/0 разрешает доступ с любого IP-адреса (небезопасно для продакшена)
+- Для продакшена используй только IP-адреса Vercel или настрой VPN/VPC
+- Получи IP-адреса Vercel: https://vercel.com/docs/concepts/edge-network/regions
+- Или используй MongoDB Atlas Private Endpoints для максимальной безопасности
 
 #### Шаг 4: Создай пользователя
 1. В разделе "Database Access" нажми "Add New Database User"
@@ -49,13 +56,13 @@ npm run generate-secrets
 
 Или сгенерируй вручную:
 ```bash
-# JWT Secret (64 символа)
+# JWT Secret (~44 символа при base64-кодировании)
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
-# Session Secret (64 символа)
+# Session Secret (~44 символа при base64-кодировании)
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
-# NextAuth Secret (32 символа)
+# NextAuth Secret (~32 символа при base64-кодировании)
 node -e "console.log(require('crypto').randomBytes(24).toString('base64'))"
 ```
 

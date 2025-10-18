@@ -9,6 +9,7 @@ import Subcategory from '@/models/Subcategory';
 import Category from '@/models/Category'; // Added import for Category
 import { getCachedSubcategories, invalidateSubcategoriesCache } from '@/lib/cache';
 import { invalidateCategoriesCache } from '@/lib/cache'; // Added import for invalidateCategoriesCache
+import mongoose from 'mongoose';
 
 // Создание новой подкатегории
 export async function createSubcategory(formData: FormData) {
@@ -123,52 +124,68 @@ export async function updateSubcategory(id: string, formData: FormData) {
     
     // Если изменилась категория, обновляем связи
     if (currentSubcategory.categoryId.toString() !== categoryId) {
-      // Получаем новую категорию для числового ID
-      const newCategory = await Category.findById(categoryId);
-      if (!newCategory) {
+      const session = await mongoose.startSession();
+      
+      try {
+        await session.withTransaction(async () => {
+          // Получаем новую категорию для числового ID
+          const newCategory = await Category.findById(categoryId).session(session);
+          if (!newCategory) {
+            throw new Error('Новая категория не найдена');
+          }
+          
+          // Удаляем подкатегорию из старой категории
+          await Category.findByIdAndUpdate(
+            currentSubcategory.categoryId,
+            { $pull: { subcategories: id } },
+            { session }
+          );
+          
+          // Добавляем подкатегорию в новую категорию
+          await Category.findByIdAndUpdate(
+            categoryId,
+            { $addToSet: { subcategories: id } },
+            { session }
+          );
+          
+          // Обновляем подкатегорию с новым числовым ID категории
+          const subcategory = await Subcategory.findByIdAndUpdate(
+            id,
+            {
+              name,
+              slug,
+              categoryId,
+              categoryNumId: newCategory.id, // Обновляем числовой ID категории
+              description,
+              image,
+              isActive
+            },
+            { new: true, runValidators: true, session }
+          );
+          
+          return subcategory;
+        });
+        
+        // Инвалидируем кэш и обновляем страницы
+        invalidateSubcategoriesCache();
+        invalidateCategoriesCache();
+        revalidatePath('/admin/subcategories');
+        revalidatePath('/admin/categories');
+        
+        return {
+          success: true,
+          subcategory: await Subcategory.findById(id)
+        };
+        
+      } catch (error: any) {
+        console.error('Ошибка при обновлении подкатегории:', error);
         return {
           success: false,
-          error: 'Новая категория не найдена'
+          error: 'Ошибка при обновлении подкатегории'
         };
+      } finally {
+        await session.endSession();
       }
-      
-      // Удаляем подкатегорию из старой категории
-      await Category.findByIdAndUpdate(
-        currentSubcategory.categoryId,
-        { $pull: { subcategories: id } }
-      );
-      
-      // Добавляем подкатегорию в новую категорию
-      await Category.findByIdAndUpdate(
-        categoryId,
-        { $addToSet: { subcategories: id } }
-      );
-      
-      // Обновляем подкатегорию с новым числовым ID категории
-      const subcategory = await Subcategory.findByIdAndUpdate(
-        id,
-        {
-          name,
-          slug,
-          categoryId,
-          categoryNumId: newCategory.id, // Обновляем числовой ID категории
-          description,
-          image,
-          isActive
-        },
-        { new: true, runValidators: true }
-      );
-      
-      // Инвалидируем кэш и обновляем страницы
-      invalidateSubcategoriesCache();
-      invalidateCategoriesCache();
-      revalidatePath('/admin/subcategories');
-      revalidatePath('/admin/categories');
-      
-      return {
-        success: true,
-        subcategory
-      };
     } else {
       // Если категория не изменилась, просто обновляем подкатегорию
       const subcategory = await Subcategory.findByIdAndUpdate(
@@ -230,20 +247,35 @@ export async function updateSubcategory(id: string, formData: FormData) {
 
 // Удаление подкатегории
 export async function deleteSubcategory(id: string) {
+  const session = await mongoose.startSession();
+  
   try {
     await dbConnect();
     
-    const subcategory = await Subcategory.findByIdAndDelete(id);
-    
-    if (!subcategory) {
-      return {
-        success: false,
-        error: 'Подкатегория не найдена'
-      };
-    }
+    await session.withTransaction(async () => {
+      // Получаем подкатегорию перед удалением, чтобы узнать родительскую категорию
+      const subcategory = await Subcategory.findById(id).session(session);
+      
+      if (!subcategory) {
+        throw new Error('Подкатегория не найдена');
+      }
+      
+      // Удаляем подкатегорию
+      await Subcategory.findByIdAndDelete(id, { session });
+      
+      // Удаляем ID подкатегории из родительской категории
+      if (subcategory.categoryId) {
+        await Category.findByIdAndUpdate(
+          subcategory.categoryId,
+          { $pull: { subcategories: id } },
+          { new: true, session }
+        );
+      }
+    });
     
     // Инвалидируем кэш и обновляем страницы
     invalidateSubcategoriesCache();
+    invalidateCategoriesCache();
     revalidatePath('/admin/subcategories');
     revalidatePath('/admin/categories');
     
@@ -258,6 +290,8 @@ export async function deleteSubcategory(id: string) {
       success: false,
       error: 'Ошибка при удалении подкатегории'
     };
+  } finally {
+    await session.endSession();
   }
 }
 

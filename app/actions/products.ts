@@ -29,7 +29,7 @@ export async function createProduct(formData: FormData) {
       };
     }
     
-    if (price <= 0) {
+    if (Number.isNaN(price) || price <= 0) {
       return {
         success: false,
         error: 'Цена должна быть больше нуля'
@@ -99,6 +99,35 @@ export async function updateProduct(formData: FormData) {
       return {
         success: false,
         error: 'ID товара обязателен'
+      };
+    }
+    
+    // Валидация обязательных полей (как в createProduct)
+    if (!name || !name.trim()) {
+      return {
+        success: false,
+        error: 'Название товара обязательно'
+      };
+    }
+    
+    if (!image || !image.trim()) {
+      return {
+        success: false,
+        error: 'Изображение товара обязательно'
+      };
+    }
+    
+    if (!categoryId || !categoryId.trim()) {
+      return {
+        success: false,
+        error: 'ID категории обязателен'
+      };
+    }
+    
+    if (Number.isNaN(price) || price <= 0) {
+      return {
+        success: false,
+        error: 'Цена должна быть больше нуля'
       };
     }
     

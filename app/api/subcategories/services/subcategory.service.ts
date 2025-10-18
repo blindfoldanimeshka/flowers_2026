@@ -107,7 +107,12 @@ export const SubcategoryService = {
     if (description !== undefined) updateData.description = description;
     if (image !== undefined) updateData.image = image;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (categoryId) updateData.categoryId = categoryId as any;
+    if (categoryId) {
+      // Convert string to ObjectId if necessary
+      updateData.categoryId = typeof categoryId === 'string' 
+        ? new Types.ObjectId(categoryId) 
+        : categoryId;
+    }
     
     updateData.updatedAt = new Date();
 

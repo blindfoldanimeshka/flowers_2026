@@ -1,6 +1,3 @@
-export const dynamic = 'force-dynamic';
-
-// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 'use server';
 
 import { revalidatePath } from 'next/cache';

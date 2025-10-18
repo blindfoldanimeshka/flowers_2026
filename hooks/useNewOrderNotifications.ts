@@ -13,7 +13,8 @@ interface NewOrder {
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
-  paymentMethod: 'cash' | 'card' | 'online' | 'delivery' | 'pickup';
+  paymentMethod: 'cash' | 'card' | 'online';
+  fulfillmentMethod: 'delivery' | 'pickup';
   createdAt: string;
   updatedAt: string;
   items: Array<{
@@ -97,8 +98,8 @@ export function useNewOrderNotifications({
             .map(item => `${item.name} x${item.quantity}`)
             .join(', ');
           
-          const deliveryEmoji = order.paymentMethod === 'delivery' ? '🚚' : '🏪';
-          const deliveryText = order.paymentMethod === 'delivery' ? 'Доставка' : 'Самовывоз';
+          const deliveryEmoji = order.fulfillmentMethod === 'delivery' ? '🚚' : '🏪';
+          const deliveryText = order.fulfillmentMethod === 'delivery' ? 'Доставка' : 'Самовывоз';
           
           toast.success(
             `🛒 Новый заказ #${order.orderNumber}!\n👤 ${order.customer.name}\n📦 ${itemsText}\n${deliveryEmoji} ${deliveryText}\n💰 ${order.totalAmount} ₽`,

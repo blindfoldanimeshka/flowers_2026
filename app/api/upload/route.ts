@@ -3,6 +3,15 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
+// Функция для определения директории загрузки
+function resolveUploadDir(): string {
+  // На Vercel используем /tmp, локально - public/uploads
+  if (process.env.VERCEL) {
+    return '/tmp/uploads';
+  }
+  return join(process.cwd(), 'public/uploads');
+}
+
 // POST запрос для загрузки изображений
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +41,7 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = join(process.cwd(), 'public/uploads');
+    const uploadDir = resolveUploadDir();
     
     // Генерируем безопасное имя файла
     const timestamp = Date.now();
@@ -82,7 +91,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { readdir, stat } = await import('fs/promises');
-    const uploadsDir = join(process.cwd(), 'public', 'uploads');
+    const uploadsDir = resolveUploadDir();
     
     if (!existsSync(uploadsDir)) {
       return NextResponse.json({ files: [] }, { status: 200 });

@@ -20,6 +20,15 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     setIsUploading(true);
     if (onUploadStart) onUploadStart();
 
+    // Проверка размера файла (10MB лимит)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setError('Файл должен быть не более 10MB');
+      setIsUploading(false);
+      if (onUploadEnd) onUploadEnd(false);
+      return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -30,8 +39,24 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to upload file');
+        let errorMessage = 'Ошибка загрузки файла';
+        try {
+          // Клонируем ответ для безопасного чтения
+          const responseClone = res.clone();
+          const contentType = res.headers.get('content-type');
+          
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+          } else {
+            const textError = await responseClone.text();
+            errorMessage = textError || errorMessage;
+          }
+        } catch (parseError) {
+          // Если и JSON и текст не получается, используем стандартное сообщение
+          errorMessage = `HTTP ${res.status}: ${res.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
       
       const data = await res.json();
@@ -41,7 +66,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
 
     } catch (err: any) {
       console.error('Upload error:', err);
-      setError(err.message || 'Upload failed');
+      setError(err.message || 'Ошибка загрузки');
       if (onUploadEnd) onUploadEnd(false);
     } finally {
       setIsUploading(false);

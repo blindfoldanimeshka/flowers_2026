@@ -5,7 +5,52 @@ export const dynamic = 'force-dynamic';
 
 import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
-import PaymentSettings from '@/models/PaymentSettings';
+import PaymentSettings, { IPaymentSettings } from '@/models/PaymentSettings';
+
+// Type guard для безопасной обработки ошибок
+function isError(error: unknown): error is Error {
+  return error instanceof Error;
+}
+
+// Интерфейс для обновления настроек платежей (без секретных ключей)
+interface PaymentSettingsUpdate {
+  isEnabled: boolean;
+  currency: string;
+  
+  stripe: {
+    enabled: boolean;
+    publishableKey: string;
+    // Секретные ключи загружаются из переменных окружения
+  };
+  
+  yookassa: {
+    enabled: boolean;
+    shopId: string;
+    // Секретные ключи загружаются из переменных окружения
+  };
+  
+  sberbank: {
+    enabled: boolean;
+    merchantId: string;
+    // Секретные ключи загружаются из переменных окружения
+  };
+  
+  cashOnDelivery: {
+    enabled: boolean;
+    minAmount: number;
+    maxAmount: number;
+  };
+  
+  cardOnDelivery: {
+    enabled: boolean;
+    minAmount: number;
+    maxAmount: number;
+  };
+  
+  taxRate: number;
+  deliveryFee: number;
+  freeDeliveryThreshold: number;
+}
 
 // Получение настроек платежей
 export async function getPaymentSettings() {
@@ -19,8 +64,9 @@ export async function getPaymentSettings() {
       settings
     };
     
-  } catch (error: any) {
-    console.error('Ошибка при получении настроек платежей:', error);
+  } catch (error: unknown) {
+    const errorMessage = isError(error) ? error.message : String(error);
+    console.error('Ошибка при получении настроек платежей:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении настроек платежей'
@@ -35,28 +81,27 @@ export async function updatePaymentSettings(formData: FormData) {
     
     const settings = await PaymentSettings.getSettings();
     
-    // Получаем данные из формы
-    const updateData: any = {
+    // Получаем данные из формы (БЕЗ секретных ключей)
+    const updateData: PaymentSettingsUpdate = {
       isEnabled: formData.get('isEnabled') === 'true',
       currency: formData.get('currency') as string,
       
       stripe: {
         enabled: formData.get('stripeEnabled') === 'true',
-        publishableKey: formData.get('stripePublishableKey') as string,
-        secretKey: formData.get('stripeSecretKey') as string,
-        webhookSecret: formData.get('stripeWebhookSecret') as string
+        publishableKey: formData.get('stripePublishableKey') as string
+        // secretKey и webhookSecret загружаются из переменных окружения
       },
       
       yookassa: {
         enabled: formData.get('yookassaEnabled') === 'true',
-        shopId: formData.get('yookassaShopId') as string,
-        secretKey: formData.get('yookassaSecretKey') as string
+        shopId: formData.get('yookassaShopId') as string
+        // secretKey загружается из переменных окружения
       },
       
       sberbank: {
         enabled: formData.get('sberbankEnabled') === 'true',
-        merchantId: formData.get('sberbankMerchantId') as string,
-        apiKey: formData.get('sberbankApiKey') as string
+        merchantId: formData.get('sberbankMerchantId') as string
+        // apiKey загружается из переменных окружения
       },
       
       cashOnDelivery: {
@@ -76,10 +121,60 @@ export async function updatePaymentSettings(formData: FormData) {
       freeDeliveryThreshold: parseFloat(formData.get('freeDeliveryThreshold') as string) || 3000
     };
     
+    // Валидируем обязательные переменные окружения для включенных платежных систем
+    if (updateData.stripe.enabled && !process.env.STRIPE_SECRET_KEY) {
+      return {
+        success: false,
+        error: 'STRIPE_SECRET_KEY environment variable is required when Stripe is enabled'
+      };
+    }
+    if (updateData.stripe.enabled && !process.env.STRIPE_WEBHOOK_SECRET) {
+      return {
+        success: false,
+        error: 'STRIPE_WEBHOOK_SECRET environment variable is required when Stripe is enabled'
+      };
+    }
+    if (updateData.yookassa.enabled && !process.env.YOOKASSA_SECRET_KEY) {
+      return {
+        success: false,
+        error: 'YOOKASSA_SECRET_KEY environment variable is required when Yookassa is enabled'
+      };
+    }
+    if (updateData.sberbank.enabled && !process.env.SBERBANK_API_KEY) {
+      return {
+        success: false,
+        error: 'SBERBANK_API_KEY environment variable is required when Sberbank is enabled'
+      };
+    }
+
+    // Загружаем секретные ключи из переменных окружения только для включенных провайдеров
+    const secureUpdateData = {
+      ...updateData,
+      stripe: {
+        ...updateData.stripe,
+        ...(updateData.stripe.enabled && {
+          secretKey: process.env.STRIPE_SECRET_KEY,
+          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET
+        })
+      },
+      yookassa: {
+        ...updateData.yookassa,
+        ...(updateData.yookassa.enabled && {
+          secretKey: process.env.YOOKASSA_SECRET_KEY
+        })
+      },
+      sberbank: {
+        ...updateData.sberbank,
+        ...(updateData.sberbank.enabled && {
+          apiKey: process.env.SBERBANK_API_KEY
+        })
+      }
+    };
+    
     // Обновляем настройки
     const updatedSettings = await PaymentSettings.findByIdAndUpdate(
       settings._id,
-      updateData,
+      secureUpdateData,
       { new: true, runValidators: true }
     );
     
@@ -90,11 +185,12 @@ export async function updatePaymentSettings(formData: FormData) {
       settings: updatedSettings
     };
     
-  } catch (error: any) {
-    console.error('Ошибка при обновлении настроек платежей:', error);
+  } catch (error: unknown) {
+    const errorMessage = isError(error) ? error.message : String(error);
+    console.error('Ошибка при обновлении настроек платежей:', errorMessage);
     
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
+    if (isError(error) && error.name === 'ValidationError') {
+      const validationErrors = Object.values((error as any).errors).map(
         (err: any) => err.message
       );
       return {
@@ -190,8 +286,9 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
       freeDeliveryThreshold: settings.freeDeliveryThreshold
     };
     
-  } catch (error: any) {
-    console.error('Ошибка при получении способов оплаты:', error);
+  } catch (error: unknown) {
+    const errorMessage = isError(error) ? error.message : String(error);
+    console.error('Ошибка при получении способов оплаты:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении способов оплаты'
@@ -202,6 +299,12 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
 // Обработка платежа
 export async function processPayment(orderId: string, paymentMethod: string, paymentData?: any) {
   try {
+    // Создаем AbortController для timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 8000); // 8 секунд timeout
+    
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/payments/process`, {
       method: 'POST',
       headers: {
@@ -212,7 +315,11 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
         paymentMethod,
         paymentData
       }),
+      signal: controller.signal
     });
+    
+    // Очищаем timeout после завершения запроса
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = await response.json();
@@ -231,8 +338,18 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
       ...result
     };
 
-  } catch (error: any) {
-    console.error('Ошибка при обработке платежа:', error);
+  } catch (error: unknown) {
+    const errorMessage = isError(error) ? error.message : String(error);
+    console.error('Ошибка при обработке платежа:', errorMessage);
+    
+    // Проверяем, является ли ошибка timeout
+    if (isError(error) && error.name === 'AbortError') {
+      return {
+        success: false,
+        error: 'Превышено время ожидания обработки платежа. Попробуйте еще раз.'
+      };
+    }
+    
     return {
       success: false,
       error: 'Ошибка при обработке платежа'

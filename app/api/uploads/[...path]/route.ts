@@ -3,13 +3,22 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 
+// Функция для определения директории загрузки
+function resolveUploadDir(): string {
+  // На Vercel используем /tmp, локально - public/uploads
+  if (process.env.VERCEL) {
+    return '/tmp/uploads';
+  }
+  return join(process.cwd(), 'public/uploads');
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
   try {
     const filePath = params.path.join('/');
-    const fullPath = join(process.cwd(), 'public', 'uploads', filePath);
+    const fullPath = join(resolveUploadDir(), filePath);
 
     // Проверяем безопасность пути
     if (!filePath || filePath.includes('..') || !existsSync(fullPath)) {

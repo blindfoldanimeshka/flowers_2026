@@ -21,7 +21,8 @@ export interface Order {
   totalAmount: number;
   status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
-  paymentMethod: 'cash' | 'card' | 'online' | 'delivery' | 'pickup';
+  paymentMethod: 'cash' | 'card' | 'online';
+  fulfillmentMethod: 'delivery' | 'pickup';
   deliveryDate?: string;
   deliveryTime?: string;
   notes?: string;

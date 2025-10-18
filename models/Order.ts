@@ -21,6 +21,7 @@ export interface IOrder extends mongoose.Document {
   status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'delivered' | 'cancelled';
   paymentStatus: 'pending' | 'paid' | 'failed';
   paymentMethod: 'cash' | 'card' | 'online';
+  fulfillmentMethod: 'delivery' | 'pickup';
   deliveryDate?: Date;
   deliveryTime?: string;
   notes?: string;
@@ -79,8 +80,20 @@ const orderSchema = new mongoose.Schema<IOrder>({
     },
     address: {
       type: String,
-      required: [true, 'Адрес доставки обязателен'],
-      trim: true
+      trim: true,
+      required: function(this: IOrder) {
+        return this.fulfillmentMethod === 'delivery';
+      },
+      validate: {
+        validator: function(this: IOrder, value: string) {
+          // Адрес обязателен только для доставки
+          if (this.fulfillmentMethod === 'delivery') {
+            return value && value.trim().length > 0;
+          }
+          return true; // Для самовывоза адрес не обязателен
+        },
+        message: 'Адрес доставки обязателен для доставки'
+      }
     }
   },
   items: [orderItemSchema],
@@ -92,7 +105,17 @@ const orderSchema = new mongoose.Schema<IOrder>({
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'],
-    default: 'pending'
+    default: 'pending',
+    validate: {
+      validator: function(this: IOrder, value: string) {
+        // Статус 'delivering' недопустим для самовывоза
+        if (this.fulfillmentMethod === 'pickup' && value === 'delivering') {
+          return false;
+        }
+        return true;
+      },
+      message: 'Статус "доставляется" недопустим для самовывоза'
+    }
   },
   paymentStatus: {
     type: String,
@@ -104,11 +127,42 @@ const orderSchema = new mongoose.Schema<IOrder>({
     enum: ['cash', 'card', 'online'],
     required: [true, 'Способ оплаты обязателен']
   },
+  fulfillmentMethod: {
+    type: String,
+    enum: ['delivery', 'pickup'],
+    required: [true, 'Способ получения обязателен']
+  },
   deliveryDate: {
-    type: Date
+    type: Date,
+    required: function(this: IOrder) {
+      return this.fulfillmentMethod === 'delivery';
+    },
+    validate: {
+      validator: function(this: IOrder, value: Date) {
+        // Дата доставки обязательна только для доставки
+        if (this.fulfillmentMethod === 'delivery') {
+          return value != null;
+        }
+        return true; // Для самовывоза дата не обязательна
+      },
+      message: 'Дата доставки обязательна для доставки'
+    }
   },
   deliveryTime: {
-    type: String
+    type: String,
+    required: function(this: IOrder) {
+      return this.fulfillmentMethod === 'delivery';
+    },
+    validate: {
+      validator: function(this: IOrder, value: string) {
+        // Время доставки обязательно только для доставки
+        if (this.fulfillmentMethod === 'delivery') {
+          return value && value.trim().length > 0;
+        }
+        return true; // Для самовывоза время не обязательно
+      },
+      message: 'Время доставки обязательно для доставки'
+    }
   },
   notes: {
     type: String,
@@ -137,6 +191,12 @@ orderSchema.pre('save', async function(next) {
     const orderNumber = `${year}${month}${day}-${String(todayOrders + 1).padStart(3, '0')}`;
     this.orderNumber = orderNumber;
   }
+  next();
+});
+
+// Pre-hooks to ensure validators run for update operations
+orderSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function(next) {
+  this.setOptions({ runValidators: true, context: 'query' });
   next();
 });
 

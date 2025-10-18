@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     
     // Добавляем фильтр по типу доставки
     if (deliveryType) {
-      query.paymentMethod = deliveryType;
+      query.fulfillmentMethod = deliveryType;
     }
     
     const newOrders = await Order.find(query)

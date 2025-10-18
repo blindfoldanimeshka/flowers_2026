@@ -40,10 +40,46 @@ export async function updateSettings(formData: FormData) {
     const contactPhone = formData.get('contactPhone') as string;
     const address = formData.get('address') as string;
     const workingHours = formData.get('workingHours') as string;
-    const deliveryRadius = parseFloat(formData.get('deliveryRadius') as string);
-    const minOrderAmount = parseFloat(formData.get('minOrderAmount') as string);
-    const freeDeliveryThreshold = parseFloat(formData.get('freeDeliveryThreshold') as string);
-    const deliveryFee = parseFloat(formData.get('deliveryFee') as string);
+    // Парсинг и валидация числовых полей
+    const deliveryRadiusRaw = parseFloat(formData.get('deliveryRadius') as string);
+    const minOrderAmountRaw = parseFloat(formData.get('minOrderAmount') as string);
+    const freeDeliveryThresholdRaw = parseFloat(formData.get('freeDeliveryThreshold') as string);
+    const deliveryFeeRaw = parseFloat(formData.get('deliveryFee') as string);
+    
+    // Валидация числовых значений
+    if (isNaN(deliveryRadiusRaw) || deliveryRadiusRaw <= 0) {
+      return {
+        success: false,
+        error: 'Радиус доставки должен быть положительным числом'
+      };
+    }
+    
+    if (isNaN(minOrderAmountRaw) || minOrderAmountRaw <= 0) {
+      return {
+        success: false,
+        error: 'Минимальная сумма заказа должна быть положительным числом'
+      };
+    }
+    
+    if (isNaN(freeDeliveryThresholdRaw) || freeDeliveryThresholdRaw < 0) {
+      return {
+        success: false,
+        error: 'Порог бесплатной доставки должен быть неотрицательным числом'
+      };
+    }
+    
+    if (isNaN(deliveryFeeRaw) || deliveryFeeRaw < 0) {
+      return {
+        success: false,
+        error: 'Стоимость доставки должна быть неотрицательным числом'
+      };
+    }
+    
+    // Используем валидированные значения
+    const deliveryRadius = deliveryRadiusRaw;
+    const minOrderAmount = minOrderAmountRaw;
+    const freeDeliveryThreshold = freeDeliveryThresholdRaw;
+    const deliveryFee = deliveryFeeRaw;
     const currency = formData.get('currency') as string;
     const timezone = formData.get('timezone') as string;
     const maintenanceMode = formData.get('maintenanceMode') === 'true';
@@ -65,12 +101,16 @@ export async function updateSettings(formData: FormData) {
       };
     }
     
-    // Получаем текущие настройки или создаем новые
-    let settings = await Settings.findOne();
-    
-    if (!settings) {
-      settings = await Settings.create({});
-    }
+    // Получаем текущие настройки или создаем новые атомарно
+    const settings = await Settings.findOneAndUpdate(
+      {},
+      {},
+      { 
+        upsert: true, 
+        new: true,
+        setDefaultsOnInsert: true
+      }
+    );
     
     // Обновляем настройки
     const updateData: any = {
@@ -139,16 +179,25 @@ export async function toggleMaintenanceMode() {
   try {
     await dbConnect();
     
-    let settings = await Settings.findOne();
-    
-    if (!settings) {
-      settings = await Settings.create({});
-    }
-    
-    const updatedSettings = await Settings.findByIdAndUpdate(
-      settings._id,
-      { maintenanceMode: !settings.maintenanceMode },
-      { new: true }
+    const updatedSettings = await Settings.findOneAndUpdate(
+      {},
+      [
+        {
+          $set: {
+            maintenanceMode: {
+              $cond: {
+                if: { $eq: ["$maintenanceMode", null] },
+                then: false, // значение по умолчанию при создании
+                else: { $not: "$maintenanceMode" } // переключение существующего значения
+              }
+            }
+          }
+        }
+      ],
+      { 
+        upsert: true, 
+        new: true
+      }
     );
     
     // Инвалидируем кэш и обновляем страницы

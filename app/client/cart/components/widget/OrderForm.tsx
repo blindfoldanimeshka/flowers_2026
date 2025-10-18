@@ -1,5 +1,4 @@
 'use client'
-export const dynamic = 'force-dynamic';
 
 
 import { useState } from 'react';
@@ -137,17 +136,21 @@ export default function OrderForm() {
                     <div className="flex gap-4">
                         <label>
                             <input
-                                type="checkbox"
+                                type="radio"
+                                name="deliveryType"
+                                value="delivery"
                                 checked={formData.deliveryType === 'delivery'}
-                                onChange={() => setFormData(prev => ({ ...prev, deliveryType: 'delivery' }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, deliveryType: e.target.value }))}
                             />
                             <span className="ml-2">Доставка</span>
                         </label>
                         <label>
                             <input
-                                type="checkbox"
+                                type="radio"
+                                name="deliveryType"
+                                value="pickup"
                                 checked={formData.deliveryType === 'pickup'}
-                                onChange={() => setFormData(prev => ({ ...prev, deliveryType: 'pickup' }))}
+                                onChange={(e) => setFormData(prev => ({ ...prev, deliveryType: e.target.value }))}
                             />
                             <span className="ml-2">Самовывоз</span>
                         </label>

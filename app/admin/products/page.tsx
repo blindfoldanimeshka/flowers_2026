@@ -6,27 +6,45 @@ import { toast } from 'react-toastify';
 import Image from 'next/image';
 import type { Product, Category, Subcategory } from '../types';
 
+type ProductFormData = Omit<Product, '_id'> & { _id?: string };
+
 interface ProductFormProps {
   product: Product | null;
-  onSave: (product: any) => void;
+  onSave: (product: Product) => void;
   onCancel: () => void;
 }
 
 const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => {
-  const [formData, setFormData] = useState(product || {
+  const [formData, setFormData] = useState<ProductFormData>(product || {
     name: '',
     description: '',
-    price: '',
+    price: 0,
     image: '',
     categoryId: '',
-    subcategoryId: ''
+    subcategoryId: '',
+    inStock: true
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   useEffect(() => {
-    // Fetch categories
-    fetch('/api/categories').then(res => res.json()).then(setCategories);
+    // Fetch categories with error handling
+    const fetchCategories = async () => {
+      try {
+        const res = await fetch('/api/categories');
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        const data = await res.json();
+        setCategories(data);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        setCategories([]);
+        toast.error('Не удалось загрузить категории');
+      }
+    };
+    
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -41,13 +59,31 @@ const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => {
   }, [formData.categoryId, categories]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev: any) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    
+    // Обработка числовых полей
+    if (type === 'number' || name === 'price') {
+      const numericValue = value === '' ? 0 : Number(value);
+      setFormData(prev => ({ ...prev, [name]: numericValue }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    const productData: Product = {
+      _id: formData._id || '', // Временно устанавливаем пустую строку для новых продуктов
+      name: formData.name,
+      description: formData.description || '',
+      price: formData.price,
+      image: formData.image,
+      categoryId: formData.categoryId,
+      inStock: formData.inStock,
+      // Включаем subcategoryId только если он существует и не пустой
+      ...(formData.subcategoryId && { subcategoryId: formData.subcategoryId })
+    };
+    onSave(productData);
   };
 
   return (
@@ -65,7 +101,7 @@ const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => {
       </select>
       <ImageUpload
         value={formData.image || ''}
-        onChange={(url: string) => setFormData((prev: any) => ({ ...prev, image: url }))}
+        onChange={(url: string) => setFormData(prev => ({ ...prev, image: url }))}
       />
       <div className="flex gap-2">
         <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Сохранить</button>
@@ -88,8 +124,9 @@ const ProductsPage = () => {
       const res = await fetch('/api/products');
       if (!res.ok) throw new Error('Не удалось загрузить товары');
       setProducts(await res.json());
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Произошла неизвестная ошибка';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -99,19 +136,26 @@ const ProductsPage = () => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const handleSave = async (productData: any) => {
+  const handleSave = async (productData: Product) => {
     if (!productData.image) {
       toast.error('Добавь фотографию.');
       return;
     }
-    const url = productData._id ? `/api/products/${productData._id}` : '/api/products';
-    const method = productData._id ? 'PUT' : 'POST';
+    // Проверяем, является ли это новым продуктом (пустой _id или отсутствует)
+    const isNewProduct = !productData._id || productData._id === '';
+    const url = isNewProduct ? '/api/products' : `/api/products/${productData._id}`;
+    const method = isNewProduct ? 'POST' : 'PUT';
 
     try {
+      // Для новых продуктов исключаем _id из данных
+      const dataToSend = isNewProduct 
+        ? { ...productData, _id: undefined } 
+        : productData;
+      
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(productData),
+        body: JSON.stringify(dataToSend),
       });
       if (!res.ok) {
         const errData = await res.json();
@@ -120,8 +164,9 @@ const ProductsPage = () => {
       setIsFormVisible(false);
       setEditingProduct(null);
       fetchProducts();
-    } catch (err: any) {
-      toast.error(err.message);
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Произошла неизвестная ошибка';
+      toast.error(errorMessage);
     }
   };
   

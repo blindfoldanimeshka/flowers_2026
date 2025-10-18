@@ -294,7 +294,7 @@ export async function getCachedOrders(filters: {
       
       // Добавляем фильтр по типу доставки
       if (filters.deliveryType) {
-        query.paymentMethod = filters.deliveryType;
+        query.fulfillmentMethod = filters.deliveryType;
       }
       
       const page = filters.page || 1;

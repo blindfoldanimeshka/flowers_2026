@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import connect from '@/lib/db';
-import Category from '@/models/Category';
+import { Category, type ICategory } from '@/models/Category';
 import { revalidatePath } from 'next/cache';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
@@ -23,7 +23,7 @@ export async function GET(
       );
     }
     
-    const subcategory = (category.subcategories as any).id(subcategoryId);
+    const subcategory = category.subcategories.id(subcategoryId);
     
     if (!subcategory) {
       return NextResponse.json(
@@ -85,7 +85,7 @@ export async function PUT(
     
     // Обновляем подкатегорию в массиве
     const subcategoryIndex = category.subcategories.findIndex(
-      (sc: any) => sc._id.toString() === subcategoryId
+      (sc) => sc._id.toString() === subcategoryId
     );
     
     if (subcategoryIndex === -1) {
@@ -172,7 +172,7 @@ export async function DELETE(
     
     // Находим индекс подкатегории в массиве
     const subcategoryIndex = category.subcategories.findIndex(
-      (sc: any) => sc._id.toString() === subcategoryId
+      (sc) => sc._id.toString() === subcategoryId
     );
     
     if (subcategoryIndex === -1) {
@@ -183,21 +183,7 @@ export async function DELETE(
       );
     }
     
-    // Step 1: Удаляем подкатегорию из коллекции Subcategory
-    const deletedSubcategory = await mongoose.model('Subcategory').deleteOne(
-      { _id: new mongoose.Types.ObjectId(subcategoryId) }
-    );
-    
-    if (deletedSubcategory.deletedCount === 0) {
-      console.error('[CATEGORY SUBCATEGORY DELETE] Failed to delete subcategory from collection');
-      return NextResponse.json(
-        { success: false, error: 'Не удалось удалить подкатегорию из коллекции' },
-        { status: 500 }
-      );
-    }
-    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Subcategory deleted from collection');
-    
-    // Step 2: Удаляем подкатегорию из массива категории
+    // Удаляем подкатегорию из массива категории
     category.subcategories.splice(subcategoryIndex, 1);
     const savedCategory = await category.save();
     
@@ -208,7 +194,7 @@ export async function DELETE(
         { status: 500 }
       );
     }
-    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Category updated successfully');
+    console.log('[CATEGORY SUBCATEGORY DELETE] ✅ Subcategory deleted successfully');
     
     // Инвалидируем кэш
     console.log('[CATEGORY SUBCATEGORY DELETE] Invalidating caches...');
