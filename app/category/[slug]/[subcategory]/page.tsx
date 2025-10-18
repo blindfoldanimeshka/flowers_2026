@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, notFound } from 'next/navigation';
-import Catalog from '@/app/client/components/catalog/Catalog';
+import Catalog from '../../../client/components/catalog/Catalog';
 import { useState, useEffect } from 'react';
 import { IProduct } from '@/models/Product';
 

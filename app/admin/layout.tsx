@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import AdminNotifications from '@/components/AdminNotifications';
+import AdminNotifications from '../../components/AdminNotifications';
 
 export default function AdminLayout({
   children,

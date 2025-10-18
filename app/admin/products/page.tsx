@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import ImageUpload from '@/app/admin/components/ImageUpload'; // Исправленный путь
+import ImageUpload from '../components/ImageUpload';
 import { toast } from 'react-toastify';
 import Image from 'next/image';
 import type { Product, Category, Subcategory } from '../types';

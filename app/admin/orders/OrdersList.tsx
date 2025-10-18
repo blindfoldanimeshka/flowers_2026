@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useCallback, useMemo } from "react";
 import { format } from 'date-fns';
-import { useNewOrderNotifications } from '@/hooks/useNewOrderNotifications';
+import { useNewOrderNotifications } from '../../../hooks/useNewOrderNotifications';
 import { toast } from 'react-toastify';
 import type { Order } from '../types';
 
