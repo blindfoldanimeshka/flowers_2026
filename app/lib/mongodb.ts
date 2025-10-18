@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const MONGODB_URI = process.env.MONGODB_URI as string;
 
 if (!MONGODB_URI) {
-  throw new Error('Пожалуйста, определите MONGODB_URI в переменных окружения Vercel');
+  console.warn('MONGODB_URI не определена. Подключение к базе данных будет пропущено.');
 }
 
 // Глобальная переменная для кэширования соединения
@@ -17,6 +17,12 @@ if (!cached.mongoose) {
  * Функция для подключения к MongoDB Atlas
  */
 async function connectDB() {
+  // Если MONGODB_URI не определена, возвращаем null
+  if (!MONGODB_URI) {
+    console.warn('MONGODB_URI не определена. Подключение к базе данных пропущено.');
+    return null;
+  }
+
   if (cached.mongoose.conn) {
     console.log('Используется существующее подключение к MongoDB Atlas');
     return cached.mongoose.conn;

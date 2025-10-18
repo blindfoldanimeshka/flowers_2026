@@ -26,7 +26,7 @@ if (MONGODB_URI && MONGODB_URI.includes('@mongodb:')) {
 // MONGODB_URI скрыт для безопасности
 
 if (!MONGODB_URI) {
-  throw new Error('Пожалуйста, определите MONGODB_URI в файле .env');
+  console.warn('MONGODB_URI не определена. Подключение к базе данных будет пропущено.');
 }
 
 // Переменная для кэширования соединения
@@ -37,6 +37,12 @@ if (!global.mongooseCache) {
 }
 
 async function connect() {
+  // Если MONGODB_URI не определена, возвращаем null
+  if (!MONGODB_URI) {
+    console.warn('MONGODB_URI не определена. Подключение к базе данных пропущено.');
+    return null;
+  }
+
   console.log('connect() called');
   if (cached.conn) {
     console.log('Using cached connection');
