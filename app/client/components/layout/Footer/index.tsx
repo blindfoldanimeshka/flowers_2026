@@ -1,12 +1,10 @@
 'use client'
-import { useContext } from "react";
-import { SettingsContext } from "../../ServerSettingsProvider";
 import Image from "next/image";
 import { motion } from "framer-motion";
 
 export default function Footer({ settings }: { settings: any }) {
     const { address, contactPhone, workingHours } = settings || {};
-    const phoneLink = contactPhone ? `tel:${contactPhone.replace(/\D/g, '')}` : null;
+    const phoneLink = contactPhone ? `tel:${contactPhone.replace(/\D/g, '')}` : undefined;
     return (
         <motion.footer 
             className="bg-[#F0D2D2] grid justify-center py-10 items-center"

@@ -125,7 +125,7 @@ export async function getCachedCategories() {
       
       // Создаем карту подкатегорий для быстрого доступа
       const subcategoryMap = new Map(
-        allSubcategories.map(sub => [sub._id.toString(), sub])
+        allSubcategories.map(sub => [String(sub._id), sub])
       );
       
       // Вручную наполняем категории подкатегориями

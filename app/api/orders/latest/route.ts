@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       );
     }
     
-    let query: any = {};
+    const query: any = {};
     
     // Если указан timestamp, получаем заказы после этой даты
     if (since) {

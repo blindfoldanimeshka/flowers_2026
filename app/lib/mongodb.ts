@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_URI = process.env.MONGODB_URI as string;
 
 if (!MONGODB_URI) {
   throw new Error('Пожалуйста, определите MONGODB_URI в переменных окружения Vercel');
 }
 
 // Глобальная переменная для кэширования соединения
-let cached = global as any;
+const cached = global as any;
 
 if (!cached.mongoose) {
   cached.mongoose = { conn: null, promise: null };

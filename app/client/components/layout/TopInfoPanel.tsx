@@ -1,11 +1,9 @@
 'use client'
-import { useContext } from "react";
-import { SettingsContext } from "../ServerSettingsProvider";
 import { motion } from "framer-motion";
 
 export default function TopInfoPanel({ settings }: { settings: any }) {
   const { contactPhone, workingHours } = settings || {};
-  const phoneLink = contactPhone ? `tel:${contactPhone.replace(/\D/g, '')}` : null;
+  const phoneLink = contactPhone ? `tel:${contactPhone.replace(/\D/g, '')}` : undefined;
   
   return (
     <motion.div 

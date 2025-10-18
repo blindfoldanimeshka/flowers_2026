@@ -3,8 +3,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import ImageUpload from '@/app/admin/components/ImageUpload'; // Исправленный путь
 import { toast } from 'react-toastify';
+import Image from 'next/image';
+import type { Product, Category, Subcategory } from '../types';
 
-const ProductForm = ({ product, onSave, onCancel }) => {
+interface ProductFormProps {
+  product: Product | null;
+  onSave: (product: any) => void;
+  onCancel: () => void;
+}
+
+const ProductForm = ({ product, onSave, onCancel }: ProductFormProps) => {
   const [formData, setFormData] = useState(product || {
     name: '',
     description: '',
@@ -13,8 +21,8 @@ const ProductForm = ({ product, onSave, onCancel }) => {
     categoryId: '',
     subcategoryId: ''
   });
-  const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
 
   useEffect(() => {
     // Fetch categories
@@ -32,12 +40,12 @@ const ProductForm = ({ product, onSave, onCancel }) => {
     }
   }, [formData.categoryId, categories]);
 
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev: any) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(formData);
   };
@@ -49,15 +57,15 @@ const ProductForm = ({ product, onSave, onCancel }) => {
       <input type="number" name="price" value={formData.price} onChange={handleChange} placeholder="Цена" className="w-full p-2 border rounded" required />
       <select name="categoryId" value={formData.categoryId} onChange={handleChange} className="w-full p-2 border rounded" required>
         <option value="">Выберите категорию</option>
-        {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
+        {categories.map((cat: Category) => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
       </select>
       <select name="subcategoryId" value={formData.subcategoryId} onChange={handleChange} className="w-full p-2 border rounded">
         <option value="">Выберите подкатегорию (необязательно)</option>
-        {subcategories.map(sub => <option key={sub._id} value={sub._id}>{sub.name}</option>)}
+        {subcategories.map((sub: Subcategory) => <option key={sub._id} value={sub._id}>{sub.name}</option>)}
       </select>
       <ImageUpload
         value={formData.image || ''}
-        onChange={url => setFormData(prev => ({ ...prev, image: url }))}
+        onChange={(url: string) => setFormData((prev: any) => ({ ...prev, image: url }))}
       />
       <div className="flex gap-2">
         <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">Сохранить</button>
@@ -69,10 +77,10 @@ const ProductForm = ({ product, onSave, onCancel }) => {
 
 
 const ProductsPage = () => {
-  const [products, setProducts] = useState([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormVisible, setIsFormVisible] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -91,7 +99,7 @@ const ProductsPage = () => {
     fetchProducts();
   }, [fetchProducts]);
 
-  const handleSave = async (productData) => {
+  const handleSave = async (productData: any) => {
     if (!productData.image) {
       toast.error('Добавь фотографию.');
       return;
@@ -117,7 +125,7 @@ const ProductsPage = () => {
     }
   };
   
-  const handleDelete = async (productId) => {
+  const handleDelete = async (productId: string) => {
     if (window.confirm('Вы уверены, что хотите удалить товар?')) {
       try {
         const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
@@ -153,9 +161,9 @@ const ProductsPage = () => {
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-semibold mb-4">Список товаров</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map(product => (
+          {products.map((product: Product) => (
             <div key={product._id} className="border rounded-lg p-4 shadow-sm">
-              <img src={product.image || '/placeholder.jpg'} alt={product.name} className="w-full h-48 object-cover rounded-md mb-4" />
+              <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="w-full h-48 object-cover rounded-md mb-4" />
               <h3 className="font-bold text-lg">{product.name}</h3>
               <p className="text-gray-600">{product.price} руб.</p>
               <div className="mt-4 flex gap-2">

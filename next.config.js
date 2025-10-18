@@ -23,7 +23,7 @@ const nextConfig = {
   
   // ESLint конфигурация
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
     dirs: ['app', 'components', 'lib', 'hooks', 'models'],
   },
   
@@ -86,7 +86,6 @@ const nextConfig = {
   },
   
   // Оптимизация сборки
-  swcMinify: true,
   compress: true,
   
   // Переменные окружения

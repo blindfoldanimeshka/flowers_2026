@@ -1,7 +1,6 @@
 import Logo from "./Logo";
 import Nav from "./Nav";
 import CartIcon from "./CartIcon";
-import { FaMapMarkerAlt, FaPhoneAlt, FaClock } from "react-icons/fa";
 
 export default function Header() {
     return (

@@ -23,7 +23,7 @@ export async function GET(
       );
     }
     
-    const subcategory = category.subcategories.id(subcategoryId);
+    const subcategory = (category.subcategories as any).id(subcategoryId);
     
     if (!subcategory) {
       return NextResponse.json(

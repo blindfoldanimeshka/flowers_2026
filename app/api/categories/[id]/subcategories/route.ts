@@ -31,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // POST-запрос для создания новой подкатегории - перенаправляется на основной API
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
   return NextResponse.json(
     { 
       error: 'Этот API-маршрут устарел. Используйте POST /api/subcategories с параметром categoryId в теле запроса.',
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 }
 
 // PUT запрос для обновления подкатегорий (замена всего массива) - не поддерживается
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(_request: NextRequest, { params }: { params: { id: string } }) {
   return NextResponse.json(
     { 
       error: 'Этот API-маршрут не поддерживается. Используйте PUT /api/subcategories/[subcategoryId] для обновления отдельной подкатегории.',

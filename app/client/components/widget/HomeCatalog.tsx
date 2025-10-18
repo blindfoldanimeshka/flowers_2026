@@ -1,6 +1,5 @@
 'use client'
 
-import Link from "next/link";
 import ShopItem from "../element/ShopItem";
 import ShopItemSkeleton from "../element/ShopItemSkeleton";
 import { useState, useEffect } from "react";
@@ -60,7 +59,7 @@ export default function HomeCatalog() {
       opacity: 1,
       scale: 1,
       transition: {
-        type: "spring",
+        type: "spring" as const,
         damping: 15,
         stiffness: 100
       }

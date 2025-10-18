@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
-import mongoose from 'mongoose';
 
 // GET - получение статистики товаров по категориям и подкатегориям
 export async function GET(request: NextRequest) {

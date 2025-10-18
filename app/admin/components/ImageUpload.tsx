@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
+import Image from 'next/image';
 
 interface ImageUploadProps {
   value: string;
@@ -105,11 +106,13 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
         <div className="mt-4">
           <p className="text-sm text-gray-600 mb-2">Превью:</p>
           <div className="relative inline-block">
-            <img 
+            <Image 
               src={preview || value} 
               alt="preview" 
+              width={128}
+              height={128}
               className="w-32 h-32 object-cover rounded-lg border shadow-sm"
-              onError={(e) => {
+              onError={() => {
                 console.error('Image failed to load:', preview || value);
                 setError('Не удалось загрузить изображение');
               }}

@@ -11,7 +11,7 @@ export async function GET() {
 
     // Загружаем все подкатегории один раз
     const subcategories = await Subcategory.find({}).lean();
-    const subcategoryMap = new Map(subcategories.map(sub => [sub._id.toString(), sub.name]));
+    const subcategoryMap = new Map(subcategories.map(sub => [String(sub._id), sub.name]));
 
     const products = await Product.find({})
       .sort({ createdAt: -1 })

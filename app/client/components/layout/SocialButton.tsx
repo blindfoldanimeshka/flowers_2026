@@ -30,14 +30,14 @@ export default function SocialButton({ settings }: { settings?: any }) {
   const toggleOpen = () => setIsOpen(!isOpen)
 
   const formatLink = (base: string, value: string) => {
-    if (!value) return null;
+    if (!value) return undefined;
     if (value.startsWith('http')) return value;
     const username = value.split('/').pop();
     return `${base}${username}`;
   };
 
   const formatWhatsAppLink = (phone: string) => {
-    if (!phone) return null;
+    if (!phone) return undefined;
     const digitsOnly = phone.replace(/\D/g, '');
     return `https://wa.me/${digitsOnly}`;
   };
@@ -50,25 +50,25 @@ export default function SocialButton({ settings }: { settings?: any }) {
     {
       name: 'Telegram',
       icon: '/icons/telegram.svg',
-      href: formatLink('https://t.me/', socialLinks.telegram),
+      href: formatLink('https://t.me/', socialLinks.telegram) as string | undefined,
       style: 'bg-blue-400',
     },
     {
       name: 'VK',
       icon: '/icons/VK.svg',
-      href: formatLink('https://vk.com/', socialLinks.vk),
+      href: formatLink('https://vk.com/', socialLinks.vk) as string | undefined,
       style: 'bg-blue-600',
     },
     {
       name: 'Instagram',
       icon: '/icons/instagram.svg',
-      href: formatLink('https://instagram.com/', socialLinks.instagram),
+      href: formatLink('https://instagram.com/', socialLinks.instagram) as string | undefined,
       style: 'bg-pink-500',
     },
     {
       name: 'WhatsApp',
       icon: '/icons/whatsapp.svg',
-      href: formatWhatsAppLink(socialLinks.whatsapp),
+      href: formatWhatsAppLink(socialLinks.whatsapp) as string | undefined,
       style: 'bg-green-500',
     },
   ]
@@ -104,7 +104,7 @@ export default function SocialButton({ settings }: { settings?: any }) {
                   }}
                 >
                   <Link
-                    href={button.href}
+                    href={button.href || ''}
                     target="_blank"
                     rel="noopener noreferrer"
                     className={`w-12 h-12 rounded-full flex items-center justify-center text-white shadow-lg transform transition-all duration-300 hover:scale-110 ${button.style}`}

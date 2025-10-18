@@ -8,7 +8,7 @@ import Category from '@/models/Category';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
 // GET all subcategories
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     await connect();
     const subcategories = await Subcategory.find({}).lean();
@@ -56,10 +56,10 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('[SUBCATEGORY API] Found category:', { 
-      _id: category._id.toString(),
+      _id: String(category._id),
       id: category.id,
       name: category.name, 
-      subcategories: Array.isArray(category.subcategories) ? category.subcategories.map(id => id.toString()) : 'not an array'
+      subcategories: Array.isArray(category.subcategories) ? category.subcategories.map((id: any) => String(id)) : 'not an array'
     });
     
     const existingSubcategory = await Subcategory.findOne({

@@ -4,11 +4,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import CartItem from "../element/CartItem";
 import CartItemSkeleton from "../element/CartItemSkeleton";
 import { useCart } from "../../../../context/CartContext";
-import { products } from "../../../../data/products";
 import { motion, AnimatePresence } from "framer-motion";
 
 const CartItemSection = () => {
-    const { cartItems, clearCart } = useCart();
+    const { cartItems } = useCart();
     console.log('CART ITEMS DEBUG:', cartItems);
     const [loading, setLoading] = useState(true);
     const [displayedItems, setDisplayedItems] = useState<typeof cartItems>([]);

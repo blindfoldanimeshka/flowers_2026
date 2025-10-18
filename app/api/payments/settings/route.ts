@@ -4,7 +4,7 @@ import dbConnect from '@/lib/db';
 import PaymentSettings from '@/models/PaymentSettings';
 
 // GET запрос для получения настроек платежей
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     await dbConnect();
     

@@ -126,7 +126,7 @@ export const ModalTrigger: React.FC<ModalTriggerProps> = ({
       <Component onClick={openModal} className={className}>
         {children}
       </Component>
-      {React.cloneElement(modal as React.ReactElement, {
+      {React.cloneElement(modal as React.ReactElement<any>, {
         isOpen,
         onClose: closeModal,
       })}

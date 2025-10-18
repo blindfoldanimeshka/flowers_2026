@@ -1,9 +1,19 @@
 "use client";
 import React, { useState } from "react";
-import { mockProducts } from "./mockProducts";
 import ImageUpload from "../components/ImageUpload";
+import Image from 'next/image';
+import type { Product, Subcategory } from '../types';
 
-const emptyProduct = {
+interface ProductForm {
+  _id: string | null;
+  name: string;
+  price: string;
+  subcategoryId?: string;
+  image: string;
+  description?: string;
+}
+
+const emptyProduct: ProductForm = {
   _id: null,
   name: "",
   price: "",
@@ -12,10 +22,15 @@ const emptyProduct = {
   description: ""
 };
 
-export default function ProductsList({ initialProducts, subcategories }) {
-  const [products, setProducts] = useState(initialProducts);
+interface ProductsListProps {
+  initialProducts: Product[];
+  subcategories: Subcategory[];
+}
+
+export default function ProductsList({ initialProducts, subcategories }: ProductsListProps) {
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [showForm, setShowForm] = useState(false);
-  const [editProduct, setEditProduct] = useState(null);
+  const [editProduct, setEditProduct] = useState<string | null>(null);
   const [form, setForm] = useState(emptyProduct);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -28,14 +43,14 @@ export default function ProductsList({ initialProducts, subcategories }) {
   };
 
   // Открыть форму для редактирования
-  const handleEdit = (product) => {
+  const handleEdit = (product: Product) => {
     setForm({ ...product, price: String(product.price) });
     setEditProduct(product._id);
     setShowForm(true);
   };
 
   // Удалить товар
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот товар?')) return;
 
     setError("");
@@ -51,16 +66,16 @@ export default function ProductsList({ initialProducts, subcategories }) {
         throw new Error(errData.error || 'Не удалось удалить товар');
       }
 
-      setProducts(products.filter(p => p._id !== id));
+      setProducts(products.filter((p: Product) => p._id !== id));
       setMessage("Товар успешно удалён");
 
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
   // Сохранить товар (добавить или обновить)
-  const handleSave = async (e) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('DEBUG FORM:', form);
     if (!form.name || !form.price || !form.subcategoryId || !form.image) {
@@ -103,7 +118,7 @@ export default function ProductsList({ initialProducts, subcategories }) {
       const savedProduct = await res.json();
 
       if (editProduct) {
-        setProducts(products.map(p => p._id === editProduct ? savedProduct : p));
+        setProducts(products.map((p: Product) => p._id === editProduct ? savedProduct : p));
         setMessage("Товар успешно обновлён");
       } else {
         setProducts([...products, savedProduct]);
@@ -112,15 +127,15 @@ export default function ProductsList({ initialProducts, subcategories }) {
       setShowForm(false);
       setEditProduct(null);
 
-    } catch (err) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
 
   // Обработка изменений в форме
-  const handleChange = (e) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+    setForm((f: ProductForm) => ({ ...f, [name]: value }));
   };
 
   return (
@@ -154,7 +169,7 @@ export default function ProductsList({ initialProducts, subcategories }) {
             {products.map(product => (
               <tr key={product._id} className="bg-white shadow-sm hover:shadow-md transition-shadow duration-200 border border-gray-100 rounded-xl">
                 <td className="p-3 text-center">
-                  <img src={product.image} alt={product.name} className="w-16 h-16 object-cover rounded-lg mx-auto border" />
+                  <Image src={product.image} alt={product.name} width={64} height={64} className="w-16 h-16 object-cover rounded-lg mx-auto border" />
                 </td>
                 <td className="p-3 font-semibold text-gray-800">{product.name}</td>
                 <td className="p-3 font-bold text-blue-700">{product.price} ₽</td>

@@ -47,6 +47,10 @@ export interface IPaymentSettings extends mongoose.Document {
   updatedAt: Date;
 }
 
+export interface IPaymentSettingsModel extends mongoose.Model<IPaymentSettings> {
+  getSettings(): Promise<IPaymentSettings>;
+}
+
 const paymentSettingsSchema = new mongoose.Schema<IPaymentSettings>({
   isEnabled: {
     type: Boolean,
@@ -170,4 +174,4 @@ paymentSettingsSchema.statics.getSettings = async function() {
   return settings;
 };
 
-export default mongoose.models.PaymentSettings || mongoose.model<IPaymentSettings>('PaymentSettings', paymentSettingsSchema); 
+export default (mongoose.models.PaymentSettings as IPaymentSettingsModel) || mongoose.model<IPaymentSettings, IPaymentSettingsModel>('PaymentSettings', paymentSettingsSchema); 

@@ -3,6 +3,7 @@ import React, { useState, useCallback, useMemo } from "react";
 import { format } from 'date-fns';
 import { useNewOrderNotifications } from '@/hooks/useNewOrderNotifications';
 import { toast } from 'react-toastify';
+import type { Order } from '../types';
 
 const statuses = {
   pending: "Ожидает",
@@ -29,9 +30,13 @@ const tabs: Tab[] = [
   { id: 'pickup', label: 'Самовывоз', icon: '🏪', deliveryType: 'pickup' },
 ];
 
-export default function OrdersList({ initialOrders }) {
-  const [orders, setOrders] = useState(initialOrders);
-  const [selectedOrder, setSelectedOrder] = useState(null);
+interface OrdersListProps {
+  initialOrders: Order[];
+}
+
+export default function OrdersList({ initialOrders }: OrdersListProps) {
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('all');
   
   // Фильтруем заказы по активной вкладке
@@ -44,11 +49,11 @@ export default function OrdersList({ initialOrders }) {
   }, [orders, activeTab]);
 
   // Callback для обработки новых заказов
-  const handleNewOrder = useCallback((newOrder) => {
+  const handleNewOrder = useCallback((newOrder: Order) => {
     console.log('Получен новый заказ:', newOrder);
     
     // Добавляем новый заказ в начало списка
-    setOrders(prevOrders => [newOrder, ...prevOrders]);
+    setOrders((prevOrders: Order[]) => [newOrder, ...prevOrders]);
     
     // Дополнительное уведомление в консоль для отладки
     console.log(`Новый заказ #${newOrder.orderNumber} добавлен в список`);
@@ -66,7 +71,7 @@ export default function OrdersList({ initialOrders }) {
   });
 
   // Функции handleStatusChange и handleDelete
-  const handleStatusChange = async (id, status) => {
+  const handleStatusChange = async (id: string, status: string) => {
     try {
       const res = await fetch(`/api/orders`, {
         method: 'PUT',
@@ -78,7 +83,7 @@ export default function OrdersList({ initialOrders }) {
       
       if (res.ok) {
         const { order } = await res.json();
-        setOrders(orders.map(o => o._id === id ? order : o));
+        setOrders(orders.map((o: Order) => o._id === id ? order : o));
         toast.success(`Статус заказа #${order.orderNumber} обновлен`);
       } else {
         const errorData = await res.json();
@@ -90,7 +95,7 @@ export default function OrdersList({ initialOrders }) {
     }
   };
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Вы уверены, что хотите удалить этот заказ?')) {
       return;
     }
@@ -114,15 +119,15 @@ export default function OrdersList({ initialOrders }) {
     }
   };
 
-  const handleShowDetails = (order) => setSelectedOrder(order);
+  const handleShowDetails = (order: Order) => setSelectedOrder(order);
   const handleCloseDetails = () => setSelectedOrder(null);
 
   // Подсчет заказов по типам
   const orderCounts = useMemo(() => {
     return {
       all: orders.length,
-      delivery: orders.filter(order => order.paymentMethod === 'delivery').length,
-      pickup: orders.filter(order => order.paymentMethod === 'pickup').length,
+      delivery: orders.filter((order: Order) => order.paymentMethod === 'delivery').length,
+      pickup: orders.filter((order: Order) => order.paymentMethod === 'pickup').length,
     };
   }, [orders]);
 
@@ -201,7 +206,7 @@ export default function OrdersList({ initialOrders }) {
                 </td>
               </tr>
             ) : (
-              filteredOrders.map((order) => (
+              filteredOrders.map((order: Order) => (
                 <tr key={order._id} className="bg-white shadow-md hover:shadow-lg transition-shadow">
                   <td className="p-3 rounded-l-xl border-l border-t border-b border-gray-200">
                     <span className="font-mono text-sm text-blue-600">
@@ -219,7 +224,7 @@ export default function OrdersList({ initialOrders }) {
                   </td>
                   <td className="p-3 border-t border-b border-gray-200">
                     <div className="space-y-1">
-                      {order.items.map((item, index) => (
+                      {order.items.map((item: Order['items'][0], index: number) => (
                         <div key={index} className="text-sm">
                           <span className="text-gray-900">{item.name}</span>
                           <span className="ml-2 text-gray-500 font-medium">x{item.quantity}</span>

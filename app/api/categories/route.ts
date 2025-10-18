@@ -1,8 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { revalidatePath } from 'next/cache';
 import slugify from 'slugify';
-import mongoose from 'mongoose';
 import connect from '@/lib/db';
 import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
@@ -35,7 +33,7 @@ export async function GET(request: NextRequest) {
       }
       acc[categoryId].push(sub);
       return acc;
-    }, {});
+    }, {} as Record<string, typeof allSubcategories>);
 
     console.log('[API] Сгруппированы подкатегории по категориям');
 

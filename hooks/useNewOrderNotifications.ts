@@ -8,14 +8,22 @@ interface NewOrder {
     name: string;
     email: string;
     phone: string;
+    address: string;
   };
   totalAmount: number;
+  status: 'pending' | 'confirmed' | 'preparing' | 'delivering' | 'delivered' | 'cancelled';
+  paymentStatus: 'pending' | 'paid' | 'failed';
+  paymentMethod: 'cash' | 'card' | 'online' | 'delivery' | 'pickup';
   createdAt: string;
+  updatedAt: string;
   items: Array<{
+    productId: string;
     name: string;
     quantity: number;
     price: number;
+    image: string;
   }>;
+  notes?: string;
 }
 
 interface UseNewOrderNotificationsProps {

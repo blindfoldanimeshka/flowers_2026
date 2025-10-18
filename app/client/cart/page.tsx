@@ -8,7 +8,7 @@ import { useCart } from "../../context/CartContext";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Cart() {
-    const { cartItems, clearCart } = useCart();
+    const { cartItems } = useCart();
     const [showOrderForm, setShowOrderForm] = useState(false);
 
     useEffect(() => {

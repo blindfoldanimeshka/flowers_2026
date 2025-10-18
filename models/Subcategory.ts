@@ -1,7 +1,19 @@
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 import slugify from 'slugify';
 
-const subcategorySchema = new mongoose.Schema({
+export interface ISubcategory extends Document {
+  name: string;
+  slug: string;
+  categoryId: mongoose.Types.ObjectId;
+  categoryNumId: number;
+  description?: string;
+  image?: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const subcategorySchema = new mongoose.Schema<ISubcategory>({
   name: {
     type: String,
     required: [true, 'Название подкатегории обязательно'],
@@ -41,7 +53,7 @@ const subcategorySchema = new mongoose.Schema({
 
 subcategorySchema.pre('save', function(next) {
   if (this.isModified('name')) {
-    // @ts-ignore
+    // @ts-expect-error - slugify может не иметь типов для this.name
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
   next();
@@ -59,6 +71,6 @@ subcategorySchema.virtual('id').get(function() {
 subcategorySchema.set('toJSON', { virtuals: true });
 subcategorySchema.set('toObject', { virtuals: true });
 
-const Subcategory = mongoose.models.Subcategory || mongoose.model('Subcategory', subcategorySchema);
+const Subcategory = mongoose.models.Subcategory || mongoose.model<ISubcategory>('Subcategory', subcategorySchema);
 
 export default Subcategory; 

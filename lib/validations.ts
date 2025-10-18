@@ -147,9 +147,14 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): T {
   }
 }
 
-export function validatePartialData<T>(schema: z.ZodSchema<T>, data: unknown): Partial<T> {
+export function validatePartialData<T>(schema: z.ZodType<T>, data: unknown): Partial<T> {
   try {
-    return schema.partial().parse(data);
+    // Используем метод partial() который доступен на ZodObject
+    if ('partial' in schema && typeof schema.partial === 'function') {
+      return schema.partial().parse(data);
+    }
+    // Если partial не доступен, просто парсим данные как есть
+    return schema.parse(data) as Partial<T>;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const errorMessages = error.issues.map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`);

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
+import React, { createContext, useContext, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
 
 // Интерфейс для товара в корзине
 export interface CartItem {

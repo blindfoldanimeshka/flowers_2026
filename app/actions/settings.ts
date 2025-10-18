@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-expressions
 'use server';
 
 import { revalidatePath } from 'next/cache';
@@ -68,7 +69,7 @@ export async function updateSettings(formData: FormData) {
     let settings = await Settings.findOne();
     
     if (!settings) {
-      settings = await Settings.getSettings();
+      settings = await Settings.create({});
     }
     
     // Обновляем настройки
@@ -141,7 +142,7 @@ export async function toggleMaintenanceMode() {
     let settings = await Settings.findOne();
     
     if (!settings) {
-      settings = await Settings.getSettings();
+      settings = await Settings.create({});
     }
     
     const updatedSettings = await Settings.findByIdAndUpdate(

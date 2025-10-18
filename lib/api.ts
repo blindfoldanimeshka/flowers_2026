@@ -1,4 +1,3 @@
-import { validateData } from './validations';
 
 // Типы для API ответов
 export interface ApiResponse<T = any> {
@@ -274,7 +273,4 @@ export function useApi() {
     utils: DataUtils,
   };
 }
-
-// Экспорт типов
-export type { ApiResponse, PaginatedResponse };
 

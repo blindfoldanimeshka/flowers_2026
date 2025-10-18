@@ -9,7 +9,6 @@ import { IMaskInput } from 'react-imask';
 
 export default function OrderForm() {
     const { cartItems, clearCart, getTotalPrice } = useCart();
-    const router = useRouter();
     const [formData, setFormData] = useState({
         name: '',
         phone: '',
@@ -23,12 +22,12 @@ export default function OrderForm() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
-    const handleChange = (e) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (cartItems.length === 0) {
             setError('Ваша корзина пуста.');
@@ -72,8 +71,8 @@ export default function OrderForm() {
             // Можно добавить редирект на страницу благодарности
             // router.push('/thank-you');
 
-        } catch (err) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : String(err));
         } finally {
             setIsLoading(false);
         }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const startTime = Date.now();
     
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       uptime: process.uptime(),
       environment: process.env.NODE_ENV,
       version: process.env.npm_package_version || '1.0.0',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Service unavailable',
+      error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : 'Service unavailable',
       services: {
         database: 'disconnected',
         api: 'running'

@@ -107,7 +107,7 @@ export const SubcategoryService = {
     if (description !== undefined) updateData.description = description;
     if (image !== undefined) updateData.image = image;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (categoryId) updateData.categoryId = categoryId;
+    if (categoryId) updateData.categoryId = categoryId as any;
     
     updateData.updatedAt = new Date();
 

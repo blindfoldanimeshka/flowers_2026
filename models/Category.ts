@@ -5,6 +5,7 @@ export interface ICategory extends Document {
   id: number;
   name: string;
   slug: string;
+  isActive?: boolean;
   subcategories: mongoose.Types.ObjectId[];
 }
 

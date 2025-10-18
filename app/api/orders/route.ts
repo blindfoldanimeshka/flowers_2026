@@ -11,9 +11,9 @@ export async function GET(request: NextRequest) {
     console.log('Получение заказов из кэша...');
     
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email');
-    const status = searchParams.get('status');
-    const deliveryType = searchParams.get('deliveryType'); // Новый параметр фильтрации
+    const email = searchParams.get('email') ?? undefined;
+    const status = searchParams.get('status') ?? undefined;
+    const deliveryType = searchParams.get('deliveryType') ?? undefined; // Новый параметр фильтрации
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     
@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(result, { status: 200 });
     
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Ошибка при получении заказов:', error);
     return NextResponse.json(
-      { error: 'Ошибка при получении заказов', details: error.message },
+      { error: 'Ошибка при получении заказов', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
@@ -130,10 +130,10 @@ export async function POST(request: NextRequest) {
       order: newOrder 
     }, { status: 201 });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Ошибка при создании заказа:', error);
     return NextResponse.json(
-      { error: 'Ошибка при создании заказа', details: error.message },
+      { error: 'Ошибка при создании заказа', details: error instanceof Error ? error.message : String(error) },
       { status: 500 });
   }
 }
