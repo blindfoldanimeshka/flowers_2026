@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
-import { Product } from '@/app/models/Product';
+import Product from '@/models/Product';
 
 export async function GET(request: NextRequest) {
   try {

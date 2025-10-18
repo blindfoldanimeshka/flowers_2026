@@ -53,7 +53,6 @@ const subcategorySchema = new mongoose.Schema<ISubcategory>({
 
 subcategorySchema.pre('save', function(next) {
   if (this.isModified('name')) {
-    // @ts-expect-error - slugify может не иметь типов для this.name
     this.slug = slugify(this.name, { lower: true, strict: true });
   }
   next();

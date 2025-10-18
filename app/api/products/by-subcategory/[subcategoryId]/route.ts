@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 import connect from '@/lib/db';
-import { Product } from '@/app/models/Product';
+import Product from '@/models/Product';
 import Subcategory from '@/models/Subcategory';
 
 // GET запрос для получения товаров по ID подкатегории

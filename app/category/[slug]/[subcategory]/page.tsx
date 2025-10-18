@@ -1,8 +1,7 @@
 'use client'
 
 import { useParams, notFound } from 'next/navigation';
-import Catalog from '../../../client/components/catalog/Catalog';
-import { useState, useEffect } from 'react';
+import Catalog from '../../../client/components/catalog/Catalog';import { useState, useEffect } from 'react';
 import { IProduct } from '@/models/Product';
 
 async function getProductsBySubcategory(subcategoryId: string): Promise<IProduct[]> {

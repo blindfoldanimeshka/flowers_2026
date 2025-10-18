@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
-import { Product } from '@/app/models/Product';
+import Product from '@/models/Product';
 import mongoose from 'mongoose';
 import { revalidatePath } from 'next/cache';
 
