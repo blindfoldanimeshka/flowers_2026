@@ -1,9 +1,12 @@
 {
   "version": 2,
-  "buildCommand": "npm ci && npm run build",
+  "buildCommand": "npm run build",
   "installCommand": "npm ci --prefer-offline --no-audit",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "env": {
+    "CI": "false"
+  },
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 10
