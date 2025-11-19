@@ -1,0 +1,67 @@
+$ git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   app/actions/categories.ts
+        modified:   app/actions/orders.ts
+        modified:   app/actions/payments.ts
+        modified:   app/actions/products.ts
+        modified:   app/actions/settings.ts
+        modified:   app/actions/subcategories.ts
+        modified:   app/admin/components/ImageUpload.tsx
+        modified:   app/admin/orders/OrdersList.tsx
+        modified:   app/admin/products/ProductsList.tsx
+        modified:   app/admin/products/page.tsx
+        modified:   app/api/categories/[id]/subcategories/[subcategoryId]/route.ts                                                                              
+        modified:   app/api/categories/[id]/subcategories/route.ts
+        modified:   app/api/categories/route.ts
+        modified:   app/api/categories/stats/route.ts
+        modified:   app/api/health/route.ts
+        modified:   app/api/orders/latest/route.ts
+        modified:   app/api/orders/route.ts
+        modified:   app/api/payments/settings/route.ts
+        modified:   app/api/products/featured/route.ts
+        modified:   app/api/settings/route.ts
+        modified:   app/api/subcategories/route.ts
+        modified:   app/api/subcategories/services/subcategory.service.ts       
+        modified:   app/api/subcategories/utils/validators.ts
+        modified:   app/api/uploads/[...path]/route.ts
+        modified:   app/client/cart/components/widget/CartItemSection.tsx       
+        modified:   app/client/cart/components/widget/OrderForm.tsx
+        modified:   app/client/cart/page.tsx
+        modified:   app/client/components/PageTransition.tsx
+        modified:   app/client/components/catalog/CategoryGrid.tsx
+        deleted:    app/client/components/home/HomeCatalog.tsx
+        modified:   app/client/components/layout/Footer/index.tsx
+        modified:   app/client/components/layout/Header/index.tsx
+        modified:   app/client/components/layout/SocialButton.tsx
+        modified:   app/client/components/layout/TopInfoPanel.tsx
+        modified:   app/client/components/widget/HomeCatalog.tsx
+        modified:   app/context/CartContext.tsx
+        modified:   app/lib/mongodb.ts
+        modified:   components/ui/Modal.tsx
+        modified:   eslint.config.mjs
+        modified:   hooks/useNewOrderNotifications.ts
+        modified:   lib/api.ts
+        modified:   lib/cache.ts
+        modified:   lib/db.ts
+        modified:   lib/validations.ts
+        modified:   models/Category.ts
+        modified:   models/PaymentSettings.ts
+        modified:   models/Subcategory.ts
+        modified:   next.config.js
+        modified:   package-lock.json
+        modified:   package.json
+        modified:   vercel.json
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        .npmrc
+        DEPLOY_STEPS.md
+        VERCEL_DEPLOYMENT_GUIDE.md
+        app/admin/types.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
