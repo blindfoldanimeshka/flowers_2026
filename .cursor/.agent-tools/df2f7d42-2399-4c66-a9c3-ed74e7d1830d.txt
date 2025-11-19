@@ -1,0 +1,51 @@
+
+
+### Page state
+- Page URL: https://vercel.com/andryxacorejz-1310s-projects/flower-production/GLMrwrf1iacfNpDTV6NVnnc1GFJk
+- Page Title: flower-production – Deployment Overview – Vercel
+- Page Snapshot:
+```yaml
+- generic [active] [ref=e1]:
+  - link "Skip to content":
+    - /url: "#geist-skip-nav"
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - link "Vercel logo":
+        - /url: /home
+        - button "Vercel Logo" [ref=e4] [cursor=pointer]:
+          - img "Vercel Logo" [ref=e5]
+      - navigation [ref=e7]:
+        - list [ref=e8]:
+          - listitem [ref=e9]:
+            - img [ref=e10]
+            - generic [ref=e12]:
+              - link:
+                - /url: /unknown-slug
+              - img [ref=e15]
+          - listitem [ref=e17]:
+            - img [ref=e18]
+            - img [ref=e23]
+          - listitem [ref=e25]:
+            - img [ref=e26]
+            - generic [ref=e28]:
+              - generic "This deployment is initializing." [ref=e29]
+              - paragraph
+        - navigation [ref=e32]:
+          - link "Contact" [ref=e33] [cursor=pointer]:
+            - /url: /contact
+            - paragraph [ref=e34]: Contact
+          - link "Login" [ref=e35] [cursor=pointer]:
+            - /url: /login
+            - paragraph [ref=e37]: Login
+          - link "Sign Up" [ref=e38] [cursor=pointer]:
+            - /url: /signup
+            - paragraph [ref=e40]: Sign Up
+    - main [ref=e41]
+    - contentinfo [ref=e42]
+  - alert [ref=e43]
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - img
+```
