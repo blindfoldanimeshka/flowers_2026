@@ -160,9 +160,9 @@ npm run db:seed
 ## 🔧 Доступы
 
 ### Админ-панель
-- **URL**: `/admin`
-- **Логин**: `AdminFlows`
-- **Пароль**: `KMFlAdmin`
+- **URL**: `НЕВАЖНО`
+- **Логин**: `НЕВАЖНО`
+- **Пароль**: `НЕВАЖНО`
 
 ### API Endpoints
 - **Health Check**: `/api/health`
