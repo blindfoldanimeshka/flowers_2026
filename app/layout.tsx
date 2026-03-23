@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { CartProvider } from "./context/CartContext";
+import { CartProvider } from '@/features/app/cart';
 import { StageWiseInit } from "./components/Stagewise";
 import CartButton from "./client/components/layout/CartButton";
 import { ToastContainer } from 'react-toastify';

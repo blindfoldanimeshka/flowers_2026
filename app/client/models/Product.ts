@@ -1,12 +1,12 @@
-// Интерфейс для модели продукта
 export interface IProduct {
   _id: string;
-  title: string;
+  name: string;
   price: number;
-  oldPrice?: number;
   description?: string;
-  imageSrc: string;
+  image: string;
   inStock?: boolean;
-  categoryId?: number;
-  subcategoryId?: number;
-} 
+  categoryId?: string;
+  categoryNumId?: number;
+  subcategoryId?: string;
+  subcategoryNumId?: number;
+}

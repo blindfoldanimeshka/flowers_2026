@@ -23,6 +23,7 @@ export async function createOrder(formData: FormData) {
     const itemsJson = formData.get('items') as string;
     const totalAmount = parseFloat(formData.get('totalAmount') as string);
     const paymentMethod = formData.get('paymentMethod') as string;
+    const fulfillmentMethod = (formData.get('fulfillmentMethod') as string) || 'delivery';
     const deliveryDate = formData.get('deliveryDate') as string;
     const deliveryTime = formData.get('deliveryTime') as string;
     const notes = formData.get('notes') as string;
@@ -69,7 +70,8 @@ export async function createOrder(formData: FormData) {
       },
       items,
       totalAmount,
-      paymentMethod
+      paymentMethod,
+      fulfillmentMethod
     };
     
     if (deliveryDate) {

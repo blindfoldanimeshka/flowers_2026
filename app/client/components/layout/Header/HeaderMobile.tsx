@@ -4,35 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useCategoriesViewModel } from '@/features/app/catalog';
 
-interface Subcategory {
-  _id?: string;
-  id: number;
-  name: string;
-  slug: string;
-  categoryId: number;
-}
-
-interface Category {
-  _id?: string;
-  id: number;
-  name: string;
-  slug: string;
-  image?: string;
-  subcategories: Subcategory[];
-}
-
-function useCategories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  useEffect(() => {
-    fetch('/api/categories')
-      .then(res => res.json())
-      .then(data => Array.isArray(data) ? setCategories(data) : setCategories([]));
-  }, []);
-  return categories;
-}
-
-// Мобильный хедер: sticky, bg, border, z-50
 export default function HeaderMobile() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -40,7 +13,7 @@ export default function HeaderMobile() {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextUrl, setNextUrl] = useState("");
   const router = useRouter();
-  const categories = useCategories();
+  const { categories } = useCategoriesViewModel();
 
   useEffect(() => {
     setMounted(true);
@@ -63,7 +36,6 @@ export default function HeaderMobile() {
     }, 300);
   };
 
-  // Функция для анимированного перехода
   const handleAnimatedNav = (url: string) => {
     setIsTransitioning(true);
     setIsClosing(true);
@@ -76,16 +48,13 @@ export default function HeaderMobile() {
     }, 320);
   };
 
-  // Overlay и меню через portal для управления z-index и эффектами
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFE1E1] h-14 flex items-center justify-between px-4">
-        {/* Логотип слева */}
         <Link href="/" className="flex items-center gap-2">
           <Image src="/image/logo.svg" alt="Floramix" width={32} height={32} />
           <span className="font-bold text-lg">Floramix</span>
         </Link>
-        {/* Бургер-меню справа */}
         <div className="relative">
           <button
             className="flex flex-col justify-center items-center w-10 h-10"
@@ -103,13 +72,11 @@ export default function HeaderMobile() {
       </div>
       {mounted && menuOpen && createPortal(
         <>
-          {/* Overlay */}
           <div
             className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-all duration-300 ${isClosing ? 'animate-fadeOut' : 'animate-fadeIn'}`}
             onClick={handleClose}
             aria-label="Закрыть меню"
           />
-          {/* Side menu */}
           <nav
             className={`fixed top-0 right-0 h-full w-72 max-w-full bg-white z-50 shadow-2xl p-4 ${isClosing ? 'animate-slideOut' : 'animate-slideIn'}`}
             style={{ boxShadow: "-8px 0 32px 0 rgba(0,0,0,0.10)" }}
@@ -126,7 +93,7 @@ export default function HeaderMobile() {
             </div>
             <ul className="mt-2">
               {categories.map(category => (
-                <li key={category._id || category.id} className="mb-2">
+                <li key={category._id} className="mb-2">
                   <button
                     type="button"
                     className="font-bold text-lg text-[#FF6B6B] hover:underline py-3 px-2 rounded-lg block w-full text-left active:bg-[#ffe1e1] focus:bg-[#ffe1e1] transition-all duration-300"
@@ -134,10 +101,10 @@ export default function HeaderMobile() {
                   >
                     {category.name}
                   </button>
-                  {category.subcategories && category.subcategories.length > 0 && (
+                  {category.subcategories?.length > 0 && (
                     <ul className="ml-4 mt-1">
                       {category.subcategories.map(sub => (
-                        <li key={sub._id || sub.id}>
+                        <li key={sub._id}>
                           <button
                             type="button"
                             className="text-gray-700 hover:text-[#FF6B6B] text-base block py-2 px-4 rounded-md w-full text-left active:bg-[#fff0f0] focus:bg-[#fff0f0] transition-all duration-300"
@@ -162,43 +129,43 @@ export default function HeaderMobile() {
           transition: all 0.3s ease-out;
           transform: translateX(-80px);
         }
-        
+
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
         }
-        
+
         @keyframes fadeOut {
           from { opacity: 1; }
           to { opacity: 0; }
         }
-        
+
         @keyframes slideIn {
           from { transform: translateX(100%); opacity: 0; }
           to { transform: translateX(0); opacity: 1; }
         }
-        
+
         @keyframes slideOut {
           from { transform: translateX(0); opacity: 1; }
           to { transform: translateX(100%); opacity: 0; }
         }
-        
+
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out forwards;
         }
-        
+
         .animate-fadeOut {
           animation: fadeOut 0.3s ease-out forwards;
         }
-        
+
         .animate-slideIn {
           animation: slideIn 0.3s ease-out forwards;
         }
-        
+
         .animate-slideOut {
           animation: slideOut 0.3s ease-out forwards;
         }
       `}</style>
     </>
   );
-} 
+}

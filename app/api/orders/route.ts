@@ -5,19 +5,17 @@ import Order from '@/models/Order';
 import { getCachedOrders, invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 import Product from '@/models/Product';
 
-// GET запрос для получения заказов (с кэшированием)
 export async function GET(request: NextRequest) {
   try {
     console.log('Получение заказов из кэша...');
-    
+
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email') ?? undefined;
     const status = searchParams.get('status') ?? undefined;
-    const deliveryType = searchParams.get('deliveryType') ?? undefined; // Новый параметр фильтрации
+    const deliveryType = searchParams.get('deliveryType') ?? undefined;
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
-    
-    // Для админов показываем все заказы, для клиентов - только их
+
     const userRole = request.headers.get('x-user-role');
     if (userRole !== 'admin' && !email) {
       return NextResponse.json(
@@ -25,23 +23,19 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    // Создаем фильтры для кэша
+
     const filters = {
       email,
       status,
-      deliveryType, // Добавляем новый фильтр
+      deliveryType,
       page,
       limit
     };
-    
-    // Получаем заказы из кэша
+
     const result = await getCachedOrders(filters);
-    
     console.log(`Получено заказов из кэша: ${result.orders.length}${deliveryType ? ` (тип: ${deliveryType})` : ''}`);
-    
+
     return NextResponse.json(result, { status: 200 });
-    
   } catch (error: unknown) {
     console.error('Ошибка при получении заказов:', error);
     return NextResponse.json(
@@ -51,49 +45,37 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Функция для генерации номера заказа
-async function generateOrderNumber() {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  
-  const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  
-  const lastOrderToday = await Order.findOne({ createdAt: { $gte: todayStart } }).sort({ createdAt: -1 });
-  
-  let sequence = 1;
-  if (lastOrderToday && lastOrderToday.orderNumber) {
-    const lastSequence = parseInt(lastOrderToday.orderNumber.split('-')[1]);
-    sequence = lastSequence + 1;
-  }
-  
-  return `${year}${month}${day}-${String(sequence).padStart(4, '0')}`;
-}
-
-// POST запрос для создания нового заказа
 export async function POST(request: NextRequest) {
   try {
     await dbConnect();
     const body = await request.json();
-    const { customer, items, paymentMethod, notes } = body;
+    const {
+      customer,
+      items,
+      paymentMethod,
+      notes,
+      fulfillmentMethod,
+      deliveryType,
+      deliveryDate,
+      deliveryTime,
+    } = body;
 
-    if (!customer || !items || !paymentMethod || items.length === 0) {
+    const resolvedFulfillmentMethod = fulfillmentMethod || deliveryType;
+
+    if (!customer || !items || !paymentMethod || !resolvedFulfillmentMethod || items.length === 0) {
       return NextResponse.json({ error: 'Неполные данные для создания заказа' }, { status: 400 });
     }
-    
+
     let totalAmount = 0;
-    const orderItems = []; // Создаем новый массив для обработанных товаров
+    const orderItems = [];
 
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) {
         return NextResponse.json({ error: `Товар с ID ${item.productId} не найден` }, { status: 404 });
       }
-      
+
       totalAmount += product.price * item.quantity;
-      
-      // Создаем новый объект товара для заказа
       orderItems.push({
         productId: item.productId,
         quantity: item.quantity,
@@ -103,14 +85,13 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Генерируем номер заказа
-    const orderNumber = await generateOrderNumber();
-
     const newOrder = new Order({
-      orderNumber, // Добавляем сгенерированный номер
       customer,
       items: orderItems,
       paymentMethod,
+      fulfillmentMethod: resolvedFulfillmentMethod,
+      deliveryDate: deliveryDate ? new Date(deliveryDate) : undefined,
+      deliveryTime: deliveryTime || undefined,
       notes,
       totalAmount,
       status: 'pending',
@@ -119,31 +100,28 @@ export async function POST(request: NextRequest) {
 
     await newOrder.save();
 
-    // Инвалидируем кэш заказов для обновления данных в real-time
     invalidateOrdersCache();
     invalidateOrderStatsCache();
 
-    console.log(`[НОВЫЙ ЗАКАЗ] Создан заказ #${orderNumber} на сумму ${totalAmount} ₽ для ${customer.name}`);
+    console.log(`[НОВЫЙ ЗАКАЗ] Создан заказ #${newOrder.orderNumber} на сумму ${totalAmount} ₽ для ${customer.name}`);
 
-    return NextResponse.json({ 
-      message: 'Заказ успешно создан', 
-      order: newOrder 
+    return NextResponse.json({
+      message: 'Заказ успешно создан',
+      order: newOrder
     }, { status: 201 });
-
   } catch (error: unknown) {
     console.error('Ошибка при создании заказа:', error);
     return NextResponse.json(
       { error: 'Ошибка при создании заказа', details: error instanceof Error ? error.message : String(error) },
-      { status: 500 });
+      { status: 500 }
+    );
   }
 }
 
-// PUT запрос для обновления статуса заказа (только для админов)
 export async function PUT(request: NextRequest) {
   try {
-    // Получаем информацию о пользователе из middleware
     const userRole = request.headers.get('x-user-role');
-    
+
     if (userRole !== 'admin') {
       return NextResponse.json(
         { error: 'Доступ запрещен - требуется роль администратора' },
@@ -152,39 +130,37 @@ export async function PUT(request: NextRequest) {
     }
 
     await dbConnect();
-    
+
     const body = await request.json();
     const { _id, ...updateData } = body;
-    
+
     if (!_id) {
       return NextResponse.json(
         { error: 'ID заказа обязателен' },
         { status: 400 }
       );
     }
-    
+
     const updatedOrder = await Order.findByIdAndUpdate(
       _id,
       updateData,
       { new: true, runValidators: true }
     ).populate('items.productId', 'name price image');
-    
+
     if (!updatedOrder) {
       return NextResponse.json(
         { error: 'Заказ не найден' },
         { status: 404 }
       );
     }
-    
-    // Инвалидируем кэш заказов и статистики
+
     invalidateOrdersCache();
     invalidateOrderStatsCache();
-    
+
     return NextResponse.json({ order: updatedOrder }, { status: 200 });
-    
   } catch (error: any) {
     console.error('Ошибка при обновлении заказа:', error);
-    
+
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
         (err: any) => err.message
@@ -194,7 +170,7 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     return NextResponse.json(
       { error: 'Ошибка при обновлении заказа', details: error.message },
       { status: 500 }
@@ -205,10 +181,10 @@ export async function PUT(request: NextRequest) {
 export async function GETAll() {
   try {
     await dbConnect();
-    const orders = await Order.find().sort({ createdAt: -1 }); // Сортируем по дате создания
+    const orders = await Order.find().sort({ createdAt: -1 });
     return NextResponse.json(orders);
   } catch (error) {
     console.error('Ошибка при получении заказов:', error);
     return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
   }
-} 
+}

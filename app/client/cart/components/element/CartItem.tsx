@@ -2,8 +2,7 @@
 
 import React, { useCallback, memo } from "react";
 import Image from "next/image";
-import { useCart } from "../../../../context/CartContext";
-import { CartItem as CartItemType } from "../../../../context/CartContext";
+import { CartItem as CartItemType, useCart } from '@/features/app/cart';
 
 interface CartItemProps {
   item: CartItemType;
