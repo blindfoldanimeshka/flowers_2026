@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import OrderCounter from '@/models/OrderCounter';
 
 export interface IOrderItem {
   productId: mongoose.Types.ObjectId;
@@ -86,11 +87,10 @@ const orderSchema = new mongoose.Schema<IOrder>({
       },
       validate: {
         validator: function(this: IOrder, value: string) {
-          // Адрес обязателен только для доставки
           if (this.fulfillmentMethod === 'delivery') {
             return value && value.trim().length > 0;
           }
-          return true; // Для самовывоза адрес не обязателен
+          return true;
         },
         message: 'Адрес доставки обязателен для доставки'
       }
@@ -108,7 +108,6 @@ const orderSchema = new mongoose.Schema<IOrder>({
     default: 'pending',
     validate: {
       validator: function(this: IOrder, value: string) {
-        // Статус 'delivering' недопустим для самовывоза
         if (this.fulfillmentMethod === 'pickup' && value === 'delivering') {
           return false;
         }
@@ -139,11 +138,10 @@ const orderSchema = new mongoose.Schema<IOrder>({
     },
     validate: {
       validator: function(this: IOrder, value: Date) {
-        // Дата доставки обязательна только для доставки
         if (this.fulfillmentMethod === 'delivery') {
           return value != null;
         }
-        return true; // Для самовывоза дата не обязательна
+        return true;
       },
       message: 'Дата доставки обязательна для доставки'
     }
@@ -155,11 +153,10 @@ const orderSchema = new mongoose.Schema<IOrder>({
     },
     validate: {
       validator: function(this: IOrder, value: string) {
-        // Время доставки обязательно только для доставки
         if (this.fulfillmentMethod === 'delivery') {
           return value && value.trim().length > 0;
         }
-        return true; // Для самовывоза время не обязательно
+        return true;
       },
       message: 'Время доставки обязательно для доставки'
     }
@@ -172,37 +169,32 @@ const orderSchema = new mongoose.Schema<IOrder>({
   timestamps: true
 });
 
-// Генерация номера заказа перед сохранением
 orderSchema.pre('save', async function(next) {
-  if (this.isNew) {
+  if (this.isNew && !this.orderNumber) {
     const date = new Date();
-    const year = date.getFullYear();
+    const year = String(date.getFullYear());
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    
-    // Находим количество заказов за сегодня
-    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const todayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-    
-    const todayOrders = await mongoose.model('Order').countDocuments({
-      createdAt: { $gte: todayStart, $lt: todayEnd }
-    });
-    
-    const orderNumber = `${year}${month}${day}-${String(todayOrders + 1).padStart(3, '0')}`;
-    this.orderNumber = orderNumber;
+    const dateKey = `${year}${month}${day}`;
+
+    const counter = await OrderCounter.findOneAndUpdate(
+      { dateKey },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    this.orderNumber = `${dateKey}-${String(counter.seq).padStart(4, '0')}`;
   }
   next();
 });
 
-// Pre-hooks to ensure validators run for update operations
 orderSchema.pre(['findOneAndUpdate', 'updateOne', 'updateMany'], function(next) {
   this.setOptions({ runValidators: true, context: 'query' });
   next();
 });
 
-// Индексы для быстрого поиска
 orderSchema.index({ 'customer.email': 1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ createdAt: -1 });
 
-export default mongoose.models.Order || mongoose.model<IOrder>('Order', orderSchema); 
+export default mongoose.models.Order || mongoose.model<IOrder>('Order', orderSchema);
