@@ -37,10 +37,8 @@ if (!global.mongooseCache) {
 }
 
 async function connect() {
-  // Если MONGODB_URI не определена, возвращаем null
   if (!MONGODB_URI) {
-    console.warn('MONGODB_URI не определена. Подключение к базе данных пропущено.');
-    return null;
+    throw new Error('MONGODB_URI is not configured');
   }
 
   console.log('connect() called');
@@ -50,12 +48,12 @@ async function connect() {
   }
 
   if (!cached.promise) {
-    // Настройки для MongoDB в Docker
     const options: ConnectOptions = {
-      authSource: 'admin'
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
     };
     console.log('Connecting to MongoDB with options:', options);
-    // MongoDB URI скрыт для безопасности
+    mongoose.set('bufferCommands', false);
     cached.promise = mongoose.connect(MONGODB_URI as string, options).then((mongooseInstance) => {
       console.log('Подключено к MongoDB');
       return mongooseInstance;
