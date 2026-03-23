@@ -6,13 +6,34 @@ import FadeWrapper from "./components/FadeWrapper";
 import TopInfoPanel from "./components/layout/TopInfoPanel";
 import { getCachedSettings } from "@/lib/cache";
 
+const defaultPublicSettings = {
+    siteName: "Floramix",
+    siteDescription: "",
+    contactPhone: "",
+    address: "",
+    workingHours: "",
+    socialLinks: {},
+};
+
 export default async function ClientLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const settings = await getCachedSettings();
-    const plainSettings = JSON.parse(JSON.stringify(settings));
+    let plainSettings = defaultPublicSettings;
+
+    try {
+        const settings = await getCachedSettings();
+        if (settings) {
+            plainSettings = {
+                ...defaultPublicSettings,
+                ...JSON.parse(JSON.stringify(settings)),
+            };
+        }
+    } catch (error) {
+        console.error("Failed to load public settings, using defaults:", error);
+    }
+
     return (
         <>
             <div
