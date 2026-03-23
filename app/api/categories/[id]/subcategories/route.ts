@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Category from '@/models/Category';
+import Subcategory from '@/models/Subcategory';
 
-// GET-запрос для получения всех подкатегорий определенной категории
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     await connect();
 
     const { id } = params;
-    // Загружаем категорию вместе с подкатегориями
-    const category = await Category.findById(id).populate('subcategories');
+    const category = await Category.findById(id);
 
     if (!category) {
       return NextResponse.json(
@@ -18,9 +17,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
-    // Возвращаем подкатегории
-    return NextResponse.json({ subcategories: category.subcategories }, { status: 200 });
-
+    const subcategories = await Subcategory.find({ categoryId: id }).lean();
+    return NextResponse.json({ subcategories }, { status: 200 });
   } catch (error: any) {
     console.error(`Ошибка при получении подкатегорий для категории с ID ${params.id}:`, error);
     return NextResponse.json(
@@ -30,10 +28,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-// POST-запрос для создания новой подкатегории - перенаправляется на основной API
 export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
   return NextResponse.json(
-    { 
+    {
       error: 'Этот API-маршрут устарел. Используйте POST /api/subcategories с параметром categoryId в теле запроса.',
       redirect_to: '/api/subcategories',
       example: {
@@ -52,10 +49,9 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   );
 }
 
-// PUT запрос для обновления подкатегорий (замена всего массива) - не поддерживается
-export async function PUT(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(_request: NextRequest, _params: { params: { id: string } }) {
   return NextResponse.json(
-    { 
+    {
       error: 'Этот API-маршрут не поддерживается. Используйте PUT /api/subcategories/[subcategoryId] для обновления отдельной подкатегории.',
       redirect_to: '/api/subcategories/[subcategoryId]'
     },

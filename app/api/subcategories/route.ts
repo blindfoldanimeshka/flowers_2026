@@ -8,10 +8,38 @@ import Category from '@/models/Category';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
 // GET all subcategories
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
     await connect();
-    const subcategories = await Subcategory.find({}).lean();
+
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get('slug');
+    const categoryId = searchParams.get('categoryId');
+    const categoryNumId = searchParams.get('categoryNumId');
+
+    const query: Record<string, string | number> = {};
+    if (slug) query.slug = slug;
+    if (categoryId) query.categoryId = categoryId;
+    if (categoryNumId) {
+      const parsedCategoryNumId = Number.parseInt(categoryNumId, 10);
+      if (!Number.isNaN(parsedCategoryNumId)) {
+        query.categoryNumId = parsedCategoryNumId;
+      }
+    }
+
+    if (slug) {
+      const subcategory = await Subcategory.findOne(query).lean();
+      if (!subcategory) {
+        return NextResponse.json(
+          { success: false, error: 'Подкатегория не найдена' },
+          { status: 404 }
+        );
+      }
+
+      return NextResponse.json(subcategory);
+    }
+
+    const subcategories = await Subcategory.find(query).lean();
     return NextResponse.json({ success: true, data: subcategories });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
