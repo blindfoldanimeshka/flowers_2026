@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import CartItem from "../element/CartItem";
 import CartItemSkeleton from "../element/CartItemSkeleton";
-import { useCart } from "../../../../context/CartContext";
+import { useCart } from '@/features/app/cart';
 import { motion, AnimatePresence } from "framer-motion";
 
 const CartItemSection = () => {

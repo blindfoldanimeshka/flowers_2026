@@ -1,7 +1,7 @@
 'use client'
 
 import Link from "next/link";
-import { useCart } from "../../../context/CartContext";
+import { useCart } from '@/features/app/cart';
 import { usePathname, useRouter } from "next/navigation";
 
 export default function CartIconMobile() {

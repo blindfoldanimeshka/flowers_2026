@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, memo } from "react";
 import Image from "next/image";
-import { useCart } from "../../../context/CartContext";
+import { useCart } from '@/features/app/cart';
 import { motion, AnimatePresence } from "framer-motion";
 import Modal from "../common/Modal";
 

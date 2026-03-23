@@ -6,16 +6,9 @@ const ADMIN_DASHBOARD_PATH = '/admin/orders';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  console.log('\n=== MIDDLEWARE DEBUG ===');
-  console.log('Pathname:', pathname);
-  console.log('Method:', request.method);
-  console.log('NODE_ENV:', process.env.NODE_ENV);
-  
-  // 1. Сначала ищем токен в cookie
+
   let token = request.cookies.get('auth_token')?.value;
 
-  // 2. Если в cookie нет, ищем в заголовке Authorization
   if (!token) {
     const authHeader = request.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {
@@ -26,7 +19,6 @@ export async function middleware(request: NextRequest) {
   const payload = token ? await verifyToken(token) : null;
   const isAuthenticated = !!payload;
 
-  // Исключаем служебные пути
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/auth') ||
@@ -35,7 +27,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Обработка страницы входа
   if (pathname === AUTH_LOGIN_PATH) {
     if (isAuthenticated) {
       return NextResponse.redirect(new URL(ADMIN_DASHBOARD_PATH, request.url));
@@ -43,7 +34,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Защита роутов админ-панели (UI)
   if (pathname.startsWith('/admin')) {
     if (!isAuthenticated || payload?.role !== 'admin') {
       const response = NextResponse.redirect(new URL(AUTH_LOGIN_PATH, request.url));
@@ -53,14 +43,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Защита API роутов
   if (pathname.startsWith('/api/')) {
-    // Временно пропускаем все запросы к категориям и подкатегориям
     if (pathname.startsWith('/api/categories') || pathname.startsWith('/api/subcategories')) {
-      console.log('MIDDLEWARE: Allowing access to', pathname);
       return NextResponse.next();
     }
-    
+
     const isPublicApiRoute =
       (
         request.method === 'GET' && (
@@ -75,7 +62,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    // Все остальные API-запросы требуют прав администратора
     if (!isAuthenticated || payload?.role !== 'admin') {
       const errorResponse = !isAuthenticated
         ? { error: 'Требуется аутентификация' }
@@ -83,12 +69,12 @@ export async function middleware(request: NextRequest) {
       const status = !isAuthenticated ? 401 : 403;
       return NextResponse.json(errorResponse, { status });
     }
-    
-    // Если пользователь — авторизованный админ, добавляем информацию в заголовки
+
     const requestHeaders = new Headers(request.headers);
-    requestHeaders.set('x-user-id', (payload as any).userId);
-    requestHeaders.set('x-user-role', (payload as any).role);
-    
+    requestHeaders.set('x-user-id', payload.userId);
+    requestHeaders.set('x-user-role', payload.role);
+    requestHeaders.set('x-username', payload.username);
+
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -99,7 +85,6 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Конфигурация middleware
 export const config = {
   matcher: ['/admin/:path*', '/api/:path*', '/auth/login'],
-}; 
+};
