@@ -14,16 +14,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
-    console.log('[API] GET /api/categories - Загрузка категорий и подкатегорий');
-
     // Получаем все категории и подкатегории параллельно
     const [categories, allSubcategories] = await Promise.all([
       Category.find(slug ? { slug } : {}).lean(),
       Subcategory.find({}).lean(),
     ]);
-
-    console.log('[API] Загружено категорий:', categories.length);
-    console.log('[API] Загружено подкатегорий:', allSubcategories.length);
 
     // Группируем подкатегории по categoryId для быстрого доступа
     const subcategoriesByCategory = allSubcategories.reduce((acc, sub) => {
@@ -35,17 +30,10 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, typeof allSubcategories>);
 
-    console.log('[API] Сгруппированы подкатегории по категориям');
-
     // Наполняем категории их подкатегориями
     const populatedCategories = categories.map((category) => {
       const categoryId = category._id.toString();
-      console.log('[API] Обработка категории:', category.name, 'ID:', categoryId);
-      
-      // Получаем подкатегории для текущей категории
       const categorySubcategories = subcategoriesByCategory[categoryId] || [];
-      console.log('[API] Найдено подкатегорий для категории:', categorySubcategories.length);
-      
       return {
         ...category,
         subcategories: categorySubcategories,

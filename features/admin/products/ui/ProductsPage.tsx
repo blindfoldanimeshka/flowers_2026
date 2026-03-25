@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import Image from 'next/image';
 import ImageUpload from '@/app/admin/components/ImageUpload';
 import { ICategory, ISubcategory } from '@/app/client/models/Category';
@@ -17,9 +17,38 @@ interface ProductFormProps {
 }
 
 const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSubmit, onCancel }: ProductFormProps) => {
+  const [priceInput, setPriceInput] = useState(String(draft.price || ''));
+
+  useEffect(() => {
+    setPriceInput(String(draft.price || ''));
+  }, [draft.price, draft._id]);
+
+  const normalizePrice = (raw: string) => {
+    const sanitized = raw.replace(',', '.').replace(/[^\d.]/g, '');
+    const parts = sanitized.split('.');
+    const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
+    return normalized;
+  };
+
+  const handlePriceChange = (value: string) => {
+    const normalized = normalizePrice(value);
+    setPriceInput(normalized);
+    const parsed = Number(normalized);
+    if (!Number.isNaN(parsed)) {
+      onChange('price', parsed);
+    }
+  };
+
+  const handlePriceBlur = () => {
+    const parsed = Number(normalizePrice(priceInput));
+    const safe = Number.isFinite(parsed) ? Math.max(0, Number(parsed.toFixed(2))) : 0;
+    setPriceInput(safe === 0 ? '' : safe.toString());
+    onChange('price', safe);
+  };
+
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = event.target;
-    if (name === 'price' || type === 'number') return onChange('price', value === '' ? 0 : Number(value));
+    if (name === 'price') return handlePriceChange(value);
     if (name === 'inStock' && type === 'checkbox' && 'checked' in event.target) return onChange('inStock', event.target.checked);
     onChange(name as keyof AdminProductDraft, value as never);
   };
@@ -28,7 +57,17 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
     <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 bg-white p-6 rounded-lg shadow-md">
       <input name="name" value={draft.name} onChange={handleChange} placeholder="Название товара" className="w-full p-2 border rounded" required />
       <textarea name="description" value={draft.description} onChange={handleChange} placeholder="Описание" className="w-full p-2 border rounded" />
-      <input type="number" min="0" name="price" value={draft.price} onChange={handleChange} placeholder="Цена" className="w-full p-2 border rounded" required />
+      <input
+        type="text"
+        inputMode="decimal"
+        name="price"
+        value={priceInput}
+        onChange={handleChange}
+        onBlur={handlePriceBlur}
+        placeholder="Цена"
+        className="w-full p-2 border rounded"
+        required
+      />
       <select name="categoryId" value={draft.categoryId} onChange={handleChange} className="w-full p-2 border rounded" required>
         <option value="">Выберите категорию</option>
         {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
@@ -93,4 +132,3 @@ export default function ProductsPage() {
     </div>
   );
 }
-

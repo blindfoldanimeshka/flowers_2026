@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, memo } from "react";
 import Image from "next/image";
 import { useCart } from '@/features/app/cart';
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 
 interface ShopItemProps {
   id: string;
@@ -27,6 +28,8 @@ const ShopItem = memo(({
     const { addToCart, isInCart, cartItems, updateQuantity } = useCart();
     const [isAdded, setIsAdded] = useState(false);
     const [itemCount, setItemCount] = useState(0);
+    const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+    const [isPortalReady, setIsPortalReady] = useState(false);
     const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
 
     useEffect(() => {
@@ -36,6 +39,29 @@ const ShopItem = memo(({
       const cartItem = cartItems.find(item => item.id === id);
       setItemCount(cartItem ? cartItem.quantity : 0);
     }, [id, isInCart, cartItems]);
+
+    useEffect(() => {
+      setIsPortalReady(true);
+    }, []);
+
+    useEffect(() => {
+      if (!isImagePreviewOpen) return;
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setIsImagePreviewOpen(false);
+        }
+      };
+
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = previousOverflow;
+      };
+    }, [isImagePreviewOpen]);
 
     const handleToggleCart = useCallback(() => {
       if (!inStock) return;
@@ -86,6 +112,12 @@ const ShopItem = memo(({
         </AnimatePresence>
 
         <div className="w-full h-[210px] sm:h-[260px] relative rounded-t-[30px] overflow-hidden flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsImagePreviewOpen(true)}
+            className="absolute inset-0 z-20 cursor-zoom-in"
+            aria-label={`Открыть фото товара ${title}`}
+          />
           <Image
             src={imageSrc}
             alt={title}
@@ -99,13 +131,13 @@ const ShopItem = memo(({
               objectPosition: 'center',
               transform: 'translateZ(0)',
             }}
-            className="rounded-t-[30px] will-change-transform"
-            onLoadingComplete={(img) => {
-              img.classList.add('transition-all', 'duration-500', 'group-hover:scale-[0.95]', 'group-hover:blur-sm', 'group-hover:brightness-50');
-            }}
+            className="rounded-t-[30px] will-change-transform transition-transform duration-500 md:group-hover:scale-[0.97]"
           />
-          <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 z-10">
-            <p className="text-white text-xs sm:text-sm text-center">{description}</p>
+          <div
+            className="absolute inset-0 z-[15] flex flex-col items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 pointer-events-none"
+            aria-hidden
+          >
+            <p className="text-white text-xs sm:text-sm text-center drop-shadow-sm">{description}</p>
             {!inStock && (
               <span className="mt-1.5 bg-white/80 text-red-500 px-1.5 py-0.5 rounded text-xs sm:text-sm font-medium">
                 Нет в наличии
@@ -115,6 +147,7 @@ const ShopItem = memo(({
         </div>
         <div className="flex flex-col items-center justify-center w-full flex-1">
           <h4 className="text-base sm:text-xl font-bold text-center leading-tight w-full mt-2 line-clamp-2 overflow-hidden max-h-[2.8em]">{title}</h4>
+          <p className="sm:hidden text-xs text-gray-700 text-center px-3 mt-1 line-clamp-2">{description}</p>
           <div className="flex justify-center items-center gap-1 w-full text-center mt-1">
             {oldPrice && (
               <p className="text-xs sm:text-sm text-gray-500 line-through text-center">{oldPrice} руб.</p>
@@ -166,6 +199,35 @@ const ShopItem = memo(({
           </div>
         </button>
       </div>
+      {isPortalReady && isImagePreviewOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4"
+          onClick={() => setIsImagePreviewOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl bg-white"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setIsImagePreviewOpen(false)}
+              className="absolute top-2 right-2 z-10 rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-gray-800"
+              aria-label="Закрыть просмотр фото"
+            >
+              ×
+            </button>
+            <div className="relative w-full h-[70vh]">
+              <Image
+                src={imageSrc}
+                alt={title}
+                fill
+                sizes="100vw"
+                className="object-contain bg-white"
+              />
+            </div>
+          </div>
+        </div>
+      , document.body)}
       </>
     );
   }

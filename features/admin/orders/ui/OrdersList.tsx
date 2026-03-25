@@ -69,8 +69,14 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
         </table>
       </div>
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-lg w-full mx-4 max-h-96 overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4"
+          onClick={handleCloseDetails}
+        >
+          <div
+            className="bg-white p-6 rounded-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold">Детали заказа #{selectedOrder.orderNumber}</h3><button onClick={handleCloseDetails} className="text-gray-500 hover:text-gray-700 text-xl">×</button></div>
             <div className="space-y-3">
               <div><strong>Клиент:</strong> {selectedOrder.customer.name}</div>

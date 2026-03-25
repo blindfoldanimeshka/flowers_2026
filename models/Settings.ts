@@ -2,6 +2,7 @@ import { createSupabaseModel } from '@/lib/supabaseModel';
 
 export interface ISettings {
   _id: string;
+  settingKey: string;
   siteName: string;
   siteDescription: string;
   contactPhone: string;
@@ -28,6 +29,7 @@ export interface ISettings {
 const Settings = createSupabaseModel({
   collection: 'settings',
   defaults: {
+    settingKey: 'global-settings',
     siteName: 'My Awesome Site',
     siteDescription: 'The best products at the best prices.',
     deliveryRadius: 10,
