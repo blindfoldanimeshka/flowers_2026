@@ -220,7 +220,7 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
       };
     }
     
-    const availableMethods = [];
+    const availableMethods: Array<{ id: string; name: string; description: string; icon: string }> = [];
     
     // Проверяем Stripe
     if (settings.stripe.enabled && settings.stripe.publishableKey) {

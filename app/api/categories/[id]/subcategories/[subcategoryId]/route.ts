@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import connect from '@/lib/db';
 import { Category } from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
+import { isValidId } from '@/lib/id';
 
 export async function GET(
   request: NextRequest,
@@ -129,7 +129,7 @@ export async function DELETE(
     const { id, subcategoryId } = params;
     console.log('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
 
-    if (!mongoose.Types.ObjectId.isValid(id) || !mongoose.Types.ObjectId.isValid(subcategoryId)) {
+    if (!isValidId(id) || !isValidId(subcategoryId)) {
       return NextResponse.json(
         { success: false, error: 'Некорректный формат ID' },
         { status: 400 }
@@ -157,7 +157,7 @@ export async function DELETE(
     await Subcategory.deleteOne({ _id: subcategoryId });
     await Category.updateOne(
       { _id: id },
-      { $pull: { subcategories: new mongoose.Types.ObjectId(subcategoryId) } }
+      { $pull: { subcategories: subcategoryId } }
     );
 
     console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory deleted successfully');

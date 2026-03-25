@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
-import mongoose from 'mongoose';
+import { isValidId } from '@/lib/id';
 import { revalidatePath } from 'next/cache';
 
 // GET запрос для получения товара по ID
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const { id } = params;
     
     // Проверка валидности ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json(
         { error: 'Неверный формат ID товара' },
         { status: 400 }
@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const body = await request.json();
     
     // Проверка валидности ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json(
         { error: 'Неверный формат ID товара' },
         { status: 400 }
@@ -103,7 +103,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const { id } = params;
     
     // Проверка валидности ID
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json(
         { error: 'Неверный формат ID товара' },
         { status: 400 }

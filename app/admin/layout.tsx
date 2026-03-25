@@ -4,8 +4,6 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { ToastContainer } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
 import AdminNotifications from '../../components/AdminNotifications';
 
 export default function AdminLayout({
@@ -86,7 +84,6 @@ export default function AdminLayout({
         <div className="p-6">
           {children}
         </div>
-        <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
       </main>
 
       {/* Компонент уведомлений для администратора */}

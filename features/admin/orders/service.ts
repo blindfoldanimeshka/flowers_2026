@@ -26,19 +26,22 @@ export async function getAdminOrders(options: GetAdminOrdersOptions = {}): Promi
   return data.orders || [];
 }
 
-export async function updateAdminOrderStatus(id: string, status: IAdminOrder['status']): Promise<IAdminOrder> {
+export async function updateAdminOrderStatus(id: string | number, status: IAdminOrder['status']): Promise<IAdminOrder> {
   const response = await fetch('/api/orders', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ _id: id, status }),
+    credentials: 'include',
+    body: JSON.stringify({ _id: String(id), status }),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Не удалось обновить статус заказа'));
   const data = await response.json();
   return data.order;
 }
 
-export async function deleteAdminOrder(id: string): Promise<void> {
-  const response = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
+export async function deleteAdminOrder(id: string | number): Promise<void> {
+  const response = await fetch(`/api/orders/${String(id)}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
   if (!response.ok) throw new Error(await parseError(response, 'Не удалось удалить заказ'));
 }
-

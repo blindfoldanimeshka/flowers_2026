@@ -62,15 +62,21 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                   </select>
                 </td>
                 <td className="p-3 border-t border-b border-gray-200 text-sm text-gray-600">{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</td>
-                <td className="p-3 rounded-r-xl border-r border-t border-b border-gray-200"><div className="flex gap-2"><button onClick={() => handleShowDetails(order)} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors">Детали</button><button onClick={() => handleDelete(order._id)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors">Удалить</button></div></td>
+                <td className="p-3 rounded-r-xl border-r border-t border-b border-gray-200"><div className="flex gap-2"><button type="button" onClick={() => handleShowDetails(order)} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors">Детали</button><button type="button" onClick={() => handleDelete(order._id)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors">Удалить</button></div></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-lg w-full mx-4 max-h-96 overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4"
+          onClick={handleCloseDetails}
+        >
+          <div
+            className="bg-white p-6 rounded-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex justify-between items-center mb-4"><h3 className="text-xl font-bold">Детали заказа #{selectedOrder.orderNumber}</h3><button onClick={handleCloseDetails} className="text-gray-500 hover:text-gray-700 text-xl">×</button></div>
             <div className="space-y-3">
               <div><strong>Клиент:</strong> {selectedOrder.customer.name}</div>
@@ -89,4 +95,5 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
     </div>
   );
 }
+
 

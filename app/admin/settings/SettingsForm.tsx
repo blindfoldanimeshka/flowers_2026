@@ -156,8 +156,6 @@ const getInitialFormState = (settings: any) => ({
 
 export default function SettingsForm({ initialSettings }: { initialSettings: any }) {
   const [form, setForm] = useState(getInitialFormState(initialSettings));
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -184,9 +182,8 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
-    setMessage("");
-    setError("");
 
     // Собираем данные для отправки, включая вложенный объект socialLinks
     const dataToSend = {
@@ -212,11 +209,19 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
         const errorData = await response.json();
         throw new Error(errorData.error || 'Не удалось сохранить настройки');
       }
-      toast.success("Настройки успешно сохранены!");
+      toast.dismiss('settings-save-success');
+      toast.success("Настройки успешно сохранены!", {
+        toastId: 'settings-save-success',
+        autoClose: 3000,
+      });
       router.refresh();
 
     } catch (err: any) {
-      toast.error(err.message);
+      toast.dismiss('settings-save-error');
+      toast.error(err.message, {
+        toastId: 'settings-save-error',
+        autoClose: 5000,
+      });
     } finally {
       setIsLoading(false);
     }

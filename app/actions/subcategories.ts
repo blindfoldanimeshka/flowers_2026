@@ -9,7 +9,7 @@ import Subcategory from '@/models/Subcategory';
 import Category from '@/models/Category'; // Added import for Category
 import { getCachedSubcategories, invalidateSubcategoriesCache } from '@/lib/cache';
 import { invalidateCategoriesCache } from '@/lib/cache'; // Added import for invalidateCategoriesCache
-import mongoose from 'mongoose';
+import { startSession } from '@/lib/supabaseModel';
 
 // Создание новой подкатегории
 export async function createSubcategory(formData: FormData) {
@@ -124,7 +124,7 @@ export async function updateSubcategory(id: string, formData: FormData) {
     
     // Если изменилась категория, обновляем связи
     if (currentSubcategory.categoryId.toString() !== categoryId) {
-      const session = await mongoose.startSession();
+      const session = await startSession();
       
       try {
         await session.withTransaction(async () => {
@@ -247,7 +247,7 @@ export async function updateSubcategory(id: string, formData: FormData) {
 
 // Удаление подкатегории
 export async function deleteSubcategory(id: string) {
-  const session = await mongoose.startSession();
+  const session = await startSession();
   
   try {
     await dbConnect();

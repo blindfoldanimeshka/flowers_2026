@@ -50,5 +50,6 @@ jest.mock('next/navigation', () => ({
 
 // Mock environment variables
 process.env.NEXT_PUBLIC_API_URL = 'http://localhost:3000';
-process.env.MONGODB_URI = 'mongodb://localhost:27017/test';
-
+process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://jnbopvwnwyummzvsqjcj.supabase.co';
+process.env.SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'test-anon-key';
+process.env.SUPABASE_COLLECTION_TABLE = process.env.SUPABASE_COLLECTION_TABLE || 'documents';

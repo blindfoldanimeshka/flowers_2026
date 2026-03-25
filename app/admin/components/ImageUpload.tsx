@@ -15,22 +15,85 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  const MAX_UPLOAD_BYTES = 900 * 1024; // Запас под nginx 1MB
+  const MAX_DIMENSION = 2560;
+
+  const optimizeImageForUpload = useCallback(async (file: File): Promise<File> => {
+    if (!file.type.startsWith('image/')) return file;
+    if (file.type === 'image/gif') return file;
+
+    const objectUrl = URL.createObjectURL(file);
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Не удалось обработать изображение'));
+        img.src = objectUrl;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Не удалось подготовить canvas для сжатия изображения');
+      }
+
+      const ratio = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+      let targetWidth = Math.max(1, Math.round(image.width * ratio));
+      let targetHeight = Math.max(1, Math.round(image.height * ratio));
+
+      const toBlob = (quality: number) => new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/webp', quality);
+      });
+
+      let bestBlob: Blob | null = null;
+      for (let scaleAttempt = 0; scaleAttempt < 4; scaleAttempt++) {
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+        ctx.clearRect(0, 0, targetWidth, targetHeight);
+        ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
+
+        for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
+          const blob = await toBlob(quality);
+          if (!blob) continue;
+          bestBlob = blob;
+          if (blob.size <= MAX_UPLOAD_BYTES) {
+            const safeName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+            return new File([blob], `${safeName}.webp`, { type: 'image/webp' });
+          }
+        }
+
+        targetWidth = Math.max(1, Math.round(targetWidth * 0.85));
+        targetHeight = Math.max(1, Math.round(targetHeight * 0.85));
+      }
+
+      if (!bestBlob) return file;
+
+      const safeName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_');
+      return new File([bestBlob], `${safeName}.webp`, { type: 'image/webp' });
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }, []);
+
   const uploadFile = useCallback(async (file: File) => {
     setError(null);
     setIsUploading(true);
     if (onUploadStart) onUploadStart();
 
-    // Проверка размера файла (10MB лимит)
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      setError('Файл должен быть не более 10MB');
+    // Жмем изображение на клиенте, чтобы избежать 413 от nginx
+    const optimizedFile = await optimizeImageForUpload(file);
+
+    // Дополнительная защита по размеру после сжатия
+    if (optimizedFile.size > MAX_UPLOAD_BYTES) {
+      setError('Файл слишком большой даже после оптимизации. Попробуйте JPG/WebP меньшего веса.');
       setIsUploading(false);
       if (onUploadEnd) onUploadEnd(false);
       return;
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', optimizedFile);
 
     try {
       const res = await fetch('/api/upload', {
@@ -71,7 +134,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     } finally {
       setIsUploading(false);
     }
-  }, [onChange, onUploadStart, onUploadEnd]);
+  }, [MAX_UPLOAD_BYTES, onChange, onUploadEnd, onUploadStart, optimizeImageForUpload]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -116,7 +179,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
               <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             <p className="text-gray-600 font-medium">Перетащите фото сюда или кликните для выбора</p>
-            <p className="text-gray-400 text-sm mt-1">PNG, JPG, WEBP, GIF до 10MB</p>
+            <p className="text-gray-400 text-sm mt-1">PNG, JPG, WEBP, GIF. Автооптимизация перед загрузкой.</p>
           </div>
         )}
       </div>

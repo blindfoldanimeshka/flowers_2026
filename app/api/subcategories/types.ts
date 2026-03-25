@@ -1,5 +1,3 @@
-import { Types } from 'mongoose';
-
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -14,14 +12,14 @@ export interface ApiResponse<T = any> {
 export interface SubcategoryBase {
   name: string;
   slug: string;
-  categoryId: Types.ObjectId;
+  categoryId: string;
   description?: string;
   image?: string;
   isActive?: boolean;
 }
 
 export interface SubcategoryDocument extends SubcategoryBase {
-  _id: Types.ObjectId;
+  _id: string;
   createdAt: Date;
   updatedAt: Date;
 }

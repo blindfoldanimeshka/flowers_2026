@@ -1,29 +1,14 @@
-import mongoose, { Document } from 'mongoose';
+import { createSupabaseModel } from '@/lib/supabaseModel';
 
-export interface IOrderCounter extends Document {
-  // Дата в формате YYYYMMDD (из Order модели)
+export interface IOrderCounter {
+  _id: string;
   dateKey: string;
-  // Последовательность заказов за день
   seq: number;
 }
 
-const orderCounterSchema = new mongoose.Schema<IOrderCounter>({
-  dateKey: {
-    type: String,
-    required: true,
-    unique: true,
-    index: true,
-  },
-  seq: {
-    type: Number,
-    required: true,
-    default: 0,
-  },
+const OrderCounter = createSupabaseModel({
+  collection: 'order_counters',
+  defaults: { seq: 0 },
 });
 
-const OrderCounter =
-  (mongoose.models.OrderCounter as mongoose.Model<IOrderCounter>) ||
-  mongoose.model<IOrderCounter>('OrderCounter', orderCounterSchema);
-
 export default OrderCounter;
-

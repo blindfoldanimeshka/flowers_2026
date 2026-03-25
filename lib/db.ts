@@ -1,74 +1,40 @@
-import mongoose, { ConnectOptions } from 'mongoose';
-
-type MongooseCache = {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-};
+import { SUPABASE_COLLECTION_TABLE, supabase, supabaseKey, supabaseUrl } from '@/lib/supabase';
 
 declare global {
   // eslint-disable-next-line no-var
-  var mongooseCache: MongooseCache | undefined;
-}
-
-// Получаем URL подключения к MongoDB
-let MONGODB_URI = process.env.MONGODB_URI;
-
-// Проверяем, запущено ли приложение вне Docker
-if (MONGODB_URI && MONGODB_URI.includes('@mongodb:')) {
-  // Если приложение запущено вне Docker, заменяем mongodb на localhost
-  const isRunningLocally = process.env.NODE_ENV === 'development' && typeof window === 'undefined';
-  if (isRunningLocally) {
-    MONGODB_URI = MONGODB_URI.replace('@mongodb:', '@localhost:');
-    console.log('Используем локальный URL для MongoDB:', MONGODB_URI);
-  }
-}
-
-// MONGODB_URI скрыт для безопасности
-
-if (!MONGODB_URI) {
-  console.warn('MONGODB_URI не определена. Подключение к базе данных будет пропущено.');
-}
-
-// Переменная для кэширования соединения
-const cached: MongooseCache = global.mongooseCache || { conn: null, promise: null };
-
-if (!global.mongooseCache) {
-  global.mongooseCache = cached;
+  var supabaseConnectionChecked: boolean | undefined;
 }
 
 async function connect() {
-  if (!MONGODB_URI) {
-    throw new Error('MONGODB_URI is not configured');
+  if (!supabaseUrl) {
+    throw new Error('SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) is not configured');
+  }
+  if (!supabaseKey) {
+    throw new Error(
+      'Supabase key is not configured. Set SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_ANON_KEY).'
+    );
   }
 
-  console.log('connect() called');
-  if (cached.conn) {
-    console.log('Using cached connection');
-    return cached.conn;
+  if (global.supabaseConnectionChecked) {
+    return true;
   }
 
-  if (!cached.promise) {
-    const options: ConnectOptions = {
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-    };
-    console.log('Connecting to MongoDB with options:', options);
-    mongoose.set('bufferCommands', false);
-    cached.promise = mongoose.connect(MONGODB_URI as string, options).then((mongooseInstance) => {
-      console.log('Подключено к MongoDB');
-      return mongooseInstance;
-    });
+  const { error } = await supabase
+    .from(SUPABASE_COLLECTION_TABLE)
+    .select('id,collection,doc')
+    .limit(1);
+
+  if (error) {
+    if (error.message.includes('schema cache') || error.message.includes('column')) {
+      throw new Error(
+        `Supabase table "${SUPABASE_COLLECTION_TABLE}" has invalid schema. Expected columns: id, collection, doc, created_at, updated_at. Run scripts/supabase-init.sql in Supabase SQL Editor.`
+      );
+    }
+    throw new Error(`Supabase connection failed: ${error.message}`);
   }
 
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    console.error('Ошибка при подключении к MongoDB:', e);
-    throw e;
-  }
-
-  return cached.conn;
+  global.supabaseConnectionChecked = true;
+  return true;
 }
 
 export default connect;

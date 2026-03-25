@@ -1,61 +1,63 @@
-const mongoose = require('mongoose');
+const { createClient } = require('@supabase/supabase-js');
 
-// Конфигурация
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://username:password@cluster.mongodb.net/flowers_production?retryWrites=true&w=majority';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jnbopvwnwyummzvsqjcj.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const TABLE = process.env.SUPABASE_COLLECTION_TABLE || 'documents';
 
-console.log('🧪 Тестирование приложения...');
-console.log('URI:', MONGODB_URI.replace(/\/\/.*@/, '//***:***@'));
+console.log('🧪 Тестирование подключения к Supabase...');
+console.log('URL:', SUPABASE_URL);
 
 async function testApp() {
   try {
-    console.log('\n1️⃣ Тестирование подключения к MongoDB Atlas...');
-    
-    await mongoose.connect(MONGODB_URI, {
-      authSource: 'admin'
+    if (!SUPABASE_KEY) {
+      throw new Error('Не задан SUPABASE_SERVICE_ROLE_KEY или SUPABASE_ANON_KEY');
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
     });
-    
-    console.log('✅ Подключение к MongoDB Atlas успешно!');
-    
-    // Тест создания коллекции
-    console.log('\n2️⃣ Тестирование записи в базу данных...');
-    const testCollection = mongoose.connection.db.collection('test_connection');
-    await testCollection.insertOne({ 
-      test: true, 
-      timestamp: new Date(),
-      message: 'Test connection successful'
-    });
-    
-    console.log('✅ Запись в базу данных успешна!');
-    
-    // Тест чтения
-    console.log('\n3️⃣ Тестирование чтения из базы данных...');
-    const result = await testCollection.findOne({ test: true });
-    console.log('✅ Чтение из базы данных успешно!');
-    console.log('📄 Результат:', result.message);
-    
-    // Очистка тестовых данных
-    console.log('\n4️⃣ Очистка тестовых данных...');
-    await testCollection.deleteMany({ test: true });
-    console.log('✅ Тестовые данные очищены');
-    
-    await mongoose.disconnect();
-    console.log('\n🎉 Все тесты прошли успешно!');
-    console.log('✅ Приложение готово к деплою на Vercel!');
-    
+
+    console.log('\n1️⃣ Проверка чтения из таблицы документов...');
+    const { error: readError } = await supabase.from(TABLE).select('id').limit(1);
+    if (readError) throw readError;
+    console.log('✅ Чтение успешно');
+
+    console.log('\n2️⃣ Тест записи в таблицу...');
+    const payload = {
+      collection: 'healthcheck',
+      doc: { message: 'Test connection successful', createdAt: new Date().toISOString() },
+    };
+
+    const { data: inserted, error: insertError } = await supabase
+      .from(TABLE)
+      .insert(payload)
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+    console.log('✅ Запись успешна');
+
+    console.log('\n3️⃣ Очистка тестовой записи...');
+    const { error: deleteError } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('id', inserted.id);
+
+    if (deleteError) throw deleteError;
+    console.log('✅ Очистка успешна');
+
+    console.log('\n🎉 Все тесты Supabase пройдены успешно!');
   } catch (error) {
     console.error('\n❌ Ошибка тестирования:');
     console.error(error.message);
-    
+
     console.log('\n🔧 Возможные решения:');
-    console.log('1. Проверьте MONGODB_URI в переменных окружения');
-    console.log('2. Убедитесь, что IP 0.0.0.0/0 добавлен в Network Access');
-    console.log('3. Проверьте username и password');
-    console.log('4. Убедитесь, что кластер запущен');
-    
+    console.log('1. Проверьте SUPABASE_URL и ключи в .env');
+    console.log('2. Создайте таблицу documents (SQL в scripts/supabase-init.sql)');
+    console.log('3. Проверьте RLS/права на таблицу documents');
+
     process.exit(1);
   }
 }
 
-// Запуск тестов
 testApp();
-

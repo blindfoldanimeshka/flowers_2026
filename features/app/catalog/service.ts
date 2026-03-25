@@ -25,10 +25,19 @@ async function fetchProducts(url: string): Promise<IProduct[]> {
   return normalizeProductsResponse(await response.json());
 }
 
+/** Один параллельный запрос на главной: CategoryGrid и HomeCatalogSection больше не дублируют GET. */
+let getAllCategoriesInflight: Promise<ICategory[]> | null = null;
+
 export async function getAllCategories(): Promise<ICategory[]> {
-  const response = await fetch('/api/categories', { cache: 'no-store' });
-  const data = await parseJson<ICategory[] | ICategory>(response);
-  return Array.isArray(data) ? data : [data];
+  if (getAllCategoriesInflight) return getAllCategoriesInflight;
+  getAllCategoriesInflight = (async () => {
+    const response = await fetch('/api/categories', { cache: 'no-store' });
+    const data = await parseJson<ICategory[] | ICategory>(response);
+    return Array.isArray(data) ? data : [data];
+  })().finally(() => {
+    getAllCategoriesInflight = null;
+  });
+  return getAllCategoriesInflight;
 }
 
 export async function getCategoryBySlug(slug: string): Promise<ICategory | null> {

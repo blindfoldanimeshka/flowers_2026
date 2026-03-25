@@ -1,9 +1,9 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
 import Subcategory from '@/models/Subcategory';
+import { isValidId } from '@/lib/id';
 
 // GET запрос для получения товаров по ID подкатегории
 export async function GET(request: NextRequest, { params }: { params: { subcategoryId: string } }) {
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: { params: { subcateg
     const { subcategoryId } = params;
     
     // Проверка валидности subcategoryId (ObjectId)
-    if (!mongoose.Types.ObjectId.isValid(subcategoryId)) {
+    if (!isValidId(subcategoryId)) {
       return NextResponse.json(
         { 
           success: false,
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: { subcateg
     }
     
     // Получаем все товары в подкатегории
-    const products = await Product.find({ subcategoryId: new mongoose.Types.ObjectId(subcategoryId) })
+    const products = await Product.find({ subcategoryId })
       .populate('categoryId', 'name slug')
       .populate('subcategoryId', 'name slug')
       .lean();

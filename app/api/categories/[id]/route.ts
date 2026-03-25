@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
-import mongoose from 'mongoose';
+import { isValidId } from '@/lib/id';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -36,7 +36,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
     const { id } = params;
     const { name } = await request.json();
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json({ error: 'Неверный ID категории' }, { status: 400 });
     }
 
@@ -70,7 +70,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     const { default: Product } = await import('@/models/Product');
     const { id } = params;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json({ error: 'Неверный ID категории' }, { status: 400 });
     }
 
