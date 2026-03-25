@@ -1,0 +1,20 @@
+# Exclude files and directories from Docker build context
+# Node modules and build output
+node_modules
+.next
+
+# VCS
+.git
+.gitignore
+
+# Docker / Compose
+Dockerfile
+docker-compose.yml
+
+# Logs and temp
+*.log
+tmp
+
+# IDE / tooling
+.vscode
+.idea
