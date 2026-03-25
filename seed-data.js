@@ -1,46 +1,62 @@
-const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://floweradmin:flowerpassword@localhost:27017/flowerdb?authSource=admin';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://jnbopvwnwyummzvsqjcj.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+const TABLE = process.env.SUPABASE_COLLECTION_TABLE || 'documents';
+
+if (!SUPABASE_KEY) {
+  throw new Error('Не задан SUPABASE_SERVICE_ROLE_KEY или SUPABASE_ANON_KEY');
+}
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
+
+async function insertDoc(collection, doc) {
+  const { error } = await supabase.from(TABLE).insert({ collection, doc });
+  if (error) throw error;
+}
+
+async function cleanCollection(collection) {
+  const { error } = await supabase.from(TABLE).delete().eq('collection', collection);
+  if (error) throw error;
+}
 
 async function seedDatabase() {
-  const client = new MongoClient(MONGODB_URI);
-  
   try {
-    await client.connect();
-    console.log('🔗 Подключение к MongoDB установлено');
-    
-    const db = client.db();
-    
-    // Создаем администратора
-    console.log('👤 Создание администратора...');
+    console.log('🔗 Подключение к Supabase установлено');
+
+    await cleanCollection(1);
+    await cleanCollection(7);
+    await cleanCollection(8);
+
+    console.log('👤 Создание пользователей...');
     const adminPassword = await bcrypt.hash('KMFlAdmin', 10);
     const userPassword = await bcrypt.hash('user12345', 10);
-    
-    const adminUser = {
-      _id: new ObjectId(),
+
+    await insertDoc(1, {
       username: 'AdminFlows',
       email: 'admin@flower-shop.ru',
       password: adminPassword,
       role: 'admin',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    const regularUser = {
-      _id: new ObjectId(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    await insertDoc(1, {
       username: 'user',
       email: 'user@flower-shop.ru',
       password: userPassword,
       role: 'user',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    
-    await db.collection('users').insertMany([adminUser, regularUser]);
-  
-    // Создаем настройки
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
     console.log('⚙️ Создание настроек...');
-    await db.collection('settings').insertOne({
+    await insertDoc(7, {
+      _id: 'global-settings',
       siteName: 'Цветочный магазин "Роза"',
       siteDescription: 'Лучшие цветы для любого случая с доставкой по Москве',
       contactEmail: 'info@flower-shop.ru',
@@ -60,65 +76,34 @@ async function seedDatabase() {
       socialLinks: {
         instagram: 'https://instagram.com/flower-shop',
         telegram: 'https://t.me/flower-shop',
-        whatsapp: '+7 (999) 123-45-67'
+        whatsapp: '+7 (999) 123-45-67',
       },
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
-    
-    // Создаем настройки платежей
+
     console.log('💳 Создание настроек платежей...');
-    await db.collection('paymentsettings').insertOne({
+    await insertDoc(8, {
       isEnabled: true,
       currency: 'RUB',
-      stripe: {
-        enabled: false,
-        publishableKey: '',
-        secretKey: '',
-        webhookSecret: ''
-      },
-      yookassa: {
-        enabled: false,
-        shopId: '',
-        secretKey: ''
-      },
-      sberbank: {
-        enabled: false,
-        merchantId: '',
-        apiKey: ''
-      },
-      cashOnDelivery: {
-        enabled: true,
-        minAmount: 0,
-        maxAmount: 50000
-      },
-      cardOnDelivery: {
-        enabled: true,
-        minAmount: 0,
-        maxAmount: 100000
-      },
+      stripe: { enabled: false, publishableKey: '', secretKey: '', webhookSecret: '' },
+      yookassa: { enabled: false, shopId: '', secretKey: '' },
+      sberbank: { enabled: false, merchantId: '', apiKey: '' },
+      cashOnDelivery: { enabled: true, minAmount: 0, maxAmount: 50000 },
+      cardOnDelivery: { enabled: true, minAmount: 0, maxAmount: 100000 },
       taxRate: 0,
       deliveryFee: 200,
       freeDeliveryThreshold: 2000,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
-    
-    console.log('✅ База данных успешно заполнена валидными тестовыми данными!');
-    console.log('\n📊 Статистика:');
-    console.log(`   - Администраторов: 1`);
-    console.log('\n🔑 Данные для входа:');
-    console.log(`   - Логин: AdminFlows`);
-    console.log(`   - Пароль: KMFlAdmin`);
-    console.log(`   - Логин пользователя: user`);
-    console.log(`   - Пароль: user12345`);
-    
+
+    console.log('✅ База данных успешно заполнена тестовыми данными');
   } catch (error) {
-    console.error('❌ Ошибка при заполнении базы данных:', error);
-  } finally {
-    await client.close();
+    console.error('❌ Ошибка при заполнении базы данных:', error.message || error);
+    process.exit(1);
   }
 }
 
-// Запуск заполнения базы данных
-seedDatabase(); 
+seedDatabase();
+

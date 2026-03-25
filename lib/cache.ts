@@ -206,7 +206,7 @@ export async function getCachedSettings() {
       console.log('[CACHE MISS] Загружаем настройки из БД');
       await dbConnect();
       // Используем findOne, так как настройки - это один документ
-      const settings = await Settings.findOne();
+      const settings = await Settings.findOne({ settingKey: 'global-settings' }) || await Settings.findOne();
       return settings ? settings.toObject() : null;
     },
     ['settings'], // Ключ кэша

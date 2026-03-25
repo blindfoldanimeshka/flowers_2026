@@ -1,10 +1,10 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { useNewOrderNotifications } from '@/hooks/useNewOrderNotifications';
 import { IAdminOrder } from '@/app/client/models/AdminOrder';
-import { deleteAdminOrder, updateAdminOrderStatus } from './service';
+import { deleteAdminOrder, getAdminOrders, updateAdminOrderStatus } from './service';
 
 type TabType = 'all' | 'delivery' | 'pickup';
 
@@ -35,19 +35,51 @@ export function useAdminOrdersViewModel(initialOrders: IAdminOrder[]) {
   }, [activeTab, orders]);
 
   const handleNewOrder = useCallback((newOrder: IAdminOrder) => {
-    setOrders(prevOrders => [newOrder, ...prevOrders]);
+    setOrders(prevOrders => {
+      const hasExisting = prevOrders.some(order => String(order._id) === String(newOrder._id));
+      if (hasExisting) {
+        return prevOrders.map(order => String(order._id) === String(newOrder._id) ? newOrder : order);
+      }
+      return [newOrder, ...prevOrders];
+    });
   }, []);
 
   const currentTab = useMemo(() => tabs.find(tab => tab.id === activeTab), [activeTab]);
 
   const { isPolling, newOrdersCount } = useNewOrderNotifications({
     enabled: true,
-    interval: 15000,
+    interval: 10000,
     deliveryType: currentTab?.deliveryType,
     onNewOrder: handleNewOrder,
   });
 
-  const handleStatusChange = useCallback(async (id: string, status: IAdminOrder['status']) => {
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncOrders = async () => {
+      try {
+        const freshOrders = await getAdminOrders({ limit: 100 });
+        if (cancelled) return;
+        setOrders(freshOrders);
+        setSelectedOrder(prev => {
+          if (!prev) return null;
+          return freshOrders.find(order => String(order._id) === String(prev._id)) ?? null;
+        });
+      } catch {
+        // Ошибки фоновой синхронизации не блокируют UI
+      }
+    };
+
+    syncOrders();
+    const timer = setInterval(syncOrders, 10000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const handleStatusChange = useCallback(async (id: string | number, status: IAdminOrder['status']) => {
     try {
       const updatedOrder = await updateAdminOrderStatus(id, status);
       setOrders(prev => prev.map(order => order._id === id ? updatedOrder : order));
@@ -57,7 +89,7 @@ export function useAdminOrdersViewModel(initialOrders: IAdminOrder[]) {
     }
   }, []);
 
-  const handleDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string | number) => {
     if (!window.confirm('Вы уверены, что хотите удалить этот заказ?')) return;
     try {
       await deleteAdminOrder(id);
@@ -89,4 +121,3 @@ export function useAdminOrdersViewModel(initialOrders: IAdminOrder[]) {
     handleCloseDetails: () => setSelectedOrder(null),
   };
 }
-

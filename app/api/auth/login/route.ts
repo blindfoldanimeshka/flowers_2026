@@ -70,8 +70,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
+      },
       { status: 500 }
     );
   }
-} 
+}

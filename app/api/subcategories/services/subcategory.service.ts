@@ -1,19 +1,18 @@
-import { ClientSession, Types } from 'mongoose';
 import Subcategory, { ISubcategory } from '@/models/Subcategory';
 import Category from '@/models/Category';
 import { Logger } from '@/lib/logger';
 
 export interface CreateSubcategoryParams {
   name: string;
-  categoryId: string | Types.ObjectId;
+  categoryId: string;
   description?: string;
   image?: string;
   isActive?: boolean;
-  session?: ClientSession;
+  session?: any;
 }
 
 export interface UpdateSubcategoryParams extends Partial<CreateSubcategoryParams> {
-  subcategoryId: string | Types.ObjectId;
+  subcategoryId: string;
 }
 
 export const SubcategoryService = {
@@ -77,7 +76,7 @@ export const SubcategoryService = {
     }
   },
 
-  async getSubcategoryById(id: string | Types.ObjectId) {
+  async getSubcategoryById(id: string) {
     return Subcategory.findById(id).populate('categoryId', 'name');
   },
 
@@ -85,7 +84,7 @@ export const SubcategoryService = {
     return Subcategory.findOne({ slug }).populate('categoryId', 'name');
   },
 
-  async getAllSubcategories(categoryId?: string | Types.ObjectId) {
+  async getAllSubcategories(categoryId?: string) {
     const query = categoryId ? { categoryId } : {};
     return Subcategory.find(query)
       .populate('categoryId', 'name')
@@ -109,12 +108,10 @@ export const SubcategoryService = {
     if (isActive !== undefined) updateData.isActive = isActive;
     if (categoryId) {
       // Convert string to ObjectId if necessary
-      updateData.categoryId = typeof categoryId === 'string' 
-        ? new Types.ObjectId(categoryId) 
-        : categoryId;
+      updateData.categoryId = categoryId;
     }
     
-    updateData.updatedAt = new Date();
+    updateData.updatedAt = new Date().toISOString();
 
     const updated = await Subcategory.findByIdAndUpdate(
       subcategoryId,
@@ -140,7 +137,7 @@ export const SubcategoryService = {
     return updated;
   },
 
-  async deleteSubcategory(id: string | Types.ObjectId) {
+  async deleteSubcategory(id: string) {
     console.log('[SUBCATEGORY SERVICE] Deleting subcategory:', id);
     
     const deleted = await Subcategory.findByIdAndDelete(id);

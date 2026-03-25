@@ -8,29 +8,6 @@ import { useCategoriesViewModel } from '@/features/app/catalog';
 export default function CategoryGrid() {
   const { categories } = useCategoriesViewModel();
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { y: 20, opacity: 0 },
-    visible: {
-      y: 0,
-      opacity: 1,
-      transition: {
-        type: "spring" as const,
-        damping: 12,
-        stiffness: 100
-      }
-    }
-  };
-
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
       <motion.h2
@@ -44,14 +21,21 @@ export default function CategoryGrid() {
 
       <motion.div
         className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8 xl:gap-12"
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.25 }}
       >
-        {categories.map(category => (
+        {categories.map((category, index) => (
           <motion.div
             key={category._id || category.id}
-            variants={itemVariants}
+            initial={{ y: 12, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{
+              type: 'spring',
+              damping: 20,
+              stiffness: 140,
+              delay: index * 0.04,
+            }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -65,6 +49,8 @@ export default function CategoryGrid() {
                     src="/image/items/11.png"
                     alt={category.name}
                     fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1280px) 33vw, 300px"
+                    priority={index < 4}
                     className="object-cover opacity-40 group-hover:scale-110 transition-transform duration-500"
                   />
                 </div>

@@ -70,7 +70,7 @@ export const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Overlay */}
-        <div className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" />
+        <div className="fixed inset-0 bg-black/25 backdrop-blur-[2px] transition-opacity" />
         
         {/* Modal */}
         <div
@@ -135,4 +135,3 @@ export const ModalTrigger: React.FC<ModalTriggerProps> = ({
 };
 
 export default Modal;
-

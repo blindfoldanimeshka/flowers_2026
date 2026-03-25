@@ -65,7 +65,7 @@ export function useAdminProductsViewModel() {
 
   const currentSubcategories = useMemo<ISubcategory[]>(() => {
     if (!draft.categoryId) return [];
-    return categories.find(category => category._id === draft.categoryId)?.subcategories || [];
+    return categories.find(category => String(category._id) === String(draft.categoryId))?.subcategories || [];
   }, [categories, draft.categoryId]);
 
   const openCreateForm = useCallback(() => {
@@ -80,8 +80,8 @@ export function useAdminProductsViewModel() {
       description: product.description || '',
       price: product.price,
       image: product.image,
-      categoryId: product.categoryId || '',
-      subcategoryId: product.subcategoryId || '',
+      categoryId: product.categoryId ? String(product.categoryId) : '',
+      subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
       inStock: product.inStock ?? true,
     });
     setIsFormVisible(true);
@@ -102,6 +102,7 @@ export function useAdminProductsViewModel() {
     if (!draft.name.trim()) return showToast('Название товара обязательно', 'error');
     if (!draft.categoryId) return showToast('Выберите категорию', 'error');
     if (!draft.image) return showToast('Добавьте изображение товара', 'error');
+    if (!Number.isFinite(draft.price) || draft.price <= 0) return showToast('Укажите корректную цену товара', 'error');
     setSaving(true);
     setError('');
     try {
@@ -163,4 +164,3 @@ export function useAdminProductsViewModel() {
     removeProduct,
   };
 }
-

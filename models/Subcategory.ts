@@ -1,75 +1,30 @@
-import mongoose, { Document } from 'mongoose';
 import slugify from 'slugify';
+import { createSupabaseModel } from '@/lib/supabaseModel';
 
-export interface ISubcategory extends Document {
+export interface ISubcategory {
+  _id: string;
   name: string;
   slug: string;
-  categoryId: mongoose.Types.ObjectId;
+  categoryId: string;
   categoryNumId: number;
   description?: string;
   image?: string;
   isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const subcategorySchema = new mongoose.Schema<ISubcategory>({
-  name: {
-    type: String,
-    required: [true, 'Название подкатегории обязательно'],
-    trim: true,
-    maxlength: [100, 'Название подкатегории не может быть длиннее 100 символов']
+const Subcategory = createSupabaseModel({
+  collection: 'subcategories',
+  defaults: { isActive: true },
+  references: {
+    categoryId: 'categories',
   },
-  slug: {
-    type: String,
-    lowercase: true,
-    trim: true,
+  preCreate: (doc) => {
+    if (!doc.slug && doc.name) {
+      doc.slug = slugify(doc.name, { lower: true, strict: true });
+    }
   },
-  categoryId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-    required: [true, 'ID категории обязателен']
-  },
-  categoryNumId: {
-    type: Number,
-    required: [true, 'Числовой ID категории обязателен']
-  },
-  description: {
-    type: String,
-    trim: true,
-    maxlength: [500, 'Описание не может быть длиннее 500 символов']
-  },
-  image: {
-    type: String,
-    trim: true
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  }
-}, {
-  timestamps: true
 });
 
-subcategorySchema.pre('save', function(next) {
-  if (this.isModified('name')) {
-    this.slug = slugify(this.name, { lower: true, strict: true });
-  }
-  next();
-});
-
-// Индекс для быстрого поиска по категории
-subcategorySchema.index({ categoryId: 1 });
-
-// Виртуальное поле для ID подкатегории (для совместимости)
-subcategorySchema.virtual('id').get(function() {
-  return this._id;
-});
-
-// Убеждаемся, что виртуальные поля включаются в JSON
-subcategorySchema.set('toJSON', { virtuals: true });
-subcategorySchema.set('toObject', { virtuals: true });
-
-const Subcategory = mongoose.models.Subcategory || mongoose.model<ISubcategory>('Subcategory', subcategorySchema);
-
-export default Subcategory; 
+export default Subcategory;

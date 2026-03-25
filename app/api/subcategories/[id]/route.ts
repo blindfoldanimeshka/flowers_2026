@@ -5,7 +5,7 @@ import Subcategory from '@/models/Subcategory';
 import Category from '@/models/Category';
 import Product from '@/models/Product';
 import { revalidatePath } from 'next/cache';
-import mongoose from 'mongoose';
+import { isValidId } from '@/lib/id';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
 // PUT - Update a subcategory by ID
@@ -15,7 +15,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     const { id } = params;
     const { name } = await request.json();
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json({ error: 'Неверный ID подкатегории' }, { status: 400 });
     }
 
@@ -52,7 +52,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     const { id } = params;
     console.log('[SUBCATEGORY DELETE] Deleting subcategory with ID:', id);
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
+    if (!isValidId(id)) {
       return NextResponse.json(
         { success: false, error: 'Неверный формат ID подкатегории' }, 
         { status: 400 }
@@ -115,7 +115,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     // Step 2: Remove the subcategory reference from the parent category
     const categoryUpdateResult = await Category.updateOne(
       { _id: categoryId },
-      { $pull: { subcategories: new mongoose.Types.ObjectId(id) } }
+      { $pull: { subcategories: id } }
     );
     
     if (categoryUpdateResult.modifiedCount === 0) {

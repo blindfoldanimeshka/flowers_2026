@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import mongoose from 'mongoose';
 import connect from '@/lib/db';
 import Subcategory from '@/models/Subcategory';
 import slugify from 'slugify';
 import Category from '@/models/Category';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
+import { isValidId } from '@/lib/id';
 
 // GET all subcategories
 export async function GET(request: NextRequest) {
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    if (!mongoose.Types.ObjectId.isValid(categoryId)) {
+    if (!isValidId(categoryId)) {
       return NextResponse.json(
         { success: false, error: 'Неверный формат ID категории' },
         { status: 400 }
@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       const subcategoryData = {
         name: name.trim(),
         slug,
-        categoryId: new mongoose.Types.ObjectId(categoryId),
+        categoryId,
         categoryNumId: category.id,
         description: description || '',
         image: image || '',

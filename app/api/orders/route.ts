@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     let totalAmount = 0;
-    const orderItems = [];
+    const orderItems: any[] = [];
 
     for (const item of items) {
       const product = await Product.findById(item.productId);

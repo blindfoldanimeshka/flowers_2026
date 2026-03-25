@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, memo } from "react";
 import Image from "next/image";
 import { useCart } from '@/features/app/cart';
 import { motion, AnimatePresence } from "framer-motion";
-import Modal from "../common/Modal";
+import { createPortal } from "react-dom";
 
 interface ShopItemProps {
   id: string;
@@ -28,20 +28,44 @@ const ShopItem = memo(({
     const { addToCart, isInCart, cartItems, updateQuantity } = useCart();
     const [isAdded, setIsAdded] = useState(false);
     const [itemCount, setItemCount] = useState(0);
-    const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
+    const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+    const [isPortalReady, setIsPortalReady] = useState(false);
     const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
 
     useEffect(() => {
       const inCart = isInCart(id);
       setIsAdded(inCart);
-      
+
       const cartItem = cartItems.find(item => item.id === id);
       setItemCount(cartItem ? cartItem.quantity : 0);
     }, [id, isInCart, cartItems]);
-    
+
+    useEffect(() => {
+      setIsPortalReady(true);
+    }, []);
+
+    useEffect(() => {
+      if (!isImagePreviewOpen) return;
+
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setIsImagePreviewOpen(false);
+        }
+      };
+
+      document.addEventListener('keydown', handleEscape);
+      return () => {
+        document.removeEventListener('keydown', handleEscape);
+        document.body.style.overflow = previousOverflow;
+      };
+    }, [isImagePreviewOpen]);
+
     const handleToggleCart = useCallback(() => {
       if (!inStock) return;
-      
+
       if (isAdded) {
         const cartItem = cartItems.find(item => item.id === id);
         if (cartItem && cartItem.quantity > 1) {
@@ -55,18 +79,13 @@ const ShopItem = memo(({
         setIsAdded(true);
       }
     }, [isAdded, inStock, cartItems, id, updateQuantity, addToCart, title, price, oldPrice, imageSrc]);
-    
-    const handleDescriptionClick = useCallback(() => {
-      setIsDescriptionModalOpen(true);
-    }, []);
-    
+
     return (
       <>
         <div className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-[240px] max-w-[280px] sm:min-w-[260px] sm:max-w-[320px] mx-auto h-[400px] sm:h-[450px] relative group">
-        {/* Бейдж скидки */}
         <AnimatePresence>
           {discount && (
-            <motion.div 
+            <motion.div
               className="absolute top-2 left-2 z-10 bg-[#FF6B6B] text-white font-bold px-1.5 py-0.5 rounded-full text-xs sm:text-sm"
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -77,11 +96,10 @@ const ShopItem = memo(({
             </motion.div>
           )}
         </AnimatePresence>
-        
-        {/* Счетчик товаров в корзине */}
+
         <AnimatePresence>
           {isAdded && itemCount > 0 && (
-            <motion.div 
+            <motion.div
               className="absolute top-2 right-2 z-10 bg-[#D8FEE9] text-black font-bold w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full text-xs sm:text-sm"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
@@ -92,12 +110,17 @@ const ShopItem = memo(({
             </motion.div>
           )}
         </AnimatePresence>
-        
-        {/* Контейнер изображения на всю ширину карточки */}
+
         <div className="w-full h-[210px] sm:h-[260px] relative rounded-t-[30px] overflow-hidden flex-shrink-0">
-          <Image 
+          <button
+            type="button"
+            onClick={() => setIsImagePreviewOpen(true)}
+            className="absolute inset-0 z-20 cursor-zoom-in"
+            aria-label={`Открыть фото товара ${title}`}
+          />
+          <Image
             src={imageSrc}
-            alt={title} 
+            alt={title}
             fill
             priority
             sizes="100vw"
@@ -108,14 +131,13 @@ const ShopItem = memo(({
               objectPosition: 'center',
               transform: 'translateZ(0)',
             }}
-            className="rounded-t-[30px] will-change-transform"
-            onLoadingComplete={(img) => {
-              img.classList.add('transition-all', 'duration-500', 'group-hover:scale-[0.95]', 'group-hover:blur-sm', 'group-hover:brightness-50');
-            }}
+            className="rounded-t-[30px] will-change-transform transition-transform duration-500 md:group-hover:scale-[0.97]"
           />
-          {/* Оверлей с описанием и статусом только при наведении */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 z-10">
-            <p className="text-white text-xs sm:text-sm text-center">{description}</p>
+          <div
+            className="absolute inset-0 z-[15] flex flex-col items-center justify-center bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 pointer-events-none"
+            aria-hidden
+          >
+            <p className="text-white text-xs sm:text-sm text-center drop-shadow-sm">{description}</p>
             {!inStock && (
               <span className="mt-1.5 bg-white/80 text-red-500 px-1.5 py-0.5 rounded text-xs sm:text-sm font-medium">
                 Нет в наличии
@@ -123,70 +145,46 @@ const ShopItem = memo(({
             )}
           </div>
         </div>
-        {/* Информация о товаре */}
         <div className="flex flex-col items-center justify-center w-full flex-1">
           <h4 className="text-base sm:text-xl font-bold text-center leading-tight w-full mt-2 line-clamp-2 overflow-hidden max-h-[2.8em]">{title}</h4>
-          {/* Цена */}
+          <p className="sm:hidden text-xs text-gray-700 text-center px-3 mt-1 line-clamp-2">{description}</p>
           <div className="flex justify-center items-center gap-1 w-full text-center mt-1">
             {oldPrice && (
               <p className="text-xs sm:text-sm text-gray-500 line-through text-center">{oldPrice} руб.</p>
             )}
             <p className="text-base sm:text-xl font-medium text-center">{price} руб.</p>
           </div>
-          {/* Кнопка описания */}
-          {description && description.trim() !== "" && (
-            <button
-              onClick={handleDescriptionClick}
-              className="mt-2 px-3 py-1.5 bg-[#FFB6C1] hover:bg-[#FFA0B0] text-black text-xs sm:text-sm font-medium rounded-full transition-colors duration-200 flex items-center gap-1"
-            >
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-              </svg>
-              Описание
-            </button>
-          )}
         </div>
-        {/* Кнопка добавления в корзину */}
         <button
           onClick={handleToggleCart}
+          type="button"
           className={`${inStock ? (isAdded ? 'bg-[#A9E2C8]' : 'bg-[#D8FEE9]') : 'bg-gray-200 cursor-not-allowed'} text-black font-middle py-2 sm:py-3 px-2 sm:px-4 rounded-[0_0_30px_30px] cursor-pointer w-full mt-auto`}
           disabled={!inStock}
         >
           <div className="flex items-center justify-center gap-2">
             {isAdded ? (
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
                 strokeWidth="2.5"
-                strokeLinecap="round" 
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="transition-all duration-300"
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             ) : (
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
                 strokeWidth="2"
-                strokeLinecap="round" 
+                strokeLinecap="round"
                 strokeLinejoin="round"
                 className="transition-all duration-300"
               >
@@ -201,52 +199,35 @@ const ShopItem = memo(({
           </div>
         </button>
       </div>
-      {/* Модальное окно с описанием */}
-      <Modal
-        isOpen={isDescriptionModalOpen}
-        onClose={() => setIsDescriptionModalOpen(false)}
-        title={title}
-        className="max-w-lg"
-      >
-        <div className="space-y-4">
-          <div className="relative w-full h-48 rounded-lg overflow-hidden">
-            <Image 
-              src={imageSrc}
-              alt={title} 
-              fill
-              className="object-cover"
-            />
-          </div>
-          <div>
-            <h4 className="text-lg font-semibold text-gray-900 mb-2">{title}</h4>
-            <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{description}</p>
-          </div>
-          <div className="flex justify-between items-center pt-2 border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              {oldPrice && (
-                <span className="text-sm text-gray-500 line-through">{oldPrice} руб.</span>
-              )}
-              <span className="text-lg font-semibold text-gray-900">{price} руб.</span>
-            </div>
+      {isPortalReady && isImagePreviewOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/25 backdrop-blur-[2px] p-4"
+          onClick={() => setIsImagePreviewOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl bg-white"
+            onClick={(event) => event.stopPropagation()}
+          >
             <button
-              onClick={() => {
-                setIsDescriptionModalOpen(false);
-                handleToggleCart();
-              }}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors duration-200 ${
-                inStock 
-                  ? isAdded 
-                    ? 'bg-[#A9E2C8] hover:bg-[#8FD4B8] text-black' 
-                    : 'bg-[#D8FEE9] hover:bg-[#C4F4D8] text-black'
-                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              }`}
-              disabled={!inStock}
+              type="button"
+              onClick={() => setIsImagePreviewOpen(false)}
+              className="absolute top-2 right-2 z-10 rounded-full bg-white/85 px-3 py-1 text-sm font-semibold text-gray-800"
+              aria-label="Закрыть просмотр фото"
             >
-              {!inStock ? "Нет в наличии" : isAdded ? "Убрать" : "Добавить в корзину"}
+              ×
             </button>
+            <div className="relative w-full h-[70vh]">
+              <Image
+                src={imageSrc}
+                alt={title}
+                fill
+                sizes="100vw"
+                className="object-contain bg-white"
+              />
+            </div>
           </div>
         </div>
-      </Modal>
+      , document.body)}
       </>
     );
   }

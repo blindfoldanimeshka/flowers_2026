@@ -5,30 +5,6 @@ import ShopItem from "@/app/client/components/element/ShopItem";
 import ShopItemSkeleton from "@/app/client/components/element/ShopItemSkeleton";
 import { useHomeCatalogViewModel } from './useHomeCatalogViewModel';
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-    },
-  },
-};
-
-const itemVariants = {
-  hidden: { y: 20, opacity: 0, scale: 0.9 },
-  visible: {
-    y: 0,
-    opacity: 1,
-    scale: 1,
-    transition: {
-      type: "spring" as const,
-      damping: 15,
-      stiffness: 100,
-    },
-  },
-};
-
 export default function HomeCatalogSection() {
   const { loading, products } = useHomeCatalogViewModel();
 
@@ -54,14 +30,21 @@ export default function HomeCatalogSection() {
       ) : (
         <motion.div
           className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8 xl:gap-12"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.35 }}
         >
           {products.map((product, index) => (
             <motion.div
               key={product._id || index}
-              variants={itemVariants}
+              initial={{ y: 16, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{
+                type: 'spring',
+                damping: 18,
+                stiffness: 120,
+                delay: index * 0.06,
+              }}
               whileHover={{ y: -5 }}
               whileTap={{ scale: 0.98 }}
             >

@@ -7,7 +7,7 @@ export interface IAdminOrderItem {
 }
 
 export interface IAdminOrder {
-  _id: string;
+  _id: string | number;
   orderNumber: string;
   customer: {
     name: string;
@@ -27,4 +27,3 @@ export interface IAdminOrder {
   createdAt: string;
   updatedAt: string;
 }
-

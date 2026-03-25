@@ -5,11 +5,9 @@ import { existsSync } from 'fs';
 
 // Функция для определения директории загрузки
 function resolveUploadDir(): string {
-  // На Vercel используем /tmp, локально - public/uploads
-  if (process.env.VERCEL) {
-    return '/tmp/uploads';
-  }
-  return join(process.cwd(), 'public/uploads');
+  // Для self-hosted используем постоянную директорию.
+  // При необходимости можно переопределить через UPLOAD_DIR.
+  return process.env.UPLOAD_DIR || join(process.cwd(), 'public/uploads');
 }
 
 // POST запрос для загрузки изображений

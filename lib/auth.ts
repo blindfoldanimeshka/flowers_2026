@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT, jwtVerify, JWTPayload as JoseJWTPayload } from 'jose';
 
 function getJwtKey() {
-  const secret = process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
   if (!secret) {
-    throw new Error('JWT_SECRET is not set');
+    throw new Error('JWT_SECRET (or NEXTAUTH_SECRET) is not set');
   }
 
   return new TextEncoder().encode(secret);
@@ -31,8 +31,11 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     });
     return payload;
   } catch (error) {
-    if (error instanceof Error && error.message === 'JWT_SECRET is not set') {
-      console.error('JWT verification is unavailable because JWT_SECRET is not configured');
+    if (
+      error instanceof Error &&
+      (error.message === 'JWT_SECRET (or NEXTAUTH_SECRET) is not set' || error.message === 'JWT_SECRET is not set')
+    ) {
+      console.error('JWT verification is unavailable because JWT secret is not configured');
     }
     return null;
   }

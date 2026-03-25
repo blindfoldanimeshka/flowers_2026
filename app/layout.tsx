@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from '@/features/app/cart';
-import { StageWiseInit } from "./components/Stagewise";
 import CartButton from "./client/components/layout/CartButton";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -40,23 +39,18 @@ export default function RootLayout({
       </head>
       <body>
         <CartProvider>
-          <StageWiseInit />
           <CartButton />
           {children}
-          
-          {/* Toast контейнер для глобальных уведомлений */}
-          <ToastContainer 
-            position="top-right" 
-            autoClose={5000} 
-            hideProgressBar={false} 
-            newestOnTop 
-            closeOnClick 
-            pauseOnFocusLoss 
-            draggable 
-            pauseOnHover 
+          <ToastContainer
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop
+            closeOnClick
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
           />
-          
-          {/* Уведомления для администраторов на всех страницах */}
           <AdminNotifications pollingInterval={45000} />
         </CartProvider>
       </body>

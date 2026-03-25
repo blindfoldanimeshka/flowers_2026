@@ -1,35 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import { existsSync } from 'fs';
 
 // Функция для определения директории загрузки
 function resolveUploadDir(): string {
-  // На Vercel используем /tmp, локально - public/uploads
-  if (process.env.VERCEL) {
-    return '/tmp/uploads';
-  }
-  return join(process.cwd(), 'public/uploads');
+  return process.env.UPLOAD_DIR || join(process.cwd(), 'public/uploads');
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } }
+  { params }: { params: Promise<{ path: string[] }> }
 ) {
   try {
-    const filePath = params.path.join('/');
-    const fullPath = join(resolveUploadDir(), filePath);
+    const resolvedParams = await params;
+    const parts = resolvedParams.path || [];
+    const filePath = parts.join('/');
+    const uploadDir = resolveUploadDir();
+    const normalizedPath = normalize(filePath).replace(/^([/\\])+/, '');
 
     // Проверяем безопасность пути
-    if (!filePath || filePath.includes('..') || !existsSync(fullPath)) {
+    if (!filePath || normalizedPath.includes('..')) {
       return new NextResponse('File not found', { status: 404 });
     }
 
-    // Читаем файл
-    const fileBuffer = await readFile(fullPath);
+    // Поддерживаем основной и legacy-пути, чтобы старые ссылки не ломались
+    const candidatePaths = Array.from(new Set([
+      join(uploadDir, normalizedPath),
+      join(process.cwd(), 'public/uploads', normalizedPath),
+      join('/tmp/uploads', normalizedPath),
+    ]));
+
+    const existingPath = candidatePaths.find((candidate) => existsSync(candidate));
+    let fileBuffer: Buffer;
+    let extension = normalizedPath.split('.').pop()?.toLowerCase();
+
+    if (existingPath) {
+      fileBuffer = await readFile(existingPath);
+    } else {
+      // Фолбэк, чтобы Next/Image не падал на битых старых ссылках
+      const fallbackPath = join(process.cwd(), 'public/image/items/11.png');
+      fileBuffer = await readFile(fallbackPath);
+      extension = 'png';
+    }
 
     // Определяем MIME-тип
-    const extension = filePath.split('.').pop()?.toLowerCase();
     let contentType = 'application/octet-stream';
     
     switch (extension) {
