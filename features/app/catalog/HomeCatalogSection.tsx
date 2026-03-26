@@ -54,6 +54,7 @@ export default function HomeCatalogSection() {
                 price={product.price}
                 description={product.description}
                 imageSrc={product.image}
+                imageGallery={product.images}
                 inStock={product.inStock}
               />
             </motion.div>
