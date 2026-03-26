@@ -14,7 +14,7 @@ const scrollbarStyles = `
 `;
 
 export default function CartPage() {
-  const { showOrderForm, openOrderForm, closeOrderForm } = useCartPageViewModel();
+  const { showOrderForm, openOrderForm, closeOrderForm, isCartEmpty } = useCartPageViewModel();
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -36,12 +36,22 @@ export default function CartPage() {
         </motion.div>
         <motion.div className="w-full lg:w-2/5 flex flex-col lg:min-h-[340px] lg:h-full" initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.5, delay: 0.3 }}>
           <div className="block lg:hidden">
-            {!showOrderForm && <motion.button className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300" onClick={openOrderForm} whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>Заказать</motion.button>}
+            {!showOrderForm && (
+              <motion.button
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                onClick={openOrderForm}
+                disabled={isCartEmpty}
+                whileHover={{ scale: isCartEmpty ? 1 : 1.02 }}
+                whileTap={{ scale: isCartEmpty ? 1 : 0.98 }}
+              >
+                Заказать
+              </motion.button>
+            )}
             <AnimatePresence>
               {showOrderForm && (
                 <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closeOrderForm}>
                   <motion.div className="relative bg-[#FFF8F8] p-6 rounded-2xl shadow-lg w-full max-w-md mx-auto" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} transition={{ type: "spring", damping: 25 }} onClick={(e) => e.stopPropagation()}>
-                    <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none" onClick={closeOrderForm} aria-label="Закрыть">×</button>
+                    <button className="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-2xl font-bold focus:outline-none" onClick={closeOrderForm} aria-label="Закрыть">x</button>
                     <OrderForm />
                   </motion.div>
                 </motion.div>
@@ -54,3 +64,4 @@ export default function CartPage() {
     </motion.div>
   );
 }
+

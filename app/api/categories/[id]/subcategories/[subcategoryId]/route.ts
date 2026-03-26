@@ -8,12 +8,12 @@ import { isValidId } from '@/lib/id';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
 ) {
   try {
     await connect();
 
-    const { id, subcategoryId } = params;
+    const { id, subcategoryId } = await params;
     const category = await Category.findById(id);
 
     if (!category) {
@@ -33,7 +33,7 @@ export async function GET(
 
     return NextResponse.json(subcategory, { status: 200 });
   } catch (error: unknown) {
-    console.error(`Ошибка при получении подкатегории с ID ${params.subcategoryId}:`, error);
+    console.error(`Ошибка при получении подкатегории с ID unknown:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
     return NextResponse.json(
       {
@@ -48,12 +48,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
 ) {
   try {
     await connect();
 
-    const { id, subcategoryId } = params;
+    const { id, subcategoryId } = await params;
     const body = await request.json();
 
     const category = await Category.findById(id);
@@ -81,7 +81,7 @@ export async function PUT(
 
     return NextResponse.json(subcategory, { status: 200 });
   } catch (error: unknown) {
-    console.error(`Ошибка при обновлении подкатегории с ID ${params.subcategoryId}:`, error);
+    console.error(`Ошибка при обновлении подкатегории с ID unknown:`, error);
 
     if (error instanceof Error) {
       if ('name' in error && error.name === 'ValidationError' && 'errors' in error) {
@@ -121,12 +121,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
 ) {
   try {
     await connect();
 
-    const { id, subcategoryId } = params;
+    const { id, subcategoryId } = await params;
     console.log('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
 
     if (!isValidId(id) || !isValidId(subcategoryId)) {
@@ -178,7 +178,7 @@ export async function DELETE(
       { status: 200 }
     );
   } catch (error: unknown) {
-    console.error(`[CATEGORY SUBCATEGORY DELETE] Error deleting subcategory ${params.subcategoryId}:`, error);
+    console.error(`[CATEGORY SUBCATEGORY DELETE] Error deleting subcategory unknown:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
 
     return NextResponse.json(
@@ -191,3 +191,4 @@ export async function DELETE(
     );
   }
 }
+

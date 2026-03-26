@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { ICategoryWithStats as Category, ISubcategory as Subcategory } from '@/app/client/models/Category';
 import { useAdminCategoriesViewModel } from '@/features/admin/categories';
 
+const MAX_CATEGORIES = 10;
+
 interface EditableNameProps {
   name: string;
   onSave: (name: string) => void;
@@ -51,10 +53,10 @@ export default function CategoriesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Добавить новую категорию</h2>
-          {categories.length >= 5 && <div className="mb-2 text-red-500 font-semibold">Максимальное количество категорий - 5.</div>}
+          {categories.length >= MAX_CATEGORIES && <div className="mb-2 text-red-500 font-semibold">Максимальное количество категорий - {MAX_CATEGORIES}.</div>}
           <form onSubmit={handleAddCategory} className="flex gap-2">
-            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-grow p-2 border rounded" disabled={categories.length >= 5} />
-            <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600" disabled={categories.length >= 5}>Добавить</button>
+            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-grow p-2 border rounded" disabled={categories.length >= MAX_CATEGORIES} />
+            <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600" disabled={categories.length >= MAX_CATEGORIES}>Добавить</button>
           </form>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-sm">

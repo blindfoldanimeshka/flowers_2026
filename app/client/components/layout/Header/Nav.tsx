@@ -5,26 +5,28 @@ import { useState, useRef, useEffect } from "react";
 import { ICategory } from '@/app/client/models/Category';
 import { useCategoriesViewModel } from '@/features/app/catalog';
 
-function ArrowDownIcon({ isOpen }: { isOpen: boolean }) {
+const MAX_HEADER_CATEGORIES = 10;
+
+function ArrowDownIcon({ isOpen, compact }: { isOpen: boolean; compact: boolean }) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
+      width={compact ? 12 : 16}
+      height={compact ? 12 : 16}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={`inline-block ml-1 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+      className={`inline-block ${compact ? 'ml-0.5' : 'ml-1'} transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
     >
       <path d="m6 9 6 6 6-6"/>
     </svg>
   );
 }
 
-function NavItem({ category }: { category: ICategory }) {
+function NavItem({ category, compact }: { category: ICategory; compact: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const navItemRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -75,18 +77,22 @@ function NavItem({ category }: { category: ICategory }) {
   return (
     <div
       ref={navItemRef}
-      className="relative md:flex md:justify-center md:items-center"
+      className="relative flex justify-center items-center min-w-0 px-1"
       onMouseOver={handleMouseOver}
       onMouseLeave={handleMouseLeave}
     >
-      <div className="flex items-center cursor-pointer">
+      <div className="flex items-center justify-center cursor-pointer min-w-0">
         <Link
           href={`/category/${category.slug}`}
-          className="font-semibold duration-300 hover:text-[#FF6B6B] text-[20px] block"
+          className={`font-semibold duration-300 hover:text-[#FF6B6B] block leading-tight ${
+            compact
+              ? 'text-[clamp(13px,1.1vw,18px)] whitespace-normal text-center break-words'
+              : 'text-[20px] whitespace-nowrap'
+          }`}
         >
           {category.name}
         </Link>
-        <ArrowDownIcon isOpen={isOpen} />
+        <ArrowDownIcon isOpen={isOpen} compact={compact} />
       </div>
 
       {isOpen && category.subcategories?.length > 0 && (
@@ -118,11 +124,19 @@ function NavItem({ category }: { category: ICategory }) {
 
 export default function Nav() {
   const { categories } = useCategoriesViewModel();
+  const visibleCategories = categories.slice(0, MAX_HEADER_CATEGORIES);
+  const isCompact = visibleCategories.length > 5;
 
   return (
-    <nav className="flex flex-row gap-6 justify-center items-center px-4 min-h-[48px] w-full max-w-screen-md mx-auto">
-      {categories.map((category) => (
-        <NavItem key={category._id} category={category} />
+    <nav
+      className={`justify-center items-center w-full mx-auto overflow-visible ${
+        isCompact
+          ? 'grid grid-cols-5 grid-rows-2 gap-x-4 gap-y-4 px-3 py-1 w-full max-w-none'
+          : 'flex flex-row gap-6 px-4 min-h-[48px] max-w-screen-md'
+      }`}
+    >
+      {visibleCategories.map((category) => (
+        <NavItem key={category._id} category={category} compact={isCompact} />
       ))}
     </nav>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useCart } from '@/features/app/cart';
 import Modal from '@/app/client/components/common/Modal';
@@ -17,13 +17,17 @@ interface ShopItemProps {
   inStock?: boolean;
 }
 
+const DEFAULT_IMAGE = '/image/items/11.png';
+const MAX_GALLERY_IMAGES = 3;
+const SWIPE_THRESHOLD_PX = 36;
+
 const ShopItem = memo(({
   id,
   title = 'Название товара',
   price = 1000,
   oldPrice,
   description = 'Описание товара',
-  imageSrc = '/image/items/11.png',
+  imageSrc = DEFAULT_IMAGE,
   imageGallery,
   inStock = true,
 }: ShopItemProps) => {
@@ -34,14 +38,21 @@ const ShopItem = memo(({
   const [quantity, setQuantity] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [canUseHover, setCanUseHover] = useState(false);
+  const [failedImageSrcs, setFailedImageSrcs] = useState<string[]>([]);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
 
   const gallery = useMemo(() => {
-    const fallback = imageSrc || '/image/items/11.png';
-    const sources = [fallback, ...(imageGallery || [])].filter(Boolean);
-    return Array.from(new Set(sources));
+    const merged = [...(imageGallery || []), imageSrc]
+      .map((src) => src?.trim())
+      .filter((src): src is string => Boolean(src));
+    const unique = Array.from(new Set(merged)).slice(0, MAX_GALLERY_IMAGES);
+    return unique.length > 0 ? unique : [DEFAULT_IMAGE];
   }, [imageSrc, imageGallery]);
+
+  const activeSource = gallery[activeImageIndex] || DEFAULT_IMAGE;
+  const displaySource = failedImageSrcs.includes(activeSource) ? DEFAULT_IMAGE : activeSource;
 
   useEffect(() => {
     const cartItem = cartItems.find((item) => item.id === id);
@@ -52,6 +63,14 @@ const ShopItem = memo(({
     if (typeof window === 'undefined') return;
     setCanUseHover(window.matchMedia('(hover: hover) and (pointer: fine)').matches);
   }, []);
+
+  useEffect(() => {
+    setActiveImageIndex((prev) => Math.min(prev, gallery.length - 1));
+  }, [gallery.length]);
+
+  useEffect(() => {
+    setFailedImageSrcs([]);
+  }, [gallery]);
 
   const openModal = () => {
     setIsProductModalOpen(true);
@@ -97,11 +116,45 @@ const ShopItem = memo(({
     }
   };
 
+  const handleTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+    if (canUseHover || gallery.length <= 1) return;
+    const touch = event.touches[0];
+    if (!touch) return;
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleTouchEnd = (event: React.TouchEvent<HTMLElement>) => {
+    if (canUseHover || gallery.length <= 1 || !touchStartRef.current) return;
+
+    const endTouch = event.changedTouches[0];
+    if (!endTouch) return;
+
+    const start = touchStartRef.current;
+    const deltaX = endTouch.clientX - start.x;
+    const deltaY = endTouch.clientY - start.y;
+    touchStartRef.current = null;
+
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return;
+    if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) return;
+
+    if (deltaX < 0) {
+      setActiveImageIndex((prev) => Math.min(prev + 1, gallery.length - 1));
+      return;
+    }
+
+    setActiveImageIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleImageError = () => {
+    if (!activeSource || activeSource === DEFAULT_IMAGE || failedImageSrcs.includes(activeSource)) return;
+    setFailedImageSrcs((prev) => [...prev, activeSource]);
+  };
+
   const isAdded = isInCart(id);
 
   return (
     <>
-      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-[240px] max-w-[280px] sm:min-w-[260px] sm:max-w-[320px] mx-auto h-[400px] sm:h-[450px] relative group overflow-hidden">
+      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-0 max-w-none mx-0 h-[320px] sm:h-[380px] relative group overflow-hidden">
         <AnimatePresence>
           {discount && (
             <motion.div
@@ -133,17 +186,20 @@ const ShopItem = memo(({
         <button
           type="button"
           onClick={openModal}
-          className="w-full h-[210px] sm:h-[260px] relative rounded-t-[30px] overflow-hidden flex-shrink-0 text-left"
+          className="w-full h-[160px] sm:h-[210px] relative rounded-t-[30px] overflow-hidden flex-shrink-0 text-left"
           aria-label={`Открыть товар ${title}`}
           onMouseMove={handlePreviewMove}
           onMouseLeave={() => canUseHover && setActiveImageIndex(0)}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <Image
-            src={gallery[activeImageIndex] || imageSrc}
+            src={displaySource}
             alt={title}
             fill
-            sizes="100vw"
+            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="rounded-t-[30px] object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            onError={handleImageError}
           />
 
           <div className="absolute inset-0 z-[10] bg-gradient-to-t from-black/35 via-transparent to-transparent" />
@@ -188,24 +244,27 @@ const ShopItem = memo(({
       </article>
 
       <Modal isOpen={isProductModalOpen} onClose={closeModal} title={title} className="max-w-3xl w-full">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-5 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-4 sm:gap-5">
           <div>
             <div
-              className="relative w-full h-[280px] sm:h-[340px] rounded-2xl overflow-hidden bg-[#fff1f1]"
+              // Фиксированная высота на широких мобилках делает картинку "вытянутой".
+              // Поэтому используем aspect-ratio, а Image — object-cover.
+              className="relative w-full aspect-[4/3] sm:aspect-[4/5] rounded-2xl overflow-hidden bg-[#fff1f1]"
               onMouseMove={handlePreviewMove}
             >
               <Image
-                src={gallery[activeImageIndex] || imageSrc}
+                src={displaySource}
                 alt={title}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover"
+                onError={handleImageError}
               />
             </div>
 
             {gallery.length > 1 && (
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {gallery.slice(0, 4).map((src, index) => (
+              <div className="mt-2 sm:mt-3 grid grid-cols-3 gap-2">
+                {gallery.map((src, index) => (
                   <button
                     key={`${id}-thumb-${index}`}
                     type="button"
@@ -223,30 +282,32 @@ const ShopItem = memo(({
           </div>
 
           <div className="flex flex-col">
-            <h3 className="text-xl sm:text-2xl font-bold leading-tight">{title}</h3>
+            <h3 className="text-lg sm:text-2xl font-bold leading-tight">{title}</h3>
             <p className="mt-2 text-sm text-gray-700">{description}</p>
 
-            <div className="mt-4 flex items-end gap-2">
+            <div className="mt-3 sm:mt-4 flex items-end gap-2">
               {oldPrice && <span className="text-sm text-gray-500 line-through">{oldPrice} руб.</span>}
-              <span className="text-2xl font-bold">{price} руб.</span>
+              <span className="text-xl sm:text-2xl font-bold">{price} руб.</span>
             </div>
 
-            <div className="mt-5">
+            <div className="mt-4 sm:mt-5">
               <p className="text-sm font-semibold mb-2">Количество</p>
               <div className="inline-flex items-center rounded-full border border-[#2f1b26]/20 bg-white">
                 <button
                   type="button"
                   onClick={() => changeQuantity(-1)}
-                  className="h-10 w-10 text-lg font-semibold hover:bg-[#f7f7f7] rounded-l-full"
+                  className="h-9 w-9 sm:h-10 sm:w-10 text-base sm:text-lg font-semibold hover:bg-[#f7f7f7] rounded-l-full"
                   aria-label="Уменьшить количество"
                 >
                   -
                 </button>
-                <span className="min-w-10 text-center text-base font-semibold">{quantity}</span>
+                <span className="min-w-9 sm:min-w-10 text-center text-sm sm:text-base font-semibold">
+                  {quantity}
+                </span>
                 <button
                   type="button"
                   onClick={() => changeQuantity(1)}
-                  className="h-10 w-10 text-lg font-semibold hover:bg-[#f7f7f7] rounded-r-full"
+                  className="h-9 w-9 sm:h-10 sm:w-10 text-base sm:text-lg font-semibold hover:bg-[#f7f7f7] rounded-r-full"
                   aria-label="Увеличить количество"
                 >
                   +
@@ -258,7 +319,7 @@ const ShopItem = memo(({
               type="button"
               onClick={handleAddToCart}
               disabled={!inStock}
-              className={`mt-6 rounded-full px-5 py-3 text-sm font-semibold transition-colors ${
+              className={`mt-5 sm:mt-6 rounded-full px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-semibold transition-colors ${
                 inStock ? 'bg-[#2f1b26] text-white hover:bg-[#20131a]' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
               }`}
             >

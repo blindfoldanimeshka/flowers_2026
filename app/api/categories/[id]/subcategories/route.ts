@@ -3,11 +3,13 @@ import connect from '@/lib/db';
 import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+type CategorySubcategoriesRouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, { params }: CategorySubcategoriesRouteContext) {
   try {
     await connect();
 
-    const { id } = params;
+    const { id } = await params;
     const category = await Category.findById(id);
 
     if (!category) {
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const subcategories = await Subcategory.find({ categoryId: id }).lean();
     return NextResponse.json({ subcategories }, { status: 200 });
   } catch (error: any) {
-    console.error(`Ошибка при получении подкатегорий для категории с ID ${params.id}:`, error);
+    console.error(`Ошибка при получении подкатегорий для категории с ID unknown:`, error);
     return NextResponse.json(
       { error: 'Ошибка при получении подкатегорий', details: error.message },
       { status: 500 }
@@ -28,7 +30,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_request: NextRequest, { params }: CategorySubcategoriesRouteContext) {
+  const { id } = await params;
   return NextResponse.json(
     {
       error: 'Этот API-маршрут устарел. Используйте POST /api/subcategories с параметром categoryId в теле запроса.',
@@ -38,7 +41,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
         method: 'POST',
         body: {
           name: 'Название подкатегории',
-          categoryId: params.id,
+          categoryId: id,
           description: 'Описание (необязательно)',
           image: 'URL изображения (необязательно)',
           isActive: true
@@ -49,7 +52,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
   );
 }
 
-export async function PUT(_request: NextRequest, _params: { params: { id: string } }) {
+export async function PUT(_request: NextRequest, _params: CategorySubcategoriesRouteContext) {
   return NextResponse.json(
     {
       error: 'Этот API-маршрут не поддерживается. Используйте PUT /api/subcategories/[subcategoryId] для обновления отдельной подкатегории.',
@@ -58,3 +61,4 @@ export async function PUT(_request: NextRequest, _params: { params: { id: string
     { status: 405 }
   );
 }
+

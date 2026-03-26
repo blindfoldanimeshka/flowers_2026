@@ -5,7 +5,6 @@ import { CartProvider } from '@/features/app/cart';
 import CartButton from "./client/components/layout/CartButton";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import AdminNotifications from '@/components/AdminNotifications';
 
 const inter = Inter({
   subsets: ["latin"],
@@ -51,7 +50,6 @@ export default function RootLayout({
             draggable
             pauseOnHover
           />
-          <AdminNotifications pollingInterval={45000} />
         </CartProvider>
       </body>
     </html>

@@ -111,9 +111,15 @@ img.rounded-t-\[30px\] {
 html {
   box-sizing: border-box;
   font-size: 16px;
+  scroll-behavior: smooth;
 }
 *, *:before, *:after {
   box-sizing: inherit;
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
 body {
   margin: 0;

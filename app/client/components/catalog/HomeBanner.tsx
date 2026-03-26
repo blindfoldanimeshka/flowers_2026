@@ -1,17 +1,31 @@
 'use client';
 
-import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 
 export default function HomeBanner() {
   return (
     <section className="w-full max-w-7xl mx-auto px-4">
       <motion.div
-        className="relative overflow-hidden rounded-[28px] bg-gradient-to-r from-[#ffe7ef] via-[#ffd8e8] to-[#ffecc8] px-6 py-8 sm:px-10 sm:py-12 shadow-sm"
+        className="relative overflow-hidden rounded-[28px] bg-[#ffe7ef] px-6 py-8 sm:px-10 sm:py-12 shadow-sm min-h-[260px] sm:min-h-[300px] md:min-h-[340px]"
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.35 }}
       >
+        {/* Фото как фон баннера (адаптивная обрезка за счет object-cover) */}
+        <div className="absolute inset-0 pointer-events-none">
+          <Image
+            src="/image/bannerpicture.png"
+            alt="Баннер"
+            fill
+            priority
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1200px"
+            className="object-cover object-[70%_50%]"
+          />
+          {/* Затемнение/градиент для читаемости текста */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#ffffff]/80 via-[#ffffff]/55 to-[#fff3d4]/70" />
+        </div>
+
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/35 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-[#fff3d4]/70 blur-3xl" />
 
@@ -25,20 +39,6 @@ export default function HomeBanner() {
           <p className="mt-3 max-w-2xl text-sm text-[#5f4150] sm:text-base">
             Свежие букеты, композиции и подарочные наборы с быстрой доставкой в день заказа.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link
-              href="#catalog-section"
-              className="rounded-full bg-[#2f1b26] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#20131a]"
-            >
-              Смотреть каталог
-            </Link>
-            <Link
-              href="#categories-section"
-              className="rounded-full border border-[#2f1b26]/25 bg-white/70 px-5 py-2.5 text-sm font-semibold text-[#2f1b26] transition-colors hover:bg-white"
-            >
-              Перейти к категориям
-            </Link>
-          </div>
         </div>
       </motion.div>
     </section>

@@ -52,7 +52,7 @@ export default function HeaderMobile() {
     <>
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFE1E1] h-14 flex items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/image/logo.svg" alt="Floramix" width={32} height={32} />
+          <Image src="/image/logo.svg" alt="Floramix" width={32} height={32} loading="eager" />
           <span className="font-bold text-lg">Floramix</span>
         </Link>
         <div className="relative">
