@@ -64,6 +64,7 @@ export default function Catalog({ categoryId, subcategoryId, title }: { category
                 price={product.price}
                 description={product.description}
                 imageSrc={product.image}
+                imageGallery={product.images}
                 inStock={product.inStock}
               />
             </div>

@@ -4,6 +4,7 @@ export interface IProduct {
   price: number;
   description?: string;
   image: string;
+  images?: string[];
   inStock?: boolean;
   categoryId?: string;
   categoryNumId?: number;

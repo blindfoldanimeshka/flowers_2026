@@ -9,6 +9,7 @@ export interface IProduct {
   subcategoryId?: string;
   subcategoryNumId?: number;
   image: string;
+  images?: string[];
   description: string;
   inStock: boolean;
   createdAt: string;
