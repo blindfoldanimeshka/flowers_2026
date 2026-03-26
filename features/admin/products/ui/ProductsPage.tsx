@@ -19,6 +19,17 @@ interface ProductFormProps {
 const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSubmit, onCancel }: ProductFormProps) => {
   const [priceInput, setPriceInput] = useState(String(draft.price || ''));
 
+  const updateImageAt = (index: number, value: string) => {
+    const nextImages = [...(draft.images || [])];
+    nextImages[index] = value;
+    const normalized = nextImages
+      .map((src) => src?.trim())
+      .filter((src): src is string => Boolean(src))
+      .slice(0, 3);
+    onChange('images', normalized);
+    onChange('image', normalized[0] || '');
+  };
+
   useEffect(() => {
     setPriceInput(String(draft.price || ''));
   }, [draft.price, draft._id]);
@@ -76,7 +87,15 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
         <option value="">Выберите подкатегорию (необязательно)</option>
         {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
       </select>
-      <ImageUpload value={draft.image || ''} onChange={(url: string) => onChange('image', url)} />
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray-700">Фото товара (до 3 шт.)</p>
+        {[0, 1, 2].map((slot) => (
+          <div key={`image-slot-${slot}`} className="rounded-md border border-gray-100 p-2">
+            <p className="mb-2 text-xs text-gray-500">Фото {slot + 1}{slot === 0 ? ' (основное)' : ''}</p>
+            <ImageUpload value={draft.images?.[slot] || ''} onChange={(url: string) => updateImageAt(slot, url)} />
+          </div>
+        ))}
+      </div>
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} />
         В наличии

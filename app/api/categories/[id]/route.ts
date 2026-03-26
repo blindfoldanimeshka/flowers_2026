@@ -3,12 +3,14 @@ import connect from '@/lib/db';
 import { isValidId } from '@/lib/id';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+type CategoryRouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, { params }: CategoryRouteContext) {
   try {
     await connect();
     const { default: Category } = await import('@/models/Category');
     const { default: Subcategory } = await import('@/models/Subcategory');
-    const { id } = params;
+    const { id } = await params;
 
     const category = await Category.findById(id).lean();
     if (!category) {
@@ -21,7 +23,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const subcategories = await Subcategory.find({ categoryId: id }).lean();
     return NextResponse.json({ ...category, subcategories }, { status: 200 });
   } catch (error: any) {
-    console.error(`Ошибка при получении категории с ID ${params.id}:`, error);
+    console.error(`Ошибка при получении категории с ID unknown:`, error);
     return NextResponse.json(
       { error: 'Ошибка при получении категории', details: error.message },
       { status: 500 }
@@ -29,11 +31,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: CategoryRouteContext) {
   try {
     await connect();
     const { default: Category } = await import('@/models/Category');
-    const { id } = params;
+    const { id } = await params;
     const { name } = await request.json();
 
     if (!isValidId(id)) {
@@ -62,13 +64,13 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(request: Request, { params }: CategoryRouteContext) {
   try {
     await connect();
     const { default: Category } = await import('@/models/Category');
     const { default: Subcategory } = await import('@/models/Subcategory');
     const { default: Product } = await import('@/models/Product');
-    const { id } = params;
+    const { id } = await params;
 
     if (!isValidId(id)) {
       return NextResponse.json({ error: 'Неверный ID категории' }, { status: 400 });
@@ -137,3 +139,4 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
   }
 }
+

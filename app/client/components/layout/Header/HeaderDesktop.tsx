@@ -21,7 +21,7 @@ export default function TopHeader() {
                 </div>
                 {/* Логотип */}
                 <Link href="/" className="flex items-center gap-x-2">
-                    <Image src="/image/logo.svg" alt="logo" width={32} height={32} className="sm:w-[40px] sm:h-[40px]" />
+                    <Image src="/image/logo.svg" alt="logo" width={32} height={32} loading="eager" className="sm:w-[40px] sm:h-[40px]" />
                     <h1 className="text-[22px] sm:text-[32px] font-bold">Floramix</h1>
                 </Link>
                 {/* Бургер-меню справа */}
@@ -41,7 +41,7 @@ export default function TopHeader() {
             <div className="hidden md:flex items-center justify-between w-full">
                 {/* Логотип */}
                 <Link href="/" className="flex items-center gap-x-2">
-                    <Image src="/image/logo.svg" alt="logo" width={40} height={40} />
+                    <Image src="/image/logo.svg" alt="logo" width={40} height={40} loading="eager" />
                     <h1 className="text-[38px] font-bold">Floramix</h1>
                 </Link>
                 {/* Навигация с паддингами */}

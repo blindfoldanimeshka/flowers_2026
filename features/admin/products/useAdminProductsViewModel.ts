@@ -13,6 +13,7 @@ export interface AdminProductDraft {
   description: string;
   price: number;
   image: string;
+  images: string[];
   categoryId: string;
   subcategoryId: string;
   inStock: boolean;
@@ -23,6 +24,7 @@ const emptyDraft: AdminProductDraft = {
   description: '',
   price: 0,
   image: '',
+  images: [],
   categoryId: '',
   subcategoryId: '',
   inStock: true,
@@ -37,6 +39,11 @@ export function useAdminProductsViewModel() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [draft, setDraft] = useState<AdminProductDraft>(emptyDraft);
+
+  const scrollToTop = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
@@ -71,7 +78,8 @@ export function useAdminProductsViewModel() {
   const openCreateForm = useCallback(() => {
     setDraft(emptyDraft);
     setIsFormVisible(true);
-  }, []);
+    scrollToTop();
+  }, [scrollToTop]);
 
   const openEditForm = useCallback((product: IProduct) => {
     setDraft({
@@ -80,12 +88,14 @@ export function useAdminProductsViewModel() {
       description: product.description || '',
       price: product.price,
       image: product.image,
+      images: Array.from(new Set([...(product.images || []), product.image].filter(Boolean))).slice(0, 3),
       categoryId: product.categoryId ? String(product.categoryId) : '',
       subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
       inStock: product.inStock ?? true,
     });
     setIsFormVisible(true);
-  }, []);
+    scrollToTop();
+  }, [scrollToTop]);
 
   const closeForm = useCallback(() => {
     setDraft(emptyDraft);
@@ -101,7 +111,8 @@ export function useAdminProductsViewModel() {
   const saveDraft = useCallback(async () => {
     if (!draft.name.trim()) return showToast('Название товара обязательно', 'error');
     if (!draft.categoryId) return showToast('Выберите категорию', 'error');
-    if (!draft.image) return showToast('Добавьте изображение товара', 'error');
+    const images = Array.from(new Set((draft.images || []).map((src) => src?.trim()).filter(Boolean))).slice(0, 3);
+    if (images.length === 0) return showToast('Добавьте хотя бы одно изображение товара', 'error');
     if (!Number.isFinite(draft.price) || draft.price <= 0) return showToast('Укажите корректную цену товара', 'error');
     setSaving(true);
     setError('');
@@ -110,7 +121,8 @@ export function useAdminProductsViewModel() {
         name: draft.name.trim(),
         description: draft.description.trim(),
         price: draft.price,
-        image: draft.image,
+        image: images[0],
+        images,
         categoryId: draft.categoryId,
         subcategoryId: draft.subcategoryId || undefined,
         inStock: draft.inStock,

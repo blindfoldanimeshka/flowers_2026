@@ -6,6 +6,20 @@ import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 
+function normalizeProductImages(input: unknown): { image?: string; images?: string[] } {
+  const raw = Array.isArray(input) ? input : [];
+  const images = Array.from(
+    new Set(
+      raw
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+    )
+  ).slice(0, 3);
+
+  if (images.length === 0) return {};
+  return { image: images[0], images };
+}
+
 // GET all products
 export async function GET(request: NextRequest) {
   try {
@@ -55,6 +69,11 @@ export async function POST(request: NextRequest) {
   try {
     await connect();
     const body = await request.json();
+    const normalizedImages = normalizeProductImages(body.images);
+    if (normalizedImages.images) {
+      body.images = normalizedImages.images;
+      body.image = normalizedImages.image;
+    }
 
     // Получаем категорию для числового ID
     if (body.categoryId) {
@@ -128,6 +147,11 @@ export async function PUT(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     const body = await request.json();
+    const normalizedImages = normalizeProductImages(body.images);
+    if (normalizedImages.images) {
+      body.images = normalizedImages.images;
+      body.image = normalizedImages.image;
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID товара обязателен' }, { status: 400 });

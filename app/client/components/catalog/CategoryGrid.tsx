@@ -7,15 +7,10 @@ import { useCategoriesViewModel } from '@/features/app/catalog';
 
 export default function CategoryGrid() {
   const { categories } = useCategoriesViewModel();
-
-  const tileClassNames = [
-    'md:col-span-3 md:row-span-2',
-    'md:col-span-3 md:row-span-1',
-    'md:col-span-2 md:row-span-1',
-    'md:col-span-4 md:row-span-1',
-    'md:col-span-3 md:row-span-1',
-    'md:col-span-3 md:row-span-1',
-  ];
+  const getDesktopSpanClass = (index: number) => {
+    const indexInGroup = index % 5;
+    return indexInGroup < 3 ? 'lg:col-span-2' : 'lg:col-span-3';
+  };
 
   return (
     <section id="categories-section" className="w-full max-w-7xl mx-auto px-4">
@@ -29,7 +24,7 @@ export default function CategoryGrid() {
       </motion.h2>
 
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 auto-rows-[160px] sm:auto-rows-[180px] md:auto-rows-[160px] gap-4 sm:gap-5"
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 auto-rows-fr gap-4 sm:gap-5"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
@@ -37,7 +32,7 @@ export default function CategoryGrid() {
         {categories.map((category, index) => (
           <motion.div
             key={category._id || category.id}
-            className={tileClassNames[index % tileClassNames.length]}
+            className={`min-h-[170px] sm:min-h-[210px] lg:min-h-[190px] ${getDesktopSpanClass(index)}`}
             initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{
@@ -56,7 +51,7 @@ export default function CategoryGrid() {
                     src={category.image || '/image/items/11.png'}
                     alt={category.name}
                     fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1200px) 40vw, 25vw"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                     priority={index < 4}
                     className="object-cover opacity-45 group-hover:scale-105 transition-transform duration-500"
                   />

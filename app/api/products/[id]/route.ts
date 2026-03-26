@@ -4,12 +4,28 @@ import Product from '@/models/Product';
 import { isValidId } from '@/lib/id';
 import { revalidatePath } from 'next/cache';
 
+function normalizeProductImages(input: unknown): { image?: string; images?: string[] } {
+  const raw = Array.isArray(input) ? input : [];
+  const images = Array.from(
+    new Set(
+      raw
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+    )
+  ).slice(0, 3);
+
+  if (images.length === 0) return {};
+  return { image: images[0], images };
+}
+
+type RouteContext = { params: Promise<{ id: string }> };
+
 // GET запрос для получения товара по ID
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     await connect();
     
-    const { id } = params;
+    const { id } = await params;
     
     // Проверка валидности ID
     if (!isValidId(id)) {
@@ -39,12 +55,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 }
 
 // PUT запрос для обновления товара
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     await connect();
     
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
+    const normalizedImages = normalizeProductImages(body.images);
+    if (normalizedImages.images) {
+      body.images = normalizedImages.images;
+      body.image = normalizedImages.image;
+    }
     
     // Проверка валидности ID
     if (!isValidId(id)) {
@@ -96,11 +117,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE запрос для удаления товара
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
     await connect();
     
-    const { id } = params;
+    const { id } = await params;
     
     // Проверка валидности ID
     if (!isValidId(id)) {
