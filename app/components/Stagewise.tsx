@@ -17,4 +17,4 @@ export function StageWiseInit() {
 
   // Компонент не рендерит ничего в DOM
   return null;
-} 
+}
