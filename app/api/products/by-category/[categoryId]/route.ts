@@ -5,12 +5,14 @@ import Product from '@/models/Product';
 import Category from '@/models/Category';
 import { isValidId } from '@/lib/id';
 
+type RouteContext = { params: Promise<{ categoryId: string }> };
+
 // GET запрос для получения товаров по ID категории
-export async function GET(request: NextRequest, { params }: { params: { categoryId: string } }) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     await connect();
     
-    const { categoryId } = params;
+    const { categoryId } = await params;
     
     // Проверка валидности categoryId (ObjectId)
     if (!isValidId(categoryId)) {

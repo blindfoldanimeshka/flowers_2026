@@ -49,7 +49,7 @@ export default function Footer({ settings }: { settings: any }) {
 
     return (
         <motion.footer 
-            className="bg-[#F0D2D2] grid justify-center py-10 items-center"
+            className="bg-[#F0D2D2] shrink-0 grid justify-center py-10 items-center"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}

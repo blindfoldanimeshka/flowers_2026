@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SignJWT, jwtVerify, JWTPayload as JoseJWTPayload } from 'jose';
+import { clearCsrfCookie } from '@/lib/csrf';
 
 function getJwtKey() {
   const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
@@ -47,12 +48,14 @@ export function setAuthCookie(response: NextResponse, token: string) {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60,
+    // Keep cookie lifetime aligned with JWT expiration (7 days).
+    maxAge: 7 * 24 * 60 * 60,
   });
 }
 
 export function clearAuthCookie(response: NextResponse): NextResponse {
   response.cookies.delete('auth_token');
+  clearCsrfCookie(response);
   return response;
 }
 

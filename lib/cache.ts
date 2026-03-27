@@ -3,13 +3,13 @@ import { revalidateTag } from 'next/cache';
 import Settings from '@/models/Settings';
 import dbConnect from './db';
 
-// Типы для кэширования
+// РўРёРїС‹ РґР»СЏ РєСЌС€РёСЂРѕРІР°РЅРёСЏ
 export interface CacheOptions {
   tags?: string[];
-  revalidate?: number; // время в секундах
+  revalidate?: number; // РІСЂРµРјСЏ РІ СЃРµРєСѓРЅРґР°С…
 }
 
-// Утилита для создания ключей кэша
+// РЈС‚РёР»РёС‚Р° РґР»СЏ СЃРѕР·РґР°РЅРёСЏ РєР»СЋС‡РµР№ РєСЌС€Р°
 function createCacheKey(prefix: string, params: Record<string, any> = {}): string {
   const sortedParams = Object.keys(params)
     .sort()
@@ -19,7 +19,7 @@ function createCacheKey(prefix: string, params: Record<string, any> = {}): strin
   return sortedParams ? `${prefix}:${sortedParams}` : prefix;
 }
 
-// Кэш для товаров
+// РљСЌС€ РґР»СЏ С‚РѕРІР°СЂРѕРІ
 export async function getCachedProducts(filters: {
   categoryId?: string;
   subcategoryId?: string;
@@ -32,7 +32,6 @@ export async function getCachedProducts(filters: {
   
   return unstable_cache(
     async () => {
-      console.log(`[CACHE MISS] Загружаем товары из БД с фильтрами:`, filters);
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: Product } = await import('@/models/Product');
@@ -80,22 +79,21 @@ export async function getCachedProducts(filters: {
           total: totalProducts,
           pages: Math.ceil(totalProducts / limit)
         },
-        cached: false // Помечаем как не из кэша
+        cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
       };
     },
     [cacheKey],
     {
-      revalidate: 5 * 60, // 5 минут
+      revalidate: 5 * 60, // 5 РјРёРЅСѓС‚
       tags: ['products']
     }
   )();
 }
 
-// Кэш для категорий
+// РљСЌС€ РґР»СЏ РєР°С‚РµРіРѕСЂРёР№
 export async function getCachedCategories() {
   return unstable_cache(
     async () => {
-      console.log('[CACHE MISS] Загружаем категории из БД');
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: Category } = await import('@/models/Category');
@@ -103,52 +101,33 @@ export async function getCachedCategories() {
       
       await dbConnect();
       
-      // Получаем все категории и подкатегории параллельно
+      // РџРѕР»СѓС‡Р°РµРј РІСЃРµ РєР°С‚РµРіРѕСЂРёРё Рё РїРѕРґРєР°С‚РµРіРѕСЂРёРё РїР°СЂР°Р»Р»РµР»СЊРЅРѕ
       const [categories, allSubcategories] = await Promise.all([
         Category.find().sort({ name: 1 }).lean(),
         Subcategory.find().lean(),
       ]);
       
-      console.log('[CACHE] Найдено категорий:', categories.length);
-      console.log('[CACHE] Найдено подкатегорий:', allSubcategories.length);
-      
-      // Логируем все категории
-      categories.forEach(cat => {
-        console.log(`[CACHE] Категория: ${cat.name}, ID: ${cat._id}, subcategories:`, 
-          Array.isArray(cat.subcategories) ? cat.subcategories.map(id => id.toString()) : []);
-      });
-      
-      // Логируем все подкатегории
-      allSubcategories.forEach(sub => {
-        console.log(`[CACHE] Подкатегория: ${sub.name}, ID: ${sub._id}, categoryId: ${sub.categoryId}`);
-      });
-      
-      // Создаем карту подкатегорий для быстрого доступа
+      // РЎРѕР·РґР°РµРј РєР°СЂС‚Сѓ РїРѕРґРєР°С‚РµРіРѕСЂРёР№ РґР»СЏ Р±С‹СЃС‚СЂРѕРіРѕ РґРѕСЃС‚СѓРїР°
       const subcategoryMap = new Map(
         allSubcategories.map(sub => [String(sub._id), sub])
       );
       
-      // Вручную наполняем категории подкатегориями
+      // Р’СЂСѓС‡РЅСѓСЋ РЅР°РїРѕР»РЅСЏРµРј РєР°С‚РµРіРѕСЂРёРё РїРѕРґРєР°С‚РµРіРѕСЂРёСЏРјРё
       const populatedCategories = categories.map(category => {
         const categorySubcategories = Array.isArray(category.subcategories)
           ? category.subcategories
               .map(subId => {
                 const subIdStr = subId.toString();
                 const sub = subcategoryMap.get(subIdStr);
-                if (!sub) {
-                  console.log(`[CACHE] Подкатегория с ID ${subIdStr} не найдена для категории ${category.name}`);
-                }
                 return sub;
               })
-              .filter(Boolean) // Убираем null, если подкатегория не найдена
+              .filter(Boolean) // РЈР±РёСЂР°РµРј null, РµСЃР»Рё РїРѕРґРєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°
           : [];
-          
-        console.log(`[CACHE] Категория ${category.name} после наполнения имеет ${categorySubcategories.length} подкатегорий`);
-        
+
         return {
           ...category,
           subcategories: categorySubcategories,
-          cached: false // Помечаем как не из кэша
+          cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
         };
       });
       
@@ -156,17 +135,16 @@ export async function getCachedCategories() {
     },
     ['categories'],
     {
-      revalidate: 10 * 60, // 10 минут
+      revalidate: 10 * 60, // 10 РјРёРЅСѓС‚
       tags: ['categories']
     }
   )();
 }
 
-// Кэш для настроек платежей
+// РљСЌС€ РґР»СЏ РЅР°СЃС‚СЂРѕРµРє РїР»Р°С‚РµР¶РµР№
 export async function getCachedPaymentSettings() {
   return unstable_cache(
     async () => {
-      console.log('[CACHE MISS] Загружаем настройки платежей из БД');
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: PaymentSettings } = await import('@/models/PaymentSettings');
@@ -176,7 +154,7 @@ export async function getCachedPaymentSettings() {
       let settings = await PaymentSettings.findOne();
       
       if (!settings) {
-        // Создаем настройки по умолчанию
+        // РЎРѕР·РґР°РµРј РЅР°СЃС‚СЂРѕР№РєРё РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
         settings = await PaymentSettings.create({
           stripe: { enabled: false, publishableKey: '', secretKey: '' },
           yookassa: { enabled: false, shopId: '', secretKey: '' },
@@ -188,40 +166,38 @@ export async function getCachedPaymentSettings() {
       
       return {
         ...settings.toObject(),
-        cached: false // Помечаем как не из кэша
+        cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
       };
     },
     ['payment-settings'],
     {
-      revalidate: 60 * 60, // 1 час
+      revalidate: 60 * 60, // 1 С‡Р°СЃ
       tags: ['payment-settings']
     }
   )();
 }
 
-// Кэш для настроек
+// РљСЌС€ РґР»СЏ РЅР°СЃС‚СЂРѕРµРє
 export async function getCachedSettings() {
   return unstable_cache(
     async () => {
-      console.log('[CACHE MISS] Загружаем настройки из БД');
       await dbConnect();
-      // Используем findOne, так как настройки - это один документ
+      // РСЃРїРѕР»СЊР·СѓРµРј findOne, С‚Р°Рє РєР°Рє РЅР°СЃС‚СЂРѕР№РєРё - СЌС‚Рѕ РѕРґРёРЅ РґРѕРєСѓРјРµРЅС‚
       const settings = await Settings.findOne({ settingKey: 'global-settings' }) || await Settings.findOne();
       return settings ? settings.toObject() : null;
     },
-    ['settings'], // Ключ кэша
+    ['settings'], // РљР»СЋС‡ РєСЌС€Р°
     {
-      revalidate: 60 * 60, // 1 час
-      tags: ['settings'], // Тег для ревалидации
+      revalidate: 60 * 60, // 1 С‡Р°СЃ
+      tags: ['settings'], // РўРµРі РґР»СЏ СЂРµРІР°Р»РёРґР°С†РёРё
     }
   )();
 }
 
-// Кэш для статистики заказов
+// РљСЌС€ РґР»СЏ СЃС‚Р°С‚РёСЃС‚РёРєРё Р·Р°РєР°Р·РѕРІ
 export async function getCachedOrderStats() {
   return unstable_cache(
     async () => {
-      console.log('[CACHE MISS] Загружаем статистику заказов из БД');
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: Order } = await import('@/models/Order');
@@ -233,12 +209,12 @@ export async function getCachedOrderStats() {
       const confirmedOrders = await Order.countDocuments({ status: 'confirmed' });
       const deliveredOrders = await Order.countDocuments({ status: 'delivered' });
       
-      // Общая сумма всех заказов
+      // РћР±С‰Р°СЏ СЃСѓРјРјР° РІСЃРµС… Р·Р°РєР°Р·РѕРІ
       const totalRevenue = await Order.aggregate([
         { $group: { _id: null, total: { $sum: '$totalAmount' } } }
       ]);
       
-      // Заказы за последние 7 дней
+      // Р—Р°РєР°Р·С‹ Р·Р° РїРѕСЃР»РµРґРЅРёРµ 7 РґРЅРµР№
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
       const recentOrders = await Order.countDocuments({
@@ -252,22 +228,22 @@ export async function getCachedOrderStats() {
         deliveredOrders,
         totalRevenue: totalRevenue[0]?.total || 0,
         recentOrders,
-        cached: false // Помечаем как не из кэша
+        cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
       };
     },
     ['order-stats'],
     {
-      revalidate: 5 * 60, // 5 минут
+      revalidate: 5 * 60, // 5 РјРёРЅСѓС‚
       tags: ['order-stats']
     }
   )();
 }
 
-// Кэш для заказов с пагинацией
+// РљСЌС€ РґР»СЏ Р·Р°РєР°Р·РѕРІ СЃ РїР°РіРёРЅР°С†РёРµР№
 export async function getCachedOrders(filters: {
   email?: string;
   status?: string;
-  deliveryType?: string; // Новый фильтр по типу доставки
+  deliveryType?: string; // РќРѕРІС‹Р№ С„РёР»СЊС‚СЂ РїРѕ С‚РёРїСѓ РґРѕСЃС‚Р°РІРєРё
   page?: number;
   limit?: number;
 } = {}) {
@@ -275,7 +251,6 @@ export async function getCachedOrders(filters: {
   
   return unstable_cache(
     async () => {
-      console.log(`[CACHE MISS] Загружаем заказы из БД с фильтрами:`, filters);
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: Order } = await import('@/models/Order');
@@ -292,7 +267,7 @@ export async function getCachedOrders(filters: {
         query['customer.email'] = filters.email;
       }
       
-      // Добавляем фильтр по типу доставки
+      // Р”РѕР±Р°РІР»СЏРµРј С„РёР»СЊС‚СЂ РїРѕ С‚РёРїСѓ РґРѕСЃС‚Р°РІРєРё
       if (filters.deliveryType) {
         query.fulfillmentMethod = filters.deliveryType;
       }
@@ -316,18 +291,18 @@ export async function getCachedOrders(filters: {
           total: totalOrders,
           pages: Math.ceil(totalOrders / limit)
         },
-        cached: false // Помечаем как не из кэша
+        cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
       };
     },
     [cacheKey],
     {
-      revalidate: 60, // 1 минута
+      revalidate: 60, // 1 РјРёРЅСѓС‚Р°
       tags: ['orders']
     }
   )();
 }
 
-// Кэш для подкатегорий
+// РљСЌС€ РґР»СЏ РїРѕРґРєР°С‚РµРіРѕСЂРёР№
 export async function getCachedSubcategories(filters: {
   categoryId?: string;
   categoryNumId?: number;
@@ -337,7 +312,6 @@ export async function getCachedSubcategories(filters: {
   
   return unstable_cache(
     async () => {
-      console.log(`[CACHE MISS] Загружаем подкатегории из БД с фильтрами:`, filters);
       
       const { default: dbConnect } = await import('@/lib/db');
       const { default: Subcategory } = await import('@/models/Subcategory');
@@ -364,56 +338,48 @@ export async function getCachedSubcategories(filters: {
       
       return subcategories.map(subcat => ({
         ...subcat.toObject(),
-        cached: false // Помечаем как не из кэша
+        cached: false // РџРѕРјРµС‡Р°РµРј РєР°Рє РЅРµ РёР· РєСЌС€Р°
       }));
     },
     [cacheKey],
     {
-      revalidate: 10 * 60, // 10 минут
+      revalidate: 10 * 60, // 10 РјРёРЅСѓС‚
       tags: ['subcategories']
     }
   )();
 }
 
-// Функции для инвалидации кэша
+// Р¤СѓРЅРєС†РёРё РґР»СЏ РёРЅРІР°Р»РёРґР°С†РёРё РєСЌС€Р°
 export function invalidateSettingsCache() {
   revalidateTag('settings', 'max');
-  console.log('[CACHE] Инвалидирован кэш настроек');
 }
 
 export function invalidateProductsCache() {
   revalidateTag('products', 'max');
-  console.log('[CACHE] Инвалидирован кэш товаров');
 }
 
 export function invalidateCategoriesCache() {
   revalidateTag('categories', 'max');
-  console.log('[CACHE] Инвалидирован кэш категорий');
 }
 
 export function invalidatePaymentSettingsCache() {
   revalidateTag('payment-settings', 'max');
-  console.log('[CACHE] Инвалидирован кэш настроек платежей');
 }
 
 export function invalidateOrderStatsCache() {
   revalidateTag('order-stats', 'max');
-  console.log('[CACHE] Инвалидирован кэш статистики заказов');
 }
 
 export function invalidateOrdersCache() {
   revalidateTag('orders', 'max');
-  console.log('[CACHE] Инвалидирован кэш заказов');
 }
 
 export function invalidateSubcategoriesCache() {
   revalidateTag('subcategories', 'max');
-  console.log('[CACHE] Инвалидирован кэш подкатегорий');
 }
 
-// Полная инвалидация всего кэша
+// РџРѕР»РЅР°СЏ РёРЅРІР°Р»РёРґР°С†РёСЏ РІСЃРµРіРѕ РєСЌС€Р°
 export function invalidateAllCache() {
-  console.log('[CACHE] Инвалидация ВСЕХ кэшей...');
   invalidateSettingsCache();
   invalidateProductsCache();
   invalidateCategoriesCache();
@@ -423,7 +389,7 @@ export function invalidateAllCache() {
   invalidateSubcategoriesCache();
 }
 
-// Кэш с пользовательскими параметрами
+// РљСЌС€ СЃ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРёРјРё РїР°СЂР°РјРµС‚СЂР°РјРё
 export function createCustomCache<T>(
   fn: (...args: any[]) => Promise<T>,
   prefix: string,

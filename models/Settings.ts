@@ -24,6 +24,9 @@ export interface ISettings {
     telegram?: string;
     whatsapp?: string;
   };
+  homeCategoryCardBackgrounds?: Record<string, string>;
+  homeBannerBackground?: string;
+  homeBannerSlides?: string[];
 }
 
 const Settings = createSupabaseModel({
@@ -40,6 +43,9 @@ const Settings = createSupabaseModel({
     timezone: 'Europe/Moscow',
     maintenanceMode: false,
     socialLinks: {},
+    homeCategoryCardBackgrounds: {},
+    homeBannerBackground: '',
+    homeBannerSlides: [],
   },
 });
 

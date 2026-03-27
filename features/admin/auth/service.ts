@@ -1,4 +1,5 @@
-import { ILoginPayload, IUser } from '@/app/client/models/Auth';
+﻿import { ILoginPayload, IUser } from '@/app/client/models/Auth';
+import { withCsrfHeaders } from '@/lib/csrf-client';
 
 function normalizeUserResponse(data: unknown): IUser | null {
   if (!data || typeof data !== 'object') return null;
@@ -41,7 +42,9 @@ export async function getCurrentUser(): Promise<IUser | null> {
 }
 
 export async function logout(): Promise<void> {
-  const response = await fetch('/api/auth/logout', { method: 'POST' });
+  const response = await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: withCsrfHeaders(),
+  });
   if (!response.ok) throw new Error(await parseError(response, 'Не удалось выполнить выход'));
 }
-

@@ -103,6 +103,23 @@ const ShopItem = memo(({
     closeModal();
   };
 
+  const handleQuickAddToCart = () => {
+    if (!inStock) return;
+
+    const existingItem = cartItems.find((item) => item.id === id);
+    if (existingItem) {
+      updateQuantity(id, existingItem.quantity + 1);
+      return;
+    }
+
+    addToCart({ id, title, price, oldPrice, imageSrc: gallery[activeImageIndex] || imageSrc });
+  };
+
+  const handleQuickUpdateQuantity = (delta: number) => {
+    if (!inStock || itemCount <= 0) return;
+    updateQuantity(id, Math.max(0, itemCount + delta));
+  };
+
   const handlePreviewMove = (event: React.MouseEvent<HTMLElement>) => {
     if (!canUseHover || gallery.length <= 1) return;
 
@@ -229,27 +246,73 @@ const ShopItem = memo(({
           </div>
         </button>
 
-        <button
-          onClick={openModal}
-          type="button"
-          className={`${inStock ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2 sm:py-3 px-2 sm:px-4 rounded-[0_0_30px_30px] w-full mt-auto`}
-          disabled={!inStock}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <span className="text-xs sm:text-sm whitespace-nowrap">
-              {!inStock ? 'Нет в наличии' : isAdded ? 'Добавить еще' : 'Открыть карточку'}
-            </span>
+        <div className="w-full mt-auto">
+          <button
+            onClick={openModal}
+            type="button"
+            className={`sm:hidden ${inStock ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2 px-2 rounded-[0_0_30px_30px] w-full`}
+            disabled={!inStock}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xs whitespace-nowrap">{!inStock ? 'Нет в наличии' : 'Открыть карточку'}</span>
+            </div>
+          </button>
+
+          <div className={`hidden sm:flex items-center justify-between gap-2 px-3 py-2 rounded-[0_0_30px_30px] ${inStock ? 'bg-[#D8FEE9]' : 'bg-gray-200'}`}>
+            {!inStock ? (
+              <div className="w-full text-center text-sm font-medium text-gray-600">Нет в наличии</div>
+            ) : (
+              <>
+                {itemCount > 0 ? (
+                  <div className="inline-flex items-center rounded-full border border-[#2f1b26]/20 bg-white">
+                    <button
+                      type="button"
+                      onClick={() => handleQuickUpdateQuantity(-1)}
+                      className="h-7 w-7 text-sm font-semibold hover:bg-[#f7f7f7] rounded-l-full"
+                      aria-label="Уменьшить количество"
+                    >
+                      -
+                    </button>
+                    <span className="min-w-7 text-center text-xs font-semibold">{itemCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleQuickUpdateQuantity(1)}
+                      className="h-7 w-7 text-sm font-semibold hover:bg-[#f7f7f7] rounded-r-full"
+                      aria-label="Увеличить количество"
+                    >
+                      +
+                    </button>
+                  </div>
+                ) : (
+                  <span className="text-xs text-[#2f1b26]/70">Добавьте товар в корзину</span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleQuickAddToCart}
+                  className="rounded-full bg-[#2f1b26] px-3 py-1.5 text-xs text-white hover:bg-[#20131a] transition-colors"
+                >
+                  {isAdded ? 'Добавить еще' : 'В корзину'}
+                </button>
+              </>
+            )}
           </div>
-        </button>
+        </div>
       </article>
 
-      <Modal isOpen={isProductModalOpen} onClose={closeModal} title={title} className="max-w-3xl w-full">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-4 sm:gap-5">
+      <Modal
+        isOpen={isProductModalOpen}
+        onClose={closeModal}
+        title={title}
+        className="w-full !max-w-[1200px]"
+        contentClassName="lg:!overflow-hidden lg:!max-h-none"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-4 sm:gap-6 lg:gap-8">
           <div>
             <div
               // Фиксированная высота на широких мобилках делает картинку "вытянутой".
               // Поэтому используем aspect-ratio, а Image — object-cover.
-              className="relative w-full aspect-[4/3] sm:aspect-[4/5] rounded-2xl overflow-hidden bg-[#fff1f1]"
+              className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#fff1f1]"
               onMouseMove={handlePreviewMove}
             >
               <Image

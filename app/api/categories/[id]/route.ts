@@ -12,6 +12,10 @@ export async function GET(request: NextRequest, { params }: CategoryRouteContext
     const { default: Subcategory } = await import('@/models/Subcategory');
     const { id } = await params;
 
+    if (!isValidId(id)) {
+      return NextResponse.json({ error: 'Неверный ID категории' }, { status: 400 });
+    }
+
     const category = await Category.findById(id).lean();
     if (!category) {
       return NextResponse.json(

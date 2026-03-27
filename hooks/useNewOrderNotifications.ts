@@ -48,13 +48,32 @@ export function useNewOrderNotifications({
   deliveryType,
   onNewOrder
 }: UseNewOrderNotificationsProps = {}): UseNewOrderNotificationsReturn {
+  const MAX_BACKOFF_MS = 5 * 60 * 1000;
   const [isPolling, setIsPolling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newOrdersCount, setNewOrdersCount] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastCheckRef = useRef<string>(new Date().toISOString());
+  const isRequestInFlightRef = useRef(false);
+  const consecutiveFailuresRef = useRef(0);
+  const nextAllowedRequestAtRef = useRef(0);
+
+  const getBackoffDelay = useCallback((failureCount: number) => {
+    const exponent = Math.max(0, failureCount - 1);
+    return Math.min(interval * Math.pow(2, exponent), MAX_BACKOFF_MS);
+  }, [interval]);
 
   const checkForNewOrders = useCallback(async () => {
+    if (isRequestInFlightRef.current) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now < nextAllowedRequestAtRef.current) {
+      return;
+    }
+
+    isRequestInFlightRef.current = true;
     try {
       setError(null);
       
@@ -78,12 +97,34 @@ export function useNewOrderNotifications({
         // Если получили 403, значит пользователь не админ - останавливаем polling
         if (response.status === 403) {
           setIsPolling(false);
+          consecutiveFailuresRef.current = 0;
+          nextAllowedRequestAtRef.current = 0;
           return;
         }
-        throw new Error(`HTTP ${response.status}`);
+        // Для временных серверных ошибок polling не должен ломать UX
+        if (response.status >= 500) {
+          consecutiveFailuresRef.current += 1;
+          const backoffMs = getBackoffDelay(consecutiveFailuresRef.current);
+          nextAllowedRequestAtRef.current = Date.now() + backoffMs;
+          setError(`Временная ошибка сервера уведомлений. Повторим через ${Math.ceil(backoffMs / 1000)} сек.`);
+          return;
+        }
+
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // ignore json parse errors for non-JSON responses
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      consecutiveFailuresRef.current = 0;
+      nextAllowedRequestAtRef.current = 0;
       
       // Обновляем timestamp последней проверки
       lastCheckRef.current = data.timestamp;
@@ -121,15 +162,22 @@ export function useNewOrderNotifications({
       }
     } catch (err: any) {
       console.error('Ошибка при проверке новых заказов:', err);
-      setError(err.message);
+      consecutiveFailuresRef.current += 1;
+      const backoffMs = getBackoffDelay(consecutiveFailuresRef.current);
+      nextAllowedRequestAtRef.current = Date.now() + backoffMs;
+      setError(`${err.message}. Повторим через ${Math.ceil(backoffMs / 1000)} сек.`);
+    } finally {
+      isRequestInFlightRef.current = false;
     }
-  }, [onNewOrder, deliveryType]);
+  }, [onNewOrder, deliveryType, getBackoffDelay]);
 
   const startPolling = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
     
+    consecutiveFailuresRef.current = 0;
+    nextAllowedRequestAtRef.current = 0;
     setIsPolling(true);
     setError(null);
     
@@ -145,6 +193,9 @@ export function useNewOrderNotifications({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    consecutiveFailuresRef.current = 0;
+    nextAllowedRequestAtRef.current = 0;
+    isRequestInFlightRef.current = false;
     setIsPolling(false);
   }, []);
 

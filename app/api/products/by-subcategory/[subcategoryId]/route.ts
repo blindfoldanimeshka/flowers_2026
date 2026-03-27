@@ -5,12 +5,14 @@ import Product from '@/models/Product';
 import Subcategory from '@/models/Subcategory';
 import { isValidId } from '@/lib/id';
 
+type RouteContext = { params: Promise<{ subcategoryId: string }> };
+
 // GET запрос для получения товаров по ID подкатегории
-export async function GET(request: NextRequest, { params }: { params: { subcategoryId: string } }) {
+export async function GET(request: NextRequest, { params }: RouteContext) {
   try {
     await connect();
     
-    const { subcategoryId } = params;
+    const { subcategoryId } = await params;
     
     // Проверка валидности subcategoryId (ObjectId)
     if (!isValidId(subcategoryId)) {

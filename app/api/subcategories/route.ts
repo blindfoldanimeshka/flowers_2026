@@ -6,6 +6,7 @@ import slugify from 'slugify';
 import Category from '@/models/Category';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 import { isValidId } from '@/lib/id';
+import { escapeRegExp, sanitizeMongoObject } from '@/lib/security';
 
 // GET all subcategories
 export async function GET(request: NextRequest) {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
   try {
     await connect();
     
-    const body = await request.json();
+    const body = sanitizeMongoObject(await request.json());
     const { name, categoryId, description, image, isActive } = body;
     
     console.log('[SUBCATEGORY API] Creating subcategory:', { name, categoryId });
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
     });
     
     const existingSubcategory = await Subcategory.findOne({
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
+      name: { $regex: new RegExp(`^${escapeRegExp(name.trim())}$`, 'i') },
       categoryId
     });
     

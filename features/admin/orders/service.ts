@@ -1,4 +1,5 @@
 import { IAdminOrder } from '@/app/client/models/AdminOrder';
+import { withCsrfHeaders } from '@/lib/csrf-client';
 
 interface GetAdminOrdersOptions {
   baseUrl?: string;
@@ -29,7 +30,7 @@ export async function getAdminOrders(options: GetAdminOrdersOptions = {}): Promi
 export async function updateAdminOrderStatus(id: string | number, status: IAdminOrder['status']): Promise<IAdminOrder> {
   const response = await fetch('/api/orders', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
     body: JSON.stringify({ _id: String(id), status }),
   });
@@ -41,6 +42,7 @@ export async function updateAdminOrderStatus(id: string | number, status: IAdmin
 export async function deleteAdminOrder(id: string | number): Promise<void> {
   const response = await fetch(`/api/orders/${String(id)}`, {
     method: 'DELETE',
+    headers: withCsrfHeaders(),
     credentials: 'include',
   });
   if (!response.ok) throw new Error(await parseError(response, 'Не удалось удалить заказ'));

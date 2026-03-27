@@ -55,7 +55,7 @@ export function useOrderFormViewModel() {
           email: formData.email || undefined,
           address: formData.deliveryType === 'pickup' ? 'Самовывоз' : formData.address,
         },
-        items: cartItems.map(item => ({ productId: item.id, quantity: item.quantity })),
+        items: cartItems.map(item => ({ productId: String(item.id), quantity: item.quantity })),
         paymentMethod: formData.paymentMethod,
         notes: formData.notes || undefined,
         deliveryType: formData.deliveryType,

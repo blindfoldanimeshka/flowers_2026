@@ -3,160 +3,127 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import { invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
+import { sanitizeMongoObject } from '@/lib/security';
 
-// GET запрос для получения конкретного заказа
-export async function GET(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'] as const;
+const PAYMENT_STATUSES = ['pending', 'paid', 'failed'] as const;
+type RouteContext = { params: Promise<{ id: string }> };
+
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     await dbConnect();
     const { id } = await context.params;
-    
+
     if (!id) {
-      return NextResponse.json(
-        { error: 'ID заказа обязателен' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
-    
-    const order = await Order.findById(id)
-      .populate('items.productId', 'name price image description');
-    
+
+    const order = await Order.findById(id).populate('items.productId', 'name price image description');
     if (!order) {
-      return NextResponse.json(
-        { error: 'Заказ не найден' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
-    
-    // Проверяем права доступа
+
     const userRole = request.headers.get('x-user-role');
-    const userEmail = request.headers.get('x-username'); // В нашем случае username = email
-    
-    // Если не админ, проверяем что заказ принадлежит пользователю
+    const userEmail = request.headers.get('x-username');
     if (userRole !== 'admin' && order.customer.email !== userEmail) {
-      return NextResponse.json(
-        { error: 'Доступ запрещен' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 });
     }
-    
+
     return NextResponse.json({ order }, { status: 200 });
-    
   } catch (error: any) {
     console.error('Ошибка при получении заказа:', error);
     return NextResponse.json(
-      { error: 'Ошибка при получении заказа', details: error.message },
+      {
+        error: 'Ошибка при получении заказа',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
       { status: 500 }
     );
   }
 }
 
-// PATCH запрос для частичного обновления заказа
-export async function PATCH(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     await dbConnect();
     const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
-    
-    // Только админы могут обновлять заказы
+
     if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Доступ запрещен - требуется роль администратора' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Доступ запрещен - требуется роль администратора' }, { status: 403 });
     }
-    
+
     if (!id) {
-      return NextResponse.json(
-        { error: 'ID заказа обязателен' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
-    
-    const body = await request.json();
-    const updatedOrder = await Order.findByIdAndUpdate(
-      id,
-      body,
-      { new: true, runValidators: true }
-    ).populate('items.productId', 'name price image');
-    
+
+    const body = sanitizeMongoObject(await request.json());
+    const updateData: Record<string, unknown> = {};
+
+    if (ORDER_STATUSES.includes(body.status as any)) updateData.status = body.status;
+    if (PAYMENT_STATUSES.includes(body.paymentStatus as any)) updateData.paymentStatus = body.paymentStatus;
+    if (typeof body.notes === 'string') updateData.notes = body.notes.slice(0, 500);
+    if (typeof body.deliveryTime === 'string') updateData.deliveryTime = body.deliveryTime.slice(0, 50);
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(id, { $set: updateData }, { new: true, runValidators: true }).populate(
+      'items.productId',
+      'name price image'
+    );
+
     if (!updatedOrder) {
-      return NextResponse.json(
-        { error: 'Заказ не найден' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
-    
-    // Инвалидируем кэш заказов
+
     invalidateOrdersCache();
     invalidateOrderStatsCache();
-    
+
     return NextResponse.json({ order: updatedOrder }, { status: 200 });
-    
   } catch (error: any) {
     console.error('Ошибка при обновлении заказа:', error);
     return NextResponse.json(
-      { error: 'Ошибка при обновлении заказа', details: error.message },
+      {
+        error: 'Ошибка при обновлении заказа',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
       { status: 500 }
     );
   }
 }
 
-// DELETE запрос для удаления заказа (только для админов)
-export async function DELETE(
-  request: NextRequest,
-  context: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     await dbConnect();
     const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
-    
-    // Только админы могут удалять заказы
+
     if (userRole !== 'admin') {
-      return NextResponse.json(
-        { error: 'Доступ запрещен - требуется роль администратора' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Доступ запрещен - требуется роль администратора' }, { status: 403 });
     }
-    
+
     if (!id) {
-      return NextResponse.json(
-        { error: 'ID заказа обязателен' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
-    
+
     const deletedOrder = await Order.findByIdAndDelete(id);
-    
     if (!deletedOrder) {
-      return NextResponse.json(
-        { error: 'Заказ не найден' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
-    
-    // Инвалидируем кэш заказов
+
     invalidateOrdersCache();
     invalidateOrderStatsCache();
-    
-    console.log(`[УДАЛЕНИЕ ЗАКАЗА] Администратор удалил заказ #${deletedOrder.orderNumber}`);
-    
-    return NextResponse.json({ 
-      message: 'Заказ успешно удален',
-      orderNumber: deletedOrder.orderNumber 
-    }, { status: 200 });
-    
+
+    return NextResponse.json({ message: 'Заказ успешно удален', orderNumber: deletedOrder.orderNumber }, { status: 200 });
   } catch (error: any) {
     console.error('Ошибка при удалении заказа:', error);
     return NextResponse.json(
-      { error: 'Ошибка при удалении заказа', details: error.message },
+      {
+        error: 'Ошибка при удалении заказа',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      },
       { status: 500 }
     );
   }
-} 
+}

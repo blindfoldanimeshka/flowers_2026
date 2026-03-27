@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-toastify';
+import { withCsrfHeaders } from '@/lib/csrf-client';
+import ImageUpload from '@/app/admin/components/ImageUpload';
 
 // Компонент для выбора времени
 interface TimePickerProps {
@@ -152,16 +154,67 @@ const getInitialFormState = (settings: any) => ({
   vk: settings?.socialLinks?.vk ?? '',
   telegram: settings?.socialLinks?.telegram ?? '',
   whatsapp: settings?.socialLinks?.whatsapp ?? '',
+  homeCategoryCardBackgrounds: settings?.homeCategoryCardBackgrounds ?? {},
+  homeBannerBackground: settings?.homeBannerBackground ?? '',
+  homeBannerSlides: Array.isArray(settings?.homeBannerSlides) ? settings.homeBannerSlides.slice(0, 6) : [],
 });
+
+interface CategoryItem {
+  _id: string;
+  slug: string;
+  name: string;
+}
+
+function normalizeSlides(slides: unknown): string[] {
+  return Array.isArray(slides)
+    ? slides.filter((item): item is string => typeof item === 'string').map((item) => item.trim()).filter(Boolean).slice(0, 6)
+    : [];
+}
 
 export default function SettingsForm({ initialSettings }: { initialSettings: any }) {
   const [form, setForm] = useState(getInitialFormState(initialSettings));
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setForm(getInitialFormState(initialSettings));
   }, [initialSettings]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadCategories = async () => {
+      try {
+        setCategoriesLoading(true);
+        const response = await fetch('/api/categories', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const list = Array.isArray(data) ? data : [];
+        if (isMounted) {
+          setCategories(
+            list
+              .filter((item: any) => item && item._id && item.slug && item.name)
+              .slice(0, 10)
+              .map((item: any) => ({
+                _id: String(item._id),
+                slug: String(item.slug),
+                name: String(item.name),
+              }))
+          );
+        }
+      } catch {
+        if (isMounted) setCategories([]);
+      } finally {
+        if (isMounted) setCategoriesLoading(false);
+      }
+    };
+
+    loadCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -195,13 +248,16 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
         vk: form.vk,
         telegram: form.telegram,
         whatsapp: form.whatsapp,
-      }
+      },
+      homeCategoryCardBackgrounds: form.homeCategoryCardBackgrounds,
+      homeBannerBackground: form.homeBannerBackground,
+      homeBannerSlides: normalizeSlides(form.homeBannerSlides),
     };
 
     try {
       const response = await fetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(dataToSend),
       });
 
@@ -271,6 +327,80 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
           </div>
         </div>
         
+        <div>
+          <label className="block mb-3 font-medium text-gray-700">
+            Фоны карточек категорий (до 10, только для существующих категорий)
+          </label>
+          {categoriesLoading ? (
+            <div className="text-sm text-gray-500">Загрузка категорий...</div>
+          ) : categories.length === 0 ? (
+            <div className="text-sm text-gray-500">
+              Категории пока не добавлены. Поля загрузки фото появятся автоматически после создания категорий.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {categories.map((category) => {
+                const value =
+                  form.homeCategoryCardBackgrounds?.[category._id] ||
+                  form.homeCategoryCardBackgrounds?.[category.slug] ||
+                  '';
+                return (
+                  <div key={category._id} className="rounded-lg border bg-gray-50 p-3">
+                    <div className="mb-2 text-sm font-medium text-gray-700">{category.name}</div>
+                    <ImageUpload
+                      value={value}
+                      onChange={(url) =>
+                        setForm((f) => ({
+                          ...f,
+                          homeCategoryCardBackgrounds: {
+                            ...(f.homeCategoryCardBackgrounds || {}),
+                            [category._id]: url,
+                            [category.slug]: url,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium text-gray-700">Фон баннера (загрузка файла)</label>
+          <ImageUpload
+            value={form.homeBannerBackground}
+            onChange={(url) => setForm((f) => ({ ...f, homeBannerBackground: url }))}
+          />
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium text-gray-700">Слайды баннера (до 6 файлов)</label>
+          <div className="space-y-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="rounded-lg border bg-gray-50 p-3">
+                <div className="mb-2 text-sm font-medium text-gray-700">Слайд {index + 1}</div>
+                <ImageUpload
+                  value={form.homeBannerSlides[index] || ''}
+                  onChange={(url) =>
+                    setForm((f) => {
+                      const nextSlides = normalizeSlides(f.homeBannerSlides);
+                      while (nextSlides.length < 6) nextSlides.push('');
+                      nextSlides[index] = url;
+                      return {
+                        ...f,
+                        homeBannerSlides: nextSlides.filter(Boolean),
+                      };
+                    })
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2">Слайды автоматически переключаются на сайте каждые 6 секунд с плавным fade.</p>
+        </div>
+
         <div>
           <label className="block mb-1 font-medium text-gray-700">WhatsApp</label>
           <input

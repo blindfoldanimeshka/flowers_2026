@@ -25,18 +25,26 @@ export async function GET(request: NextRequest) {
     
     // Если указан timestamp, получаем заказы после этой даты
     if (since) {
-      query.createdAt = { $gt: new Date(since) };
+      const parsedSince = new Date(since);
+      if (Number.isNaN(parsedSince.getTime())) {
+        return NextResponse.json({ error: 'Некорректный параметр since' }, { status: 400 });
+      }
+      query.createdAt = { $gt: parsedSince };
     }
     
     // Добавляем фильтр по типу доставки
     if (deliveryType) {
+      if (deliveryType !== 'delivery' && deliveryType !== 'pickup') {
+        return NextResponse.json({ error: 'Некорректный параметр deliveryType' }, { status: 400 });
+      }
       query.fulfillmentMethod = deliveryType;
     }
     
+    // For notifications we already store item snapshots in each order (name/price/image),
+    // so avoid expensive populate calls that can fail on transient upstream issues.
     const newOrders = await Order.find(query)
       .sort({ createdAt: -1 })
-      .limit(50)
-      .populate('items.productId', 'name price image');
+      .limit(50);
     
     // Возвращаем количество новых заказов и сами заказы
     return NextResponse.json({

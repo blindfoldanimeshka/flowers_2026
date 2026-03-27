@@ -13,6 +13,9 @@ const defaultPublicSettings = {
     address: "",
     workingHours: "",
     socialLinks: {},
+    homeCategoryCardBackgrounds: {},
+    homeBannerBackground: "",
+    homeBannerSlides: [],
 };
 
 export default async function ClientLayout({
@@ -35,28 +38,23 @@ export default async function ClientLayout({
     }
 
     return (
-        <>
+        <div className="relative flex min-h-screen flex-col overflow-x-clip">
             <div
+                className="pointer-events-none fixed inset-0 -z-10"
                 style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
                     backgroundImage: "url('/image/bg.png')",
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     opacity: 0.5,
-                    zIndex: -1,
                 }}
             />
             <HeaderSwitcher />
             <TopInfoPanel settings={plainSettings} />
-            <FadeWrapper>
-              {children}
-            </FadeWrapper>
+            <main className="flex-1">
+                <FadeWrapper>{children}</FadeWrapper>
+            </main>
             <SocialButton settings={plainSettings} />
             <Footer settings={plainSettings} />
-        </>
+        </div>
     )
 }
