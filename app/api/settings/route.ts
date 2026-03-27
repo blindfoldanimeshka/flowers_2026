@@ -133,10 +133,16 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
     }
 
     if (field === 'homeCategoryCardBackgrounds' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      const cleanedEntries = Object.entries(value as Record<string, unknown>)
-        .map(([key, item]) => [key.trim(), sanitizeString(item)] as const)
-        .filter(([key, item]) => key.length > 0 && typeof item === 'string');
-      sanitizedBody.homeCategoryCardBackgrounds = Object.fromEntries(cleanedEntries);
+      const backgrounds: Record<string, string> = {};
+      for (const [rawKey, item] of Object.entries(value as Record<string, unknown>)) {
+        const key = rawKey.trim();
+        if (!key) continue;
+        const normalized = sanitizeString(item);
+        if (normalized !== undefined) {
+          backgrounds[key] = normalized;
+        }
+      }
+      sanitizedBody.homeCategoryCardBackgrounds = backgrounds;
       continue;
     }
 
