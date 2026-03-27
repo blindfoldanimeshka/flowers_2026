@@ -3,6 +3,7 @@ import connect from '@/lib/db';
 import Product from '@/models/Product';
 import { isValidId } from '@/lib/id';
 import { revalidatePath } from 'next/cache';
+import { sanitizeMongoObject } from '@/lib/security';
 
 function normalizeProductImages(input: unknown): { image?: string; images?: string[] } {
   const raw = Array.isArray(input) ? input : [];
@@ -60,7 +61,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     await connect();
     
     const { id } = await params;
-    const body = await request.json();
+    const body = sanitizeMongoObject(await request.json());
     const normalizedImages = normalizeProductImages(body.images);
     if (normalizedImages.images) {
       body.images = normalizedImages.images;
@@ -76,9 +77,23 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     }
     
     // Обновляем товар
+    const updateData: Record<string, unknown> = {};
+    if (typeof body.name === 'string' && body.name.trim()) updateData.name = body.name.trim();
+    if (typeof body.description === 'string') updateData.description = body.description;
+    if (typeof body.price === 'number' && Number.isFinite(body.price) && body.price >= 0) updateData.price = body.price;
+    if (typeof body.inStock === 'boolean') updateData.inStock = body.inStock;
+    if (typeof body.categoryId === 'string' && body.categoryId.trim()) updateData.categoryId = body.categoryId.trim();
+    if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) updateData.subcategoryId = body.subcategoryId.trim();
+    if (typeof body.image === 'string' && body.image.trim()) updateData.image = body.image.trim();
+    if (Array.isArray(body.images)) updateData.images = body.images.filter((item: unknown) => typeof item === 'string').slice(0, 3);
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
+    }
+
     const updatedProduct = await Product.findByIdAndUpdate(
       id,
-      { $set: body },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
     

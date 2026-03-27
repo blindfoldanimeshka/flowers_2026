@@ -1,5 +1,7 @@
 
 // Типы для API ответов
+import { withCsrfHeaders } from '@/lib/csrf-client';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -89,6 +91,7 @@ export class ApiClient {
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -97,6 +100,7 @@ export class ApiClient {
   async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -105,6 +109,7 @@ export class ApiClient {
   async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -113,6 +118,7 @@ export class ApiClient {
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
+      headers: withCsrfHeaders(),
     });
   }
 
@@ -165,6 +171,17 @@ export class ApiClient {
       Object.entries(headers).forEach(([key, value]) => {
         xhr.setRequestHeader(key, value);
       });
+
+      const csrfHeaders = withCsrfHeaders();
+      if (csrfHeaders instanceof Headers) {
+        csrfHeaders.forEach((value, key) => xhr.setRequestHeader(key, value));
+      } else if (Array.isArray(csrfHeaders)) {
+        csrfHeaders.forEach(([key, value]) => xhr.setRequestHeader(key, value));
+      } else {
+        Object.entries(csrfHeaders).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+      }
 
       xhr.send(formData);
     });

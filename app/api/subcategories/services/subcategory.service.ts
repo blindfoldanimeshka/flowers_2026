@@ -1,6 +1,7 @@
 import Subcategory, { ISubcategory } from '@/models/Subcategory';
 import Category from '@/models/Category';
 import { Logger } from '@/lib/logger';
+import { escapeRegExp } from '@/lib/security';
 
 export interface CreateSubcategoryParams {
   name: string;
@@ -33,7 +34,7 @@ export const SubcategoryService = {
 
       // Check for existing subcategory with same name in this category
       const existingSubcategory = await Subcategory.findOne({
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
+        name: { $regex: new RegExp(`^${escapeRegExp(name)}$`, 'i') },
         categoryId
       }).session(session || null);
 

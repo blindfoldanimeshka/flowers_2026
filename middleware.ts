@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { isTrustedOriginRequest, isValidCsrfRequest } from '@/lib/csrf';
 
 const AUTH_LOGIN_PATH = '/auth/login';
 const ADMIN_DASHBOARD_PATH = '/admin/orders';
@@ -44,15 +45,12 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/')) {
-    if (pathname.startsWith('/api/categories') || pathname.startsWith('/api/subcategories')) {
-      return NextResponse.next();
-    }
-
     const isPublicApiRoute =
       (
         request.method === 'GET' && (
           pathname.startsWith('/api/products') ||
           pathname.startsWith('/api/categories') ||
+          pathname.startsWith('/api/subcategories') ||
           pathname.startsWith('/api/settings')
         )
       ) ||
@@ -68,6 +66,19 @@ export async function middleware(request: NextRequest) {
         : { error: 'Доступ запрещен. Требуются права администратора.' };
       const status = !isAuthenticated ? 401 : 403;
       return NextResponse.json(errorResponse, { status });
+    }
+
+    const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
+    const hasAuthCookie = Boolean(request.cookies.get('auth_token')?.value);
+
+    if (isMutatingRequest && hasAuthCookie) {
+      if (!isTrustedOriginRequest(request)) {
+        return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+      }
+
+      if (!isValidCsrfRequest(request)) {
+        return NextResponse.json({ error: 'CSRF token mismatch' }, { status: 403 });
+      }
     }
 
     const requestHeaders = new Headers(request.headers);

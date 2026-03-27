@@ -59,7 +59,7 @@ export default function Catalog({ categoryId, subcategoryId, title }: { category
               style={{ animationDelay: getAnimationDelay(index) }}
             >
               <ShopItem
-                id={product._id}
+                id={String(product._id)}
                 title={product.name}
                 price={product.price}
                 description={product.description}

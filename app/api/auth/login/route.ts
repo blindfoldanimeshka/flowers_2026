@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { createToken, setAuthCookie } from '@/lib/auth';
+import { generateCsrfToken, setCsrfCookie } from '@/lib/csrf';
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,15 +56,15 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       message: 'Login successful',
       user: {
-        id: user._id,
+        id: user._id.toString(),
         username: user.username,
         role: user.role
-      },
-      token: token
+      }
     });
 
     // Установка cookie
     setAuthCookie(response, token);
+    setCsrfCookie(response, generateCsrfToken());
 
     return response;
 

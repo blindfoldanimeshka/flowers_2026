@@ -1,12 +1,45 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useCategoriesViewModel } from '@/features/app/catalog';
 
+interface PublicSettings {
+  homeCategoryCardBackgrounds?: Record<string, string>;
+}
+
 export default function CategoryGrid() {
   const { categories } = useCategoriesViewModel();
+  const [settings, setSettings] = useState<PublicSettings | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/settings', { cache: 'no-store' });
+        if (!response.ok) return;
+
+        const data = (await response.json()) as { settings?: PublicSettings };
+        if (isMounted) {
+          setSettings(data.settings || null);
+        }
+      } catch {
+        if (isMounted) {
+          setSettings(null);
+        }
+      }
+    };
+
+    fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const getDesktopSpanClass = (index: number) => {
     const indexInGroup = index % 5;
     return indexInGroup < 3 ? 'lg:col-span-2' : 'lg:col-span-3';
@@ -48,7 +81,12 @@ export default function CategoryGrid() {
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
                 <div className="absolute inset-0 opacity-80 group-hover:opacity-95 transition-opacity duration-300">
                   <Image
-                    src={category.image || '/image/items/11.png'}
+                    src={
+                      settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
+                      settings?.homeCategoryCardBackgrounds?.[category.slug] ||
+                      category.image ||
+                      '/image/items/11.png'
+                    }
                     alt={category.name}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

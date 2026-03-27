@@ -10,6 +10,7 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({ 
@@ -17,7 +18,8 @@ const Modal: React.FC<ModalProps> = ({
   onClose, 
   title, 
   children, 
-  className = "" 
+  className = "",
+  contentClassName = "",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
@@ -109,7 +111,7 @@ const Modal: React.FC<ModalProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            className={`bg-white rounded-[20px] shadow-xl max-w-md w-full max-h-[90vh] overflow-hidden ${className}`}
+            className={`bg-white rounded-[20px] shadow-xl w-full max-h-[90vh] sm:max-h-[92vh] overflow-hidden ${className || 'max-w-md'}`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Заголовок с крестиком */}
@@ -140,7 +142,7 @@ const Modal: React.FC<ModalProps> = ({
             )}
 
             {/* Контент */}
-            <div className="p-3 sm:p-4 overflow-y-auto max-h-[calc(90vh-120px)]">{children}</div>
+            <div className={`p-3 sm:p-4 overflow-y-auto max-h-[calc(90vh-120px)] sm:max-h-[calc(92vh-120px)] ${contentClassName}`}>{children}</div>
           </motion.div>
         </motion.div>
       )}

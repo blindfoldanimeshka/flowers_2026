@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
+import { withCsrfHeaders } from '@/lib/csrf-client';
 
 interface ImageUploadProps {
   value: string;
@@ -98,6 +99,8 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: withCsrfHeaders(),
+        credentials: 'include',
         body: formData,
       });
 

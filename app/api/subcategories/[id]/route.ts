@@ -8,11 +8,13 @@ import { revalidatePath } from 'next/cache';
 import { isValidId } from '@/lib/id';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 
+type RouteContext = { params: Promise<{ id: string }> };
+
 // PUT - Update a subcategory by ID
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: RouteContext) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = await params;
     const { name } = await request.json();
 
     if (!isValidId(id)) {
@@ -46,10 +48,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE - Delete a subcategory by ID
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
   try {
     await dbConnect();
-    const { id } = params;
+    const { id } = await params;
     console.log('[SUBCATEGORY DELETE] Deleting subcategory with ID:', id);
 
     if (!isValidId(id)) {

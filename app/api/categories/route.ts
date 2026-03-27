@@ -1,10 +1,11 @@
-export const dynamic = 'force-dynamic';
+﻿export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import slugify from 'slugify';
 import connect from '@/lib/db';
 import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 import { invalidateCategoriesCache } from '@/lib/cache';
+import { escapeRegExp, sanitizeMongoObject } from '@/lib/security';
 
 // GET all categories with their subcategories
 export async function GET(request: NextRequest) {
@@ -14,13 +15,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
-    // Получаем все категории и подкатегории параллельно
+    // РџРѕР»СѓС‡Р°РµРј РІСЃРµ РєР°С‚РµРіРѕСЂРёРё Рё РїРѕРґРєР°С‚РµРіРѕСЂРёРё РїР°СЂР°Р»Р»РµР»СЊРЅРѕ
     const [categories, allSubcategories] = await Promise.all([
       Category.find(slug ? { slug } : {}).lean(),
       Subcategory.find({}).lean(),
     ]);
 
-    // Группируем подкатегории по categoryId для быстрого доступа
+    // Р“СЂСѓРїРїРёСЂСѓРµРј РїРѕРґРєР°С‚РµРіРѕСЂРёРё РїРѕ categoryId РґР»СЏ Р±С‹СЃС‚СЂРѕРіРѕ РґРѕСЃС‚СѓРїР°
     const subcategoriesByCategory = allSubcategories.reduce((acc, sub) => {
       const categoryId = sub.categoryId.toString();
       if (!acc[categoryId]) {
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, typeof allSubcategories>);
 
-    // Наполняем категории их подкатегориями
+    // РќР°РїРѕР»РЅСЏРµРј РєР°С‚РµРіРѕСЂРёРё РёС… РїРѕРґРєР°С‚РµРіРѕСЂРёСЏРјРё
     const populatedCategories = categories.map((category) => {
       const categoryId = category._id.toString();
       const categorySubcategories = subcategoriesByCategory[categoryId] || [];
@@ -40,10 +41,10 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Если искали по slug, возвращаем один объект, иначе массив
+    // Р•СЃР»Рё РёСЃРєР°Р»Рё РїРѕ slug, РІРѕР·РІСЂР°С‰Р°РµРј РѕРґРёРЅ РѕР±СЉРµРєС‚, РёРЅР°С‡Рµ РјР°СЃСЃРёРІ
     if (slug) {
       if (populatedCategories.length === 0) {
-        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+        return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
       }
       return NextResponse.json(populatedCategories[0]);
     }
@@ -51,35 +52,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(populatedCategories);
 
   } catch (error: unknown) {
-    console.error('Ошибка в API категорий:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Ошибка сервера';
+    console.error('РћС€РёР±РєР° РІ API РєР°С‚РµРіРѕСЂРёР№:', error);
+    const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 // POST a new category
 export async function POST(request: NextRequest) {
-  console.log('POST /api/categories called');
   try {
     await connect();
-    console.log('Connected to DB');
     const body = await request.json();
-    console.log('Request body:', body);
     const { name } = body;
-    console.log('Category name:', name);
     if (!name) {
-      console.log('No name provided');
-      return NextResponse.json({ error: 'Название категории обязательно' }, { status: 400 });
+      return NextResponse.json({ error: 'РќР°Р·РІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ' }, { status: 400 });
     }
     
-    // Сначала проверяем существование категории с таким именем
+    // РЎРЅР°С‡Р°Р»Р° РїСЂРѕРІРµСЂСЏРµРј СЃСѓС‰РµСЃС‚РІРѕРІР°РЅРёРµ РєР°С‚РµРіРѕСЂРёРё СЃ С‚Р°РєРёРј РёРјРµРЅРµРј
     const existingByName = await Category.findOne({
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
+      name: { $regex: new RegExp(`^${escapeRegExp(name.trim())}$`, 'i') }
     });
     
     if (existingByName) {
       return NextResponse.json({ 
-        error: 'Категория с таким названием уже существует',
+        error: 'РљР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚',
         existingCategory: {
           id: existingByName._id,
           name: existingByName.name,
@@ -88,60 +84,57 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
     
-    // Генерируем уникальный slug
+    // Р“РµРЅРµСЂРёСЂСѓРµРј СѓРЅРёРєР°Р»СЊРЅС‹Р№ slug
     const baseSlug = slugify(name, { lower: true, strict: true }) || `category-${Date.now()}`;
     let slug = baseSlug;
     let counter = 1;
     
-    // Находим уникальный slug
+    // РќР°С…РѕРґРёРј СѓРЅРёРєР°Р»СЊРЅС‹Р№ slug
     while (await Category.exists({ slug })) {
       slug = `${baseSlug}-${counter++}`;
     }
     
-    console.log('Generated unique slug:', slug);
     
-    // Улучшенная логика генерации ID
+    // РЈР»СѓС‡С€РµРЅРЅР°СЏ Р»РѕРіРёРєР° РіРµРЅРµСЂР°С†РёРё ID
     const lastCategory = await Category.findOne().sort({ id: -1 }).lean();
     const newId = lastCategory && typeof lastCategory.id === 'number' ? lastCategory.id + 1 : 1;
 
-    console.log(`Generated new ID: ${newId}`);
 
     const newCategory = new Category({
       id: newId,
       name: name.trim(),
-      slug: slug, // Используем уже сгенерированный уникальный slug
+      slug: slug, // РСЃРїРѕР»СЊР·СѓРµРј СѓР¶Рµ СЃРіРµРЅРµСЂРёСЂРѕРІР°РЅРЅС‹Р№ СѓРЅРёРєР°Р»СЊРЅС‹Р№ slug
       subcategories: []
     });
     
     let savedCategory;
     try {
       savedCategory = await newCategory.save();
-      // Инвалидируем кэш категорий
+      // РРЅРІР°Р»РёРґРёСЂСѓРµРј РєСЌС€ РєР°С‚РµРіРѕСЂРёР№
       invalidateCategoriesCache();
     } catch (err: any) {
       if (err && err.code === 11000) {
-        // Обработка ошибки дублирования
+        // РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РєРё РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ
         const key = Object.keys(err.keyValue)[0];
         const value = err.keyValue[key];
         return NextResponse.json(
-          { error: `Поле \"${key}\" со значением \"${value}\" уже существует.` },
+          { error: `РџРѕР»Рµ \"${key}\" СЃРѕ Р·РЅР°С‡РµРЅРёРµРј \"${value}\" СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.` },
           { status: 409 } // 409 Conflict
         );
       } else {
-        // Другие ошибки при сохранении
+        // Р”СЂСѓРіРёРµ РѕС€РёР±РєРё РїСЂРё СЃРѕС…СЂР°РЅРµРЅРёРё
         throw err;
       }
     }
-    console.log('New category saved:', newCategory);
     // TODO: trigger ISR invalidation if needed
     return NextResponse.json(savedCategory, { status: 201 });
   } catch (error: unknown) {
     console.error(error);
-    // Обрабатываем дубликаты по уникальным полям
+    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РґСѓР±Р»РёРєР°С‚С‹ РїРѕ СѓРЅРёРєР°Р»СЊРЅС‹Рј РїРѕР»СЏРј
     if (error && typeof error === 'object' && 'code' in error && (error as any).code === 11000) {
-      return NextResponse.json({ error: 'Категория с таким названием или URL-адресом уже существует' }, { status: 400 });
+      return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј РёР»Рё URL-Р°РґСЂРµСЃРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚' }, { status: 400 });
     }
-    const errorMessage = error instanceof Error ? error.message : 'Ошибка сервера';
+    const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
@@ -152,29 +145,38 @@ export async function PUT(request: NextRequest) {
         await connect();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
-        const body = await request.json();
+        const body = sanitizeMongoObject(await request.json());
 
         if (!id) {
-            return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
+            return NextResponse.json({ error: 'ID РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»РµРЅ' }, { status: 400 });
         }
 
-        const updatedCategory = await Category.findByIdAndUpdate(id, body, { new: true, runValidators: true });
+        const updateData: Record<string, unknown> = {};
+        if (typeof body.name === 'string' && body.name.trim()) updateData.name = body.name.trim();
+        if (typeof body.slug === 'string' && body.slug.trim()) updateData.slug = body.slug.trim();
+        if (typeof body.isActive === 'boolean') updateData.isActive = body.isActive;
+
+        if (Object.keys(updateData).length === 0) {
+            return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
+        }
+
+        const updatedCategory = await Category.findByIdAndUpdate(id, { $set: updateData }, { new: true, runValidators: true });
 
         if (!updatedCategory) {
-            return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+            return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
         }
 
-        // Инвалидируем кэш категорий
+        // РРЅРІР°Р»РёРґРёСЂСѓРµРј РєСЌС€ РєР°С‚РµРіРѕСЂРёР№
         invalidateCategoriesCache();
 
         return NextResponse.json(updatedCategory);
     } catch (error: unknown) {
         console.error('Error updating category:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Ошибка сервера';
+        const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
         return NextResponse.json(
             { 
                 success: false,
-                error: 'Ошибка при обновлении категории',
+                error: 'РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РєР°С‚РµРіРѕСЂРёРё',
                 details: errorMessage
             }, 
             { status: 500 }
@@ -189,7 +191,7 @@ export async function DELETE(request: NextRequest) {
     
     if (!id) {
         return NextResponse.json(
-            { success: false, error: 'ID категории обязателен. Используйте /api/categories/[id] для удаления конкретной категории.' }, 
+            { success: false, error: 'ID РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»РµРЅ. РСЃРїРѕР»СЊР·СѓР№С‚Рµ /api/categories/[id] РґР»СЏ СѓРґР°Р»РµРЅРёСЏ РєРѕРЅРєСЂРµС‚РЅРѕР№ РєР°С‚РµРіРѕСЂРёРё.' }, 
             { status: 400 }
         );
     }
@@ -197,7 +199,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(
         { 
             success: false, 
-            error: 'Используйте DELETE /api/categories/[id] для удаления конкретной категории',
+            error: 'РСЃРїРѕР»СЊР·СѓР№С‚Рµ DELETE /api/categories/[id] РґР»СЏ СѓРґР°Р»РµРЅРёСЏ РєРѕРЅРєСЂРµС‚РЅРѕР№ РєР°С‚РµРіРѕСЂРёРё',
             redirect: `/api/categories/${id}`
         }, 
         { status: 405 }
