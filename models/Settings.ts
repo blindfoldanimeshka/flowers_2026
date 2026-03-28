@@ -27,6 +27,8 @@ export interface ISettings {
   homeCategoryCardBackgrounds?: Record<string, string>;
   homeBannerBackground?: string;
   homeBannerSlides?: string[];
+  /** Единая медиатека: загрузки и выбор в товарах и оформлении главной */
+  mediaLibrary?: Array<{ id: string; url: string; createdAt?: string }>;
 }
 
 const Settings = createSupabaseModel({
@@ -46,6 +48,7 @@ const Settings = createSupabaseModel({
     homeCategoryCardBackgrounds: {},
     homeBannerBackground: '',
     homeBannerSlides: [],
+    mediaLibrary: [],
   },
 });
 

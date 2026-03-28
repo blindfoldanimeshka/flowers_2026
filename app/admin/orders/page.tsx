@@ -45,7 +45,7 @@ export default async function OrdersPage() {
   const plainOrders = JSON.parse(JSON.stringify(orders));
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="flex h-[calc(100vh-7.75rem)] min-h-0 w-full max-w-full flex-col overflow-hidden bg-gray-100 px-3 py-4 sm:px-5 sm:py-6">
       <OrdersList initialOrders={plainOrders} />
     </div>
   );

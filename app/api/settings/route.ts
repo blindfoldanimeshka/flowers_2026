@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Settings from '@/models/Settings';
@@ -30,6 +31,7 @@ interface SettingsUpdatePayload {
   homeCategoryCardBackgrounds?: Record<string, string>;
   homeBannerBackground?: string;
   homeBannerSlides?: string[];
+  mediaLibrary?: Array<{ id: string; url: string; createdAt?: string }>;
 }
 
 const SETTINGS_KEY = 'global-settings';
@@ -54,6 +56,7 @@ const ALLOWED_FIELDS: (keyof SettingsUpdatePayload)[] = [
   'homeCategoryCardBackgrounds',
   'homeBannerBackground',
   'homeBannerSlides',
+  'mediaLibrary',
 ];
 
 function sanitizeString(value: unknown): string | undefined {
@@ -156,6 +159,27 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
         : [];
 
       sanitizedBody.homeBannerSlides = slides;
+      continue;
+    }
+
+    if (field === 'mediaLibrary' && Array.isArray(value)) {
+      const cleaned: Array<{ id: string; url: string; createdAt?: string }> = [];
+      for (const item of value) {
+        if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+        const rec = item as Record<string, unknown>;
+        const url = sanitizeString(rec.url);
+        if (!url) continue;
+        const id =
+          typeof rec.id === 'string' && rec.id.trim().length > 0 ? rec.id.trim() : randomUUID();
+        const createdAt =
+          typeof rec.createdAt === 'string' && rec.createdAt.trim().length > 0
+            ? rec.createdAt.trim()
+            : undefined;
+        cleaned.push(createdAt ? { id, url, createdAt } : { id, url });
+        if (cleaned.length >= 400) break;
+      }
+      sanitizedBody.mediaLibrary = cleaned;
+      continue;
     }
   }
 
@@ -178,8 +202,10 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
     };
   }
 
+  const { mediaLibrary: _adminMediaLibrary, ...rest } = settings;
+
   return {
-    ...settings,
+    ...rest,
     homeCategoryCardBackgrounds:
       typeof settings.homeCategoryCardBackgrounds === 'object' &&
       settings.homeCategoryCardBackgrounds !== null &&
@@ -215,6 +241,7 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
     homeCategoryCardBackgrounds: {},
     homeBannerBackground: '',
     homeBannerSlides: [],
+    mediaLibrary: [],
   };
 
   const settings = await Settings.findOneAndUpdate(
