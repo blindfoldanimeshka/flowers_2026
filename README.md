@@ -145,6 +145,10 @@ npm run db:seed
 - **Сборка падает** — `npm run lint` и `npm run type-check`; исправьте ошибки, не отключая проверки без необходимости.
 - **Картинки** — проверьте `next.config` и маршрут `/api/upload` / хранение в настройках проекта.
 
-## Лицензия
+## Разработчики
 
-blindfoldStudios (см. поле `license` в `package.json`).
+blindfoldStudios:
+blindfold
+Z3r00000-cyber
+virpom
+TcKatFire
