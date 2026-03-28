@@ -9,11 +9,11 @@ interface OrdersListProps {
 
 export default function OrdersList({ initialOrders }: OrdersListProps) {
   const vm = useAdminOrdersViewModel(initialOrders);
-  const { filteredOrders, selectedOrder, activeTab, setActiveTab, tabs, currentTab, isPolling, newOrdersCount, orderCounts, handleStatusChange, handleDelete, handleShowDetails, handleCloseDetails } = vm;
+  const { filteredOrders, selectedOrder, activeTab, setActiveTab, tabs, currentTab, isPolling, newOrdersCount, highlightNewOrderIds, orderCounts, handleStatusChange, handleDelete, handleShowDetails, handleCloseDetails } = vm;
 
   return (
-    <div className="p-8 bg-white rounded-2xl shadow-xl max-w-7xl mx-auto border border-gray-100">
-      <div className="flex justify-between items-center mb-8">
+    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl sm:p-8">
+      <div className="flex shrink-0 justify-between items-center mb-6 sm:mb-8">
         <h2 className="text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 text-sm">
@@ -23,7 +23,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
           {newOrdersCount > 0 && <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">+{newOrdersCount} новых</div>}
         </div>
       </div>
-      <div className="mb-6">
+      <div className="mb-4 shrink-0 sm:mb-6">
         <div className="border-b border-gray-200">
           <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             {tabs.map((tab) => (
@@ -38,33 +38,50 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
           </nav>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain">
         <table className="w-full border-separate" style={{ borderSpacing: '0 0.5rem' }}>
-          <thead>
-            <tr className="bg-gray-100 text-gray-600 uppercase text-sm">
+          <thead className="sticky top-0 z-10">
+            <tr className="bg-gray-100 text-gray-600 uppercase text-sm shadow-sm">
               <th className="p-3 rounded-l-xl">Номер</th><th className="p-3">Клиент</th><th className="p-3">Телефон</th><th className="p-3">Товары</th><th className="p-3">Получение</th><th className="p-3">Сумма</th><th className="p-3">Статус</th><th className="p-3">Дата</th><th className="p-3 rounded-r-xl">Действия</th>
             </tr>
           </thead>
           <tbody>
             {filteredOrders.length === 0 ? (
               <tr><td colSpan={9} className="p-8 text-center text-gray-500"><div className="flex flex-col items-center gap-2"><span className="text-4xl">{currentTab?.icon || '📦'}</span><span>Заказов нет</span></div></td></tr>
-            ) : filteredOrders.map((order) => (
-              <tr key={order._id} className="bg-white shadow-md hover:shadow-lg transition-shadow">
-                <td className="p-3 rounded-l-xl border-l border-t border-b border-gray-200"><span className="font-mono text-sm text-blue-600">{order.orderNumber}</span></td>
-                <td className="p-3 border-t border-b border-gray-200"><div><div className="font-semibold text-gray-900">{order.customer.name}</div><div className="text-sm text-gray-500">{order.customer.email}</div></div></td>
-                <td className="p-3 border-t border-b border-gray-200 text-gray-700">{order.customer.phone}</td>
-                <td className="p-3 border-t border-b border-gray-200"><div className="space-y-1">{order.items.map((item, index) => <div key={index} className="text-sm"><span className="text-gray-900">{item.name}</span><span className="ml-2 text-gray-500 font-medium">x{item.quantity}</span>{index < order.items.length - 1 && <span className="text-gray-400">,</span>}</div>)}</div></td>
-                <td className="p-3 border-t border-b border-gray-200"><span className={`px-2 py-1 rounded-full text-xs font-medium ${order.fulfillmentMethod === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>{order.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}</span></td>
-                <td className="p-3 border-t border-b border-gray-200 font-semibold text-gray-900">{order.totalAmount} ₽</td>
-                <td className="p-3 border-t border-b border-gray-200">
+            ) : filteredOrders.map((order) => {
+              const isNewHighlight = highlightNewOrderIds.has(String(order._id));
+              const cellBg = isNewHighlight ? 'bg-emerald-50' : 'bg-white';
+              const cellBorder = isNewHighlight ? 'border-emerald-300' : 'border-gray-200';
+              return (
+              <tr
+                key={order._id}
+                className="shadow-md hover:shadow-lg transition-shadow"
+              >
+                <td className={`p-3 rounded-l-xl border-l border-t border-b ${cellBorder} ${cellBg}`}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {isNewHighlight && (
+                      <span className="shrink-0 rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                        Новый
+                      </span>
+                    )}
+                    <span className="font-mono text-sm text-blue-600">{order.orderNumber}</span>
+                  </div>
+                </td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg}`}><div><div className="font-semibold text-gray-900">{order.customer.name}</div><div className="text-sm text-gray-500">{order.customer.email}</div></div></td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg} text-gray-700`}>{order.customer.phone}</td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg}`}><div className="space-y-1">{order.items.map((item, index) => <div key={index} className="text-sm"><span className="text-gray-900">{item.name}</span><span className="ml-2 text-gray-500 font-medium">x{item.quantity}</span>{index < order.items.length - 1 && <span className="text-gray-400">,</span>}</div>)}</div></td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg}`}><span className={`px-2 py-1 rounded-full text-xs font-medium ${order.fulfillmentMethod === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>{order.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}</span></td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg} font-semibold text-gray-900`}>{order.totalAmount} ₽</td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg}`}>
                   <select value={order.status} onChange={(e) => handleStatusChange(order._id, e.target.value as IAdminOrder['status'])} className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-200 ${order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : order.status === 'confirmed' ? 'bg-blue-100 text-blue-800' : order.status === 'preparing' ? 'bg-purple-100 text-purple-800' : order.status === 'delivering' ? 'bg-orange-100 text-orange-800' : order.status === 'delivered' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     {Object.entries(orderStatuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
                 </td>
-                <td className="p-3 border-t border-b border-gray-200 text-sm text-gray-600">{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</td>
-                <td className="p-3 rounded-r-xl border-r border-t border-b border-gray-200"><div className="flex gap-2"><button type="button" onClick={() => handleShowDetails(order)} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors">Детали</button><button type="button" onClick={() => handleDelete(order._id)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors">Удалить</button></div></td>
+                <td className={`p-3 border-t border-b ${cellBorder} ${cellBg} text-sm text-gray-600`}>{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</td>
+                <td className={`p-3 rounded-r-xl border-r border-t border-b ${cellBorder} ${cellBg}`}><div className="flex gap-2"><button type="button" onClick={() => handleShowDetails(order)} className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm transition-colors">Детали</button><button type="button" onClick={() => handleDelete(order._id)} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded text-sm transition-colors">Удалить</button></div></td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>

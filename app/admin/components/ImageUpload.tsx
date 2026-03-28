@@ -1,20 +1,94 @@
 "use client";
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
 import { withCsrfHeaders } from '@/lib/csrf-client';
+
+interface MediaLibraryItem {
+  url: string;
+  inLibrary: boolean;
+}
 
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
   onUploadStart?: () => void;
   onUploadEnd?: (success: boolean) => void;
+  /** Показать выбор из общей медиатеки (товары, баннеры, фоны категорий) */
+  showMediaLibrary?: boolean;
+  /** После успешной загрузки добавить URL в медиатеку настроек */
+  registerInLibrary?: boolean;
 }
 
-export default function ImageUpload({ value, onChange, onUploadStart, onUploadEnd }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string | null>(value);
+export default function ImageUpload({
+  value,
+  onChange,
+  onUploadStart,
+  onUploadEnd,
+  showMediaLibrary = true,
+  registerInLibrary = true,
+}: ImageUploadProps) {
+  const [preview, setPreview] = useState<string | null>(value || null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryItems, setLibraryItems] = useState<MediaLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreview(value ? value : null);
+  }, [value]);
+
+  const loadMediaLibrary = useCallback(async () => {
+    if (!showMediaLibrary) return;
+    setLibraryLoading(true);
+    setLibraryError(null);
+    try {
+      const res = await fetch('/api/media-library', { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? 'Требуется вход в админку' : 'Не удалось загрузить медиатеку');
+      }
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setLibraryItems(
+        items
+          .filter((item: { url?: string }) => typeof item?.url === 'string' && item.url.length > 0)
+          .map((item: { url: string; inLibrary?: boolean }) => ({
+            url: item.url,
+            inLibrary: Boolean(item.inLibrary),
+          })),
+      );
+    } catch (e) {
+      setLibraryError(e instanceof Error ? e.message : 'Ошибка медиатеки');
+    } finally {
+      setLibraryLoading(false);
+    }
+  }, [showMediaLibrary]);
+
+  useEffect(() => {
+    if (showMediaLibrary) {
+      void loadMediaLibrary();
+    }
+  }, [showMediaLibrary, loadMediaLibrary]);
+
+  const registerUrlInLibrary = useCallback(async (url: string) => {
+    if (!registerInLibrary || !url) return;
+    try {
+      await fetch('/api/media-library', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...withCsrfHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ url }),
+      });
+      void loadMediaLibrary();
+    } catch {
+      // не блокируем UI
+    }
+  }, [registerInLibrary, loadMediaLibrary]);
 
   const MAX_UPLOAD_BYTES = 900 * 1024; // Запас под nginx 1MB
   const MAX_DIMENSION = 2560;
@@ -128,6 +202,9 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
       const data = await res.json();
       if (typeof onChange === 'function') onChange(data.url);
       setPreview(data.url);
+      if (typeof data.url === 'string') {
+        void registerUrlInLibrary(data.url);
+      }
       if (onUploadEnd) onUploadEnd(true);
 
     } catch (err: any) {
@@ -137,7 +214,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     } finally {
       setIsUploading(false);
     }
-  }, [MAX_UPLOAD_BYTES, onChange, onUploadEnd, onUploadStart, optimizeImageForUpload]);
+  }, [MAX_UPLOAD_BYTES, onChange, onUploadEnd, onUploadStart, optimizeImageForUpload, registerUrlInLibrary]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -158,8 +235,63 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     onChange('');
   }, [onChange]);
 
+  const pickFromLibrary = (url: string) => {
+    setError(null);
+    onChange(url);
+    setPreview(url);
+    setLibraryOpen(false);
+  };
+
   return (
-    <div>
+    <div className="space-y-3">
+      {showMediaLibrary && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50/80">
+          <button
+            type="button"
+            onClick={() => {
+              setLibraryOpen((o) => !o);
+              if (!libraryOpen) void loadMediaLibrary();
+            }}
+            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            <span>Медиатека (общие изображения)</span>
+            <span className="text-gray-400">{libraryOpen ? '▲' : '▼'}</span>
+          </button>
+          {libraryOpen && (
+            <div className="border-t border-gray-200 p-3">
+              <p className="mb-2 text-xs text-gray-500">
+                Загруженные здесь файлы попадают в общий список — их можно снова выбрать в товарах, баннере и фонах категорий.
+              </p>
+              {libraryLoading && <p className="text-sm text-gray-500">Загрузка…</p>}
+              {libraryError && <p className="text-sm text-red-600">{libraryError}</p>}
+              {!libraryLoading && !libraryError && libraryItems.length === 0 && (
+                <p className="text-sm text-gray-500">Пока нет изображений. Загрузите файл ниже — он появится в списке.</p>
+              )}
+              {libraryItems.length > 0 && (
+                <div className="max-h-48 overflow-y-auto overscroll-contain">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                    {libraryItems.map((item) => (
+                      <button
+                        key={item.url}
+                        type="button"
+                        onClick={() => pickFromLibrary(item.url)}
+                        className={`relative aspect-square overflow-hidden rounded-md border-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                          value === item.url ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        title={item.inLibrary ? 'В медиатеке' : 'Из товара или оформления'}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- превью из медиатеки, произвольные URL */}
+                        <img src={item.url} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         {...getRootProps()}
         className={`w-full p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
