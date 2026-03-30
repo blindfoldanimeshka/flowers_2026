@@ -42,7 +42,7 @@ export default function CategoryGrid() {
 
   const getDesktopSpanClass = (index: number) => {
     const indexInGroup = index % 5;
-    return indexInGroup < 3 ? 'lg:col-span-2' : 'lg:col-span-3';
+    return indexInGroup < 3 ? 'xl:col-span-2' : 'xl:col-span-3';
   };
 
   return (
@@ -57,7 +57,7 @@ export default function CategoryGrid() {
       </motion.h2>
 
       <motion.div
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 auto-rows-fr gap-4 sm:gap-5"
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 auto-rows-fr gap-4 sm:gap-5 lg:gap-6"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
@@ -65,7 +65,7 @@ export default function CategoryGrid() {
         {categories.map((category, index) => (
           <motion.div
             key={category._id || category.id}
-            className={`min-h-[170px] sm:min-h-[210px] lg:min-h-[190px] ${getDesktopSpanClass(index)}`}
+            className={`min-h-[170px] sm:min-h-[210px] md:min-h-[220px] lg:min-h-[210px] xl:min-h-[190px] ${getDesktopSpanClass(index)}`}
             initial={{ y: 12, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{
@@ -89,7 +89,7 @@ export default function CategoryGrid() {
                     }
                     alt={category.name}
                     fill
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, (max-width: 1279px) 25vw, 33vw"
                     priority={index < 4}
                     className="object-cover opacity-45 group-hover:scale-105 transition-transform duration-500"
                   />
@@ -99,7 +99,7 @@ export default function CategoryGrid() {
                 <div className="relative h-full flex flex-col justify-between p-4 sm:p-5">
                   <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight pr-4">{category.name}</h3>
 
-                  <div className="hidden md:flex flex-wrap gap-2 max-w-[90%]">
+                  <div className="hidden lg:flex flex-wrap gap-2 max-w-[90%]">
                     {category.subcategories?.slice(0, 3).map((subcategory) => (
                       <span
                         key={subcategory._id}

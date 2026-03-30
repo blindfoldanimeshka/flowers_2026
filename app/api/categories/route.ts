@@ -7,6 +7,19 @@ import Subcategory from '@/models/Subcategory';
 import { invalidateCategoriesCache } from '@/lib/cache';
 import { escapeRegExp, sanitizeMongoObject } from '@/lib/security';
 
+const CATEGORY_FIELDS = '_id id name slug isActive';
+const SUBCATEGORY_FIELDS = '_id name slug categoryId categoryNumId isActive';
+const PUBLIC_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=120';
+
+type DuplicateKeyError = {
+  code?: number;
+  keyValue?: Record<string, unknown>;
+};
+
+function isDuplicateKeyError(error: unknown): error is DuplicateKeyError {
+  return Boolean(error && typeof error === 'object' && 'code' in error && (error as DuplicateKeyError).code === 11000);
+}
+
 // GET all categories with their subcategories
 export async function GET(request: NextRequest) {
   try {
@@ -15,13 +28,31 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const slug = searchParams.get('slug');
 
-    // РџРѕР»СѓС‡Р°РµРј РІСЃРµ РєР°С‚РµРіРѕСЂРёРё Рё РїРѕРґРєР°С‚РµРіРѕСЂРёРё РїР°СЂР°Р»Р»РµР»СЊРЅРѕ
+    if (slug) {
+      const category = await Category.findOne({ slug }).select(CATEGORY_FIELDS).lean();
+      if (!category) {
+        return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
+      }
+
+      const categorySubcategories = await Subcategory.find({ categoryId: category._id })
+        .select(SUBCATEGORY_FIELDS)
+        .lean();
+
+      return NextResponse.json(
+        {
+          ...category,
+          subcategories: categorySubcategories,
+        },
+        { headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL } }
+      );
+    }
+
+    // РџРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№ Рё РїРѕРґРєР°С‚РµРіРѕСЂРёР№ РґР»СЏ РЅР°РІРёРіР°С†РёРё
     const [categories, allSubcategories] = await Promise.all([
-      Category.find(slug ? { slug } : {}).lean(),
-      Subcategory.find({}).lean(),
+      Category.find({}).select(CATEGORY_FIELDS).lean(),
+      Subcategory.find({}).select(SUBCATEGORY_FIELDS).lean(),
     ]);
 
-    // Р“СЂСѓРїРїРёСЂСѓРµРј РїРѕРґРєР°С‚РµРіРѕСЂРёРё РїРѕ categoryId РґР»СЏ Р±С‹СЃС‚СЂРѕРіРѕ РґРѕСЃС‚СѓРїР°
     const subcategoriesByCategory = allSubcategories.reduce((acc, sub) => {
       const categoryId = sub.categoryId.toString();
       if (!acc[categoryId]) {
@@ -31,25 +62,17 @@ export async function GET(request: NextRequest) {
       return acc;
     }, {} as Record<string, typeof allSubcategories>);
 
-    // РќР°РїРѕР»РЅСЏРµРј РєР°С‚РµРіРѕСЂРёРё РёС… РїРѕРґРєР°С‚РµРіРѕСЂРёСЏРјРё
     const populatedCategories = categories.map((category) => {
       const categoryId = category._id.toString();
-      const categorySubcategories = subcategoriesByCategory[categoryId] || [];
       return {
         ...category,
-        subcategories: categorySubcategories,
+        subcategories: subcategoriesByCategory[categoryId] || [],
       };
     });
 
-    // Р•СЃР»Рё РёСЃРєР°Р»Рё РїРѕ slug, РІРѕР·РІСЂР°С‰Р°РµРј РѕРґРёРЅ РѕР±СЉРµРєС‚, РёРЅР°С‡Рµ РјР°СЃСЃРёРІ
-    if (slug) {
-      if (populatedCategories.length === 0) {
-        return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
-      }
-      return NextResponse.json(populatedCategories[0]);
-    }
-
-    return NextResponse.json(populatedCategories);
+    return NextResponse.json(populatedCategories, {
+      headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL },
+    });
 
   } catch (error: unknown) {
     console.error('РћС€РёР±РєР° РІ API РєР°С‚РµРіРѕСЂРёР№:', error);
@@ -112,11 +135,11 @@ export async function POST(request: NextRequest) {
       savedCategory = await newCategory.save();
       // РРЅРІР°Р»РёРґРёСЂСѓРµРј РєСЌС€ РєР°С‚РµРіРѕСЂРёР№
       invalidateCategoriesCache();
-    } catch (err: any) {
-      if (err && err.code === 11000) {
+    } catch (err: unknown) {
+      if (isDuplicateKeyError(err) && err.keyValue) {
         // РћР±СЂР°Р±РѕС‚РєР° РѕС€РёР±РєРё РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ
         const key = Object.keys(err.keyValue)[0];
-        const value = err.keyValue[key];
+        const value = key ? err.keyValue[key] : '';
         return NextResponse.json(
           { error: `РџРѕР»Рµ \"${key}\" СЃРѕ Р·РЅР°С‡РµРЅРёРµРј \"${value}\" СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚.` },
           { status: 409 } // 409 Conflict
@@ -131,7 +154,7 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error(error);
     // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РґСѓР±Р»РёРєР°С‚С‹ РїРѕ СѓРЅРёРєР°Р»СЊРЅС‹Рј РїРѕР»СЏРј
-    if (error && typeof error === 'object' && 'code' in error && (error as any).code === 11000) {
+    if (isDuplicateKeyError(error)) {
       return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј РёР»Рё URL-Р°РґСЂРµСЃРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚' }, { status: 400 });
     }
     const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';

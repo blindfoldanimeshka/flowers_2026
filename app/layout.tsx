@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from '@/features/app/cart';
@@ -18,6 +18,13 @@ export const metadata: Metadata = {
   description: "Цветы на любой вкус",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#ffffff",
+};
+
 export const dynamic = 'force-dynamic';
 
 export default function RootLayout({
@@ -28,13 +35,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className={`${inter.variable} h-full`}>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="icon" href="/favicon.svg" />
-        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
-        <meta name="theme-color" content="#ffffff" />
       </head>
       <body className="min-h-screen">
         <CartProvider>

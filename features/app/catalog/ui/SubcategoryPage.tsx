@@ -13,7 +13,7 @@ export default function SubcategoryPage() {
   if (!subcategory) return notFound();
 
   return (
-    <div className="mt-40">
+    <div className="pt-[calc(var(--mobile-top-offset)+32px)] md:pt-[var(--tablet-top-offset)] lg:pt-[var(--desktop-top-offset)]">
       <div className="max-w-screen-xl mx-auto px-4 pb-12">
         <Catalog title={`Товары в подкатегории: ${subcategory.name}`} subcategoryId={subcategory._id} />
       </div>
