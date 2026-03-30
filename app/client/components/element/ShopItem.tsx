@@ -345,7 +345,6 @@ const ShopItem = memo(({
           </div>
 
           <div className="flex flex-col">
-            <h3 className="text-lg sm:text-2xl font-bold leading-tight">{title}</h3>
             <p className="mt-2 text-sm text-gray-700">{description}</p>
 
             <div className="mt-3 sm:mt-4 flex items-end gap-2">
