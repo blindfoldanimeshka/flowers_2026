@@ -21,7 +21,7 @@ export default function CartButton() {
 
   if (isCartPage) {
     return (
-      <div className="fixed bottom-6 right-24 z-50 md:hidden">
+      <div className="fixed z-50 md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
         <button
           onClick={() => router.back()}
           className={buttonClasses}
@@ -48,7 +48,7 @@ export default function CartButton() {
   }
 
   return (
-    <div className="fixed bottom-6 right-24 z-50 md:hidden">
+    <div className="fixed z-50 md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
       <Link
         href="/client/cart"
         className={buttonClasses}

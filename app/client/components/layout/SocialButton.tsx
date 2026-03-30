@@ -5,9 +5,20 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 
-export default function SocialButton({ settings }: { settings?: any }) {
+type SocialLinks = {
+  telegram?: string;
+  vk?: string;
+  instagram?: string;
+  whatsapp?: string;
+};
+
+type PublicSettings = {
+  socialLinks?: SocialLinks;
+};
+
+export default function SocialButton({ settings }: { settings?: PublicSettings }) {
   const [isOpen, setIsOpen] = useState(false)
-  const [localSettings, setLocalSettings] = useState(settings)
+  const [localSettings, setLocalSettings] = useState<PublicSettings | undefined>(settings)
 
   // Fetch settings from the API if none were passed in
   useEffect(() => {
@@ -16,7 +27,7 @@ export default function SocialButton({ settings }: { settings?: any }) {
         try {
           const res = await fetch('/api/settings', { cache: 'no-store' });
           if (!res.ok) throw new Error('Failed to fetch settings');
-          const data = await res.json();
+          const data = (await res.json()) as { settings?: PublicSettings };
           setLocalSettings(data.settings);
         } catch (err) {
           console.error('Unable to load settings for SocialButton:', err);
@@ -29,14 +40,14 @@ export default function SocialButton({ settings }: { settings?: any }) {
 
   const toggleOpen = () => setIsOpen(!isOpen)
 
-  const formatLink = (base: string, value: string) => {
+  const formatLink = (base: string, value?: string) => {
     if (!value) return undefined;
     if (value.startsWith('http')) return value;
     const username = value.split('/').pop();
     return `${base}${username}`;
   };
 
-  const formatWhatsAppLink = (phone: string) => {
+  const formatWhatsAppLink = (phone?: string) => {
     if (!phone) return undefined;
     const digitsOnly = phone.replace(/\D/g, '');
     return `https://wa.me/${digitsOnly}`;
@@ -75,7 +86,8 @@ export default function SocialButton({ settings }: { settings?: any }) {
 
   return (
     <motion.div 
-      className="fixed bottom-6 right-6 z-50 flex flex-col items-end"
+      className="fixed z-50 flex flex-col items-end"
+      style={{ bottom: "var(--float-offset-bottom)", right: "calc(24px + var(--safe-area-right))" }}
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
       transition={{ duration: 0.5, delay: 0.5, type: "spring" }}

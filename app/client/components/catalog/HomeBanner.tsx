@@ -78,7 +78,7 @@ export default function HomeBanner() {
   return (
     <section className="w-full max-w-7xl mx-auto px-4">
       <motion.div
-        className="relative overflow-hidden rounded-[28px] bg-[#ffe7ef] px-6 py-8 sm:px-10 sm:py-12 shadow-sm min-h-[260px] sm:min-h-[300px] md:min-h-[340px]"
+        className="relative overflow-hidden rounded-[28px] bg-[#ffe7ef] px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-12 shadow-sm min-h-[250px] sm:min-h-[290px] md:min-h-[clamp(280px,40dvh,360px)] lg:min-h-[340px]"
         style={backgroundStyle}
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -99,12 +99,12 @@ export default function HomeBanner() {
                 alt="Баннер"
                 fill
                 priority
-                sizes="(max-width: 640px) 100vw, (max-width: 1024px) 90vw, 1200px"
+                sizes="(max-width: 767px) 100vw, (max-width: 1279px) 92vw, 1200px"
                 className="object-cover object-[70%_50%]"
               />
             </motion.div>
           </AnimatePresence>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#ffffff]/80 via-[#ffffff]/55 to-[#fff3d4]/70" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#ffffff]/92 via-[#ffffff]/72 to-[#fff3d4]/60" />
         </div>
 
         <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/35 blur-2xl" />
@@ -114,10 +114,10 @@ export default function HomeBanner() {
           <p className="inline-flex rounded-full bg-white/55 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8c3f56]">
             FloraMix Collection
           </p>
-          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-[#2f1b26] sm:text-4xl md:text-5xl">
+          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-[#2f1b26] [text-shadow:0_1px_0_rgba(255,255,255,0.55)] sm:text-4xl md:text-[clamp(2.2rem,4.8vw,3rem)] xl:text-5xl">
             Цветы для любого повода
           </h1>
-          <p className="mt-3 max-w-2xl text-sm text-[#5f4150] sm:text-base">
+          <p className="mt-3 inline-block max-w-2xl rounded-xl bg-white/52 px-3 py-2 text-sm font-medium leading-relaxed text-[#4f3641] backdrop-blur-[2px] sm:text-base">
             Свежие букеты, композиции и подарочные наборы с быстрой доставкой в день заказа.
           </p>
         </div>

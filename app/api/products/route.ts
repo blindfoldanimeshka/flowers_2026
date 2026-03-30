@@ -7,6 +7,16 @@ import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 import { sanitizeMongoObject } from '@/lib/security';
 
+const CATALOG_FIELDS = '_id name price oldPrice description image images inStock categoryId subcategoryId categoryNumId subcategoryNumId';
+const PRODUCTS_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=120';
+
+type ProductQuery = Record<string, string | number>;
+type ValidationErrorShape = {
+  name?: string;
+  message?: string;
+  errors?: Record<string, { message?: string }>;
+};
+
 function normalizeProductImages(input: unknown): { image?: string; images?: string[] } {
   const raw = Array.isArray(input) ? input : [];
   const images = Array.from(
@@ -30,8 +40,9 @@ export async function GET(request: NextRequest) {
     const subcategoryId = searchParams.get('subcategoryId');
     const categoryNumId = searchParams.get('categoryNumId');
     const subcategoryNumId = searchParams.get('subcategoryNumId');
+    const view = searchParams.get('view');
 
-    const query: any = {};
+    const query: ProductQuery = {};
     
     // Р¤РёР»СЊС‚СЂР°С†РёСЏ РїРѕ ObjectId РєР°С‚РµРіРѕСЂРёРё
     if (categoryId) query.categoryId = categoryId;
@@ -55,8 +66,15 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    const products = await Product.find(query).lean();
-    return NextResponse.json(products);
+    const productsQuery = Product.find(query);
+    if (view === 'catalog') {
+      productsQuery.select(CATALOG_FIELDS);
+    }
+
+    const products = await productsQuery.lean();
+    return NextResponse.json(products, {
+      headers: { 'Cache-Control': PRODUCTS_CACHE_CONTROL },
+    });
   } catch (error) {
     console.error('РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё С‚РѕРІР°СЂРѕРІ:', error);
     return NextResponse.json([], { status: 500 });
@@ -105,13 +123,16 @@ export async function POST(request: NextRequest) {
     revalidatePath('/category', 'layout');
 
     return NextResponse.json(newProduct, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const validationError = error as ValidationErrorShape;
     console.error('РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё С‚РѕРІР°СЂР°:', error);
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+    if (validationError?.name === 'ValidationError') {
+      const validationErrors = Object.values(validationError.errors || {})
+        .map((err) => err?.message)
+        .filter((msg): msg is string => Boolean(msg));
       return NextResponse.json({ error: 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё', details: validationErrors }, { status: 400 });
     }
-    return NextResponse.json({ error: 'РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё С‚РѕРІР°СЂР°', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё С‚РѕРІР°СЂР°', details: validationError?.message || 'Unknown error' }, { status: 500 });
   }
 }
 

@@ -23,7 +23,7 @@ export default function Catalog({ categoryId, subcategoryId, title }: { category
           <h1 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-8 text-center px-4">{title}</h1>
         )}
         <div className="w-full max-w-7xl mb-4 sm:mb-8 px-4">
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 lg:gap-10">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-7 lg:gap-8 xl:gap-10">
             {Array(8).fill(0).map((_, index) => (
               <ShopItemSkeleton key={index} />
             ))}
@@ -51,11 +51,11 @@ export default function Catalog({ categoryId, subcategoryId, title }: { category
       )}
 
       <div className="w-full max-w-7xl mb-4 sm:mb-8 px-4">
-        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8 lg:gap-10">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-7 lg:gap-8 xl:gap-10">
           {products.map((product, index) => (
             <div
               key={product._id}
-              className={`opacity-0 ${getAnimationClass(index, typeof window !== 'undefined' && window.innerWidth < 640 ? 2 : 4)}`}
+              className={`opacity-0 ${getAnimationClass(index, typeof window !== 'undefined' ? (window.innerWidth >= 1280 ? 4 : window.innerWidth >= 1024 ? 3 : 2) : 4)}`}
               style={{ animationDelay: getAnimationDelay(index) }}
             >
               <ShopItem

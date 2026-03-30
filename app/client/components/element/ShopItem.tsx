@@ -171,7 +171,7 @@ const ShopItem = memo(({
 
   return (
     <>
-      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-0 max-w-none mx-0 h-[320px] sm:h-[380px] relative group overflow-hidden">
+      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-0 max-w-none mx-0 h-[320px] sm:h-[360px] lg:h-[372px] xl:h-[380px] relative group overflow-hidden">
         <AnimatePresence>
           {discount && (
             <motion.div
@@ -203,7 +203,7 @@ const ShopItem = memo(({
         <button
           type="button"
           onClick={openModal}
-          className="w-full h-[160px] sm:h-[210px] relative rounded-t-[30px] overflow-hidden flex-shrink-0 text-left"
+          className="w-full h-[160px] sm:h-[198px] lg:h-[210px] relative rounded-t-[30px] overflow-hidden flex-shrink-0 text-left"
           aria-label={`Открыть товар ${title}`}
           onMouseMove={handlePreviewMove}
           onMouseLeave={() => canUseHover && setActiveImageIndex(0)}
@@ -214,7 +214,7 @@ const ShopItem = memo(({
             src={displaySource}
             alt={title}
             fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            sizes="(max-width: 1023px) 50vw, (max-width: 1279px) 33vw, 25vw"
             className="rounded-t-[30px] object-cover transition-transform duration-300 group-hover:scale-[1.02]"
             onError={handleImageError}
           />

@@ -6,8 +6,8 @@ import { HomeCatalogSection } from '@/features/app/catalog';
 
 export default function HomePage() {
   return (
-    <div>
-      <div className="mt-40">
+    <div className="pt-[calc(var(--mobile-top-offset)+32px)] md:pt-[var(--tablet-top-offset)] lg:pt-[var(--desktop-top-offset)]">
+      <div>
         <HomeBanner />
       </div>
       <div className="mt-10">

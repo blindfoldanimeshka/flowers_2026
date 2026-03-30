@@ -5,13 +5,18 @@ export function useMediaQuery(query: string) {
 
   useEffect(() => {
     const media = window.matchMedia(query);
-    if (media.matches !== matches) {
-      setMatches(media.matches);
+    const updateMatch = () => setMatches(media.matches);
+
+    updateMatch();
+
+    if (typeof media.addEventListener === "function") {
+      media.addEventListener("change", updateMatch);
+      return () => media.removeEventListener("change", updateMatch);
     }
-    const listener = () => setMatches(media.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, [matches, query]);
+
+    media.addListener(updateMatch);
+    return () => media.removeListener(updateMatch);
+  }, [query]);
 
   return matches;
 } 
