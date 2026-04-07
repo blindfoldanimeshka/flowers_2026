@@ -8,6 +8,7 @@ export default function CartButton() {
   const pathname = usePathname();
   const router = useRouter();
   const isCartPage = pathname === '/client/cart';
+  const isAdminRoute = pathname?.startsWith('/admin');
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -15,6 +16,10 @@ export default function CartButton() {
     const timer = setTimeout(() => setIsAnimating(false), 300);
     return () => clearTimeout(timer);
   }, [pathname]);
+
+  if (isAdminRoute) {
+    return null;
+  }
 
   const buttonClasses = "w-14 h-14 rounded-full bg-pink-400 hover:bg-pink-300 active:scale-90 shadow-lg flex items-center justify-center transition-all duration-300";
   const iconClasses = `transition-all duration-300 ${isAnimating ? 'scale-0 rotate-180' : 'scale-100 rotate-0'}`;
