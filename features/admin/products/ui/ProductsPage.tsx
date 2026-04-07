@@ -65,7 +65,7 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
   };
 
   return (
-    <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 bg-white p-6 rounded-lg shadow-md">
+    <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 rounded-lg bg-white p-4 shadow-md sm:p-6">
       <input name="name" value={draft.name} onChange={handleChange} placeholder="Название товара" className="w-full p-2 border rounded" required />
       <textarea name="description" value={draft.description} onChange={handleChange} placeholder="Описание" className="w-full p-2 border rounded" />
       <input
@@ -100,9 +100,9 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
         <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} />
         В наличии
       </label>
-      <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={saving} className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-50">{saving ? 'Сохранение...' : 'Сохранить'}</button>
-        <button type="button" onClick={onCancel} className="bg-gray-300 p-2 rounded">Отмена</button>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="submit" disabled={saving} className="w-full rounded bg-blue-500 p-2 text-white hover:bg-blue-600 disabled:opacity-50 sm:w-auto">{saving ? 'Сохранение...' : 'Сохранить'}</button>
+        <button type="button" onClick={onCancel} className="w-full rounded bg-gray-300 p-2 sm:w-auto">Отмена</button>
       </div>
     </form>
   );
@@ -114,8 +114,8 @@ export default function ProductsPage() {
   if (loading) return <div>Загрузка...</div>;
 
   return (
-    <div className="p-3 sm:p-8 bg-gray-50 min-h-screen">
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="min-h-0 bg-gray-50 p-2 sm:p-4 lg:p-6">
+      <div className="fixed right-3 top-16 z-50 space-y-2 sm:right-4 sm:top-20">
         {toasts.map((toast) => (
           <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
             <span className="font-medium">{toast.message}</span>
@@ -132,17 +132,17 @@ export default function ProductsPage() {
           <ProductForm draft={draft} categories={categories} subcategories={currentSubcategories} saving={saving} onChange={updateDraft} onSubmit={saveDraft} onCancel={closeForm} />
         </div>
       )}
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Список товаров</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product: IProduct) => (
-            <div key={product._id} className="border rounded-lg p-4 shadow-sm">
+            <div key={product._id} className="rounded-lg border p-4 shadow-sm">
               <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="w-full h-48 object-cover rounded-md mb-4" />
               <h3 className="font-bold text-lg">{product.name}</h3>
               <p className="text-gray-600">{product.price} руб.</p>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => openEditForm(product)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Редактировать</button>
-                <button onClick={() => removeProduct(product)} className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Удалить</button>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <button onClick={() => openEditForm(product)} className="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">Редактировать</button>
+                <button onClick={() => removeProduct(product)} className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600">Удалить</button>
               </div>
             </div>
           ))}

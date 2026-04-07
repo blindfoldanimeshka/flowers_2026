@@ -51,7 +51,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
   }, [selectedOrder, handleCloseDetails]);
 
   return (
-    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 sm:p-6 lg:p-8 shadow-xl">
+    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 sm:p-5 lg:p-6 shadow-xl">
       <div className="mb-4 sm:mb-8 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
         <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 sm:gap-4">
@@ -64,7 +64,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       </div>
 
       <div className="mb-4 shrink-0 sm:mb-6">
-        <div className="border-b border-gray-200 overflow-x-auto">
+        <div className="overflow-x-auto border-b border-gray-200">
           <nav className="-mb-px flex space-x-2 sm:space-x-8 min-w-max" aria-label="Tabs">
             {tabs.map((tab) => (
               <button
@@ -85,7 +85,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain">
         <div className="space-y-3 md:hidden">
           {filteredOrders.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
@@ -304,7 +304,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
             aria-modal="true"
             aria-labelledby={modalTitleId}
             aria-describedby={modalDescriptionId}
-            className="mx-4 max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+            className="mx-2 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:mx-4 sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
@@ -344,7 +344,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                         width={640}
                         height={640}
                         unoptimized
-                        className="h-[min(70vh,640px)] w-[min(100%,640px)] object-cover md:w-[min(65vw,640px)]"
+                        className="h-[clamp(180px,42vh,420px)] w-full max-w-[640px] object-cover md:w-[min(65vw,640px)]"
                         loading="lazy"
                         sizes="(max-width: 768px) 92vw, 640px"
                         onError={(event) => {
