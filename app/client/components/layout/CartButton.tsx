@@ -9,6 +9,7 @@ export default function CartButton() {
   const router = useRouter();
   const isCartPage = pathname === '/client/cart';
   const isAdminRoute = pathname?.startsWith('/admin');
+  const isAuthRoute = pathname?.startsWith('/auth');
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -17,7 +18,7 @@ export default function CartButton() {
     return () => clearTimeout(timer);
   }, [pathname]);
 
-  if (isAdminRoute) {
+  if (isAdminRoute || isAuthRoute) {
     return null;
   }
 
