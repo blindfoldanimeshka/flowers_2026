@@ -283,16 +283,16 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       </div>
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-2 pt-4 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={handleCloseDetails} aria-hidden="true">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-2 pt-3 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={handleCloseDetails} aria-hidden="true">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={modalTitleId}
             aria-describedby={modalDescriptionId}
-            className="mx-2 max-h-[94vh] w-full max-w-6xl overflow-y-auto overscroll-contain touch-pan-y rounded-2xl bg-white p-4 shadow-2xl sm:mx-4 sm:max-h-[92vh] sm:p-6"
+            className="mx-1 max-h-[95vh] w-full max-w-6xl overflow-y-auto overscroll-contain touch-pan-y rounded-2xl bg-white p-4 shadow-2xl sm:mx-4 sm:max-h-[92vh] sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-4 flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="sticky top-0 z-10 -mx-4 mb-4 flex items-start justify-between gap-3 border-b border-gray-100 bg-white px-4 pb-3 pt-1 sm:-mx-6 sm:px-6">
               <h3 id={modalTitleId} className="text-xl font-bold">
                 Детали заказа #{selectedOrder.orderNumber}
               </h3>
@@ -307,12 +307,12 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
             </div>
 
             <div id={modalDescriptionId} className="grid gap-4 text-sm sm:grid-cols-2 sm:text-base">
-              <div><strong>Клиент:</strong> {selectedOrder.customer.name}</div>
-              <div><strong>Email:</strong> {selectedOrder.customer.email || 'Не указан'}</div>
-              <div><strong>Телефон:</strong> {selectedOrder.customer.phone}</div>
-              <div><strong>Адрес:</strong> {selectedOrder.customer.address || 'Не указан'}</div>
-              <div><strong>Общая сумма:</strong> {selectedOrder.totalAmount} ₽</div>
-              <div><strong>Способ получения:</strong> {selectedOrder.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}</div>
+              <div className="break-words"><strong>Клиент:</strong> {selectedOrder.customer.name}</div>
+              <div className="break-words"><strong>Email:</strong> {selectedOrder.customer.email || 'Не указан'}</div>
+              <div className="break-words"><strong>Телефон:</strong> {selectedOrder.customer.phone}</div>
+              <div className="break-words"><strong>Адрес:</strong> {selectedOrder.customer.address || 'Не указан'}</div>
+              <div className="break-words"><strong>Общая сумма:</strong> {selectedOrder.totalAmount} ₽</div>
+              <div className="break-words"><strong>Способ получения:</strong> {selectedOrder.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}</div>
               <div className="sm:col-span-2">
                 <div className="mb-1 font-semibold">Статус заказа</div>
                 <select
@@ -339,7 +339,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                   ))}
                 </select>
               </div>
-              {selectedOrder.notes && <div><strong>Примечания:</strong> {selectedOrder.notes}</div>}
+              {selectedOrder.notes && <div className="break-words"><strong>Примечания:</strong> {selectedOrder.notes}</div>}
             </div>
 
             <div className="mt-5 border-t border-gray-100 pt-4">
