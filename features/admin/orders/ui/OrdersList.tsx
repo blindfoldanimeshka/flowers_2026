@@ -51,7 +51,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
   }, [selectedOrder, handleCloseDetails]);
 
   return (
-    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 sm:p-5 lg:p-6 shadow-xl">
+    <div className="w-full max-w-none rounded-2xl border border-gray-100 bg-white p-3 shadow-xl sm:p-5 lg:p-6">
       <div className="mb-4 sm:mb-8 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
         <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 sm:gap-4">
@@ -85,10 +85,10 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overflow-x-auto overscroll-contain">
-        <div className="space-y-3 md:hidden">
+      <div className="overflow-x-auto overscroll-contain">
+        <div className="grid grid-cols-2 gap-2.5 md:hidden">
           {filteredOrders.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <div className="col-span-2 p-8 text-center text-gray-500">
               <div className="flex flex-col items-center gap-2">
                 <span className="text-4xl">{currentTab?.icon || '📦'}</span>
                 <span>Заказов нет</span>
@@ -97,79 +97,57 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
           ) : (
             filteredOrders.map((order) => {
               const isNewHighlight = highlightNewOrderIds.has(String(order._id));
+              const previewImage =
+                order.items.find((item) => typeof item.image === 'string' && item.image.trim().length > 0)?.image ||
+                '/image/items/11.png';
+              const statusLabel = orderStatuses[order.status];
 
               return (
                 <button
                   key={order._id}
                   type="button"
                   onClick={() => handleShowDetails(order)}
-                  className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors ${
-                    isNewHighlight ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white'
+                  className={`relative min-h-[170px] w-full overflow-hidden rounded-lg border text-left shadow-sm transition ${
+                    isNewHighlight ? 'border-emerald-300' : 'border-gray-200'
                   }`}
+                  style={{
+                    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.72) 74%), url('${previewImage}')`,
+                    backgroundPosition: 'center',
+                    backgroundSize: 'cover',
+                  }}
                 >
-                  <div className="mb-2 flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                  <div className="flex h-full flex-col justify-between p-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         {isNewHighlight && (
-                          <span className="shrink-0 rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                          <span className="mb-1 inline-flex rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                             Новый
                           </span>
                         )}
-                        <span className="font-mono text-sm text-blue-700">{order.orderNumber}</span>
+                        <p className="truncate font-mono text-[11px] font-semibold text-white">{order.orderNumber}</p>
                       </div>
-                      <p className="mt-1 truncate text-sm font-semibold text-gray-900">{order.customer.name}</p>
-                      <p className="truncate text-xs text-gray-500">{order.customer.phone}</p>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          order.fulfillmentMethod === 'delivery'
+                            ? 'bg-blue-100/90 text-blue-800'
+                            : 'bg-green-100/90 text-green-800'
+                        }`}
+                      >
+                        {order.fulfillmentMethod === 'delivery' ? 'Доставка' : 'Самовывоз'}
+                      </span>
                     </div>
-                    <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        order.fulfillmentMethod === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}
-                    >
-                      {order.fulfillmentMethod === 'delivery' ? 'Доставка' : 'Самовывоз'}
-                    </span>
-                  </div>
 
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-gray-900">{order.totalAmount} ₽</span>
-                    <span className="text-xs text-gray-500">{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</span>
-                  </div>
-
-                  <div className="mb-2 text-xs text-gray-600">
-                    {order.items.slice(0, 2).map((item) => `${item.name} x${item.quantity}`).join(', ')}
-                    {order.items.length > 2 && ` +${order.items.length - 2}`}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
-                    <select
-                      value={order.status}
-                      onChange={(e) => handleStatusChange(order._id, e.target.value as IAdminOrder['status'])}
-                      className={`rounded-full border-0 px-3 py-1 text-xs font-medium focus:ring-2 focus:ring-blue-200 ${
-                        order.status === 'pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : order.status === 'confirmed'
-                            ? 'bg-blue-100 text-blue-800'
-                            : order.status === 'preparing'
-                              ? 'bg-purple-100 text-purple-800'
-                              : order.status === 'delivering'
-                                ? 'bg-orange-100 text-orange-800'
-                                : order.status === 'delivered'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {Object.entries(orderStatuses).map(([key, label]) => (
-                        <option key={key} value={key}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(order._id)}
-                      className="rounded bg-red-500 px-3 py-1 text-xs text-white transition-colors hover:bg-red-600"
-                    >
-                      Удалить
-                    </button>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-white">{order.customer.name}</p>
+                      <p className="truncate text-[11px] text-white/80">{order.customer.phone}</p>
+                      <div className="mt-1 flex items-end justify-between gap-2">
+                        <span className="text-sm font-bold text-white">{order.totalAmount} ₽</span>
+                        <span className="max-w-[48%] truncate rounded bg-black/35 px-1.5 py-0.5 text-[10px] text-white/95">
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-white/75">{format(new Date(order.createdAt), 'dd.MM HH:mm')}</p>
+                    </div>
                   </div>
                 </button>
               );
@@ -337,14 +315,14 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               <ul className="space-y-3">
                 {selectedOrder.items.map((item, index) => (
                   <li key={index} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3 md:flex-row md:items-start">
-                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+                    <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white md:w-auto">
                       <Image
                         src={item.image || '/image/items/11.png'}
                         alt={item.name}
                         width={640}
                         height={640}
                         unoptimized
-                        className="h-[clamp(180px,42vh,420px)] w-full max-w-[640px] object-cover md:w-[min(65vw,640px)]"
+                        className="h-44 w-full object-cover sm:h-52 md:h-64 md:w-[min(52vw,520px)]"
                         loading="lazy"
                         sizes="(max-width: 768px) 92vw, 640px"
                         onError={(event) => {

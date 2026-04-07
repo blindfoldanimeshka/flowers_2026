@@ -132,17 +132,17 @@ export default function ProductsPage() {
           <ProductForm draft={draft} categories={categories} subcategories={currentSubcategories} saving={saving} onChange={updateDraft} onSubmit={saveDraft} onCancel={closeForm} />
         </div>
       )}
-      <div className="rounded-lg bg-white p-4 shadow-md sm:p-6">
+      <div className="rounded-lg bg-white p-3 shadow-md sm:p-6">
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Список товаров</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
           {products.map((product: IProduct) => (
-            <div key={product._id} className="rounded-lg border p-4 shadow-sm">
-              <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="w-full h-48 object-cover rounded-md mb-4" />
-              <h3 className="font-bold text-lg">{product.name}</h3>
-              <p className="text-gray-600">{product.price} руб.</p>
-              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                <button onClick={() => openEditForm(product)} className="rounded bg-blue-500 px-3 py-2 text-sm text-white hover:bg-blue-600">Редактировать</button>
-                <button onClick={() => removeProduct(product)} className="rounded bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600">Удалить</button>
+            <div key={product._id} className="rounded-lg border p-2.5 shadow-sm sm:p-4">
+              <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
+              <h3 className="truncate text-sm font-bold sm:text-lg">{product.name}</h3>
+              <p className="text-xs text-gray-600 sm:text-base">{product.price} руб.</p>
+              <div className="mt-2 flex flex-col gap-1.5 sm:mt-4 sm:gap-2">
+                <button onClick={() => openEditForm(product)} className="rounded bg-blue-500 px-2 py-1.5 text-xs text-white hover:bg-blue-600 sm:px-3 sm:py-2 sm:text-sm">Редактировать</button>
+                <button onClick={() => removeProduct(product)} className="rounded bg-red-500 px-2 py-1.5 text-xs text-white hover:bg-red-600 sm:px-3 sm:py-2 sm:text-sm">Удалить</button>
               </div>
             </div>
           ))}
