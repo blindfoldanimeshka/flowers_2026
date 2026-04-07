@@ -100,7 +100,7 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
         <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} />
         В наличии
       </label>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <button type="submit" disabled={saving} className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-50">{saving ? 'Сохранение...' : 'Сохранить'}</button>
         <button type="button" onClick={onCancel} className="bg-gray-300 p-2 rounded">Отмена</button>
       </div>
@@ -114,7 +114,7 @@ export default function ProductsPage() {
   if (loading) return <div>Загрузка...</div>;
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-3 sm:p-8 bg-gray-50 min-h-screen">
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
           <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
@@ -122,18 +122,18 @@ export default function ProductsPage() {
           </div>
         ))}
       </div>
-      <h1 className="text-3xl font-bold mb-8">Управление товарами</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Управление товарами</h1>
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-600">{error}</div>}
       {!isFormVisible ? (
-        <button onClick={openCreateForm} className="bg-green-500 text-white p-3 rounded-lg mb-8 shadow-md hover:bg-green-600">+ Добавить новый товар</button>
+        <button onClick={openCreateForm} className="w-full sm:w-auto bg-green-500 text-white p-3 rounded-lg mb-6 sm:mb-8 shadow-md hover:bg-green-600">+ Добавить новый товар</button>
       ) : (
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">{draft._id ? 'Редактировать товар' : 'Новый товар'}</h2>
+          <h2 className="text-xl sm:text-2xl font-semibold mb-4">{draft._id ? 'Редактировать товар' : 'Новый товар'}</h2>
           <ProductForm draft={draft} categories={categories} subcategories={currentSubcategories} saving={saving} onChange={updateDraft} onSubmit={saveDraft} onCancel={closeForm} />
         </div>
       )}
       <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4">Список товаров</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold mb-4">Список товаров</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map((product: IProduct) => (
             <div key={product._id} className="border rounded-lg p-4 shadow-sm">

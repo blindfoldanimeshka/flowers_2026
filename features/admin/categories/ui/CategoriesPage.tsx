@@ -35,7 +35,7 @@ export default function CategoriesPage() {
   if (error) return <div className="text-red-500">Ошибка: {error}</div>;
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
+    <div className="p-3 sm:p-8 bg-gray-50 min-h-screen">
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map((toast) => (
           <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
@@ -43,8 +43,8 @@ export default function CategoriesPage() {
           </div>
         ))}
       </div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Управление категориями</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Управление категориями</h1>
         <label className="flex items-center gap-3 text-sm font-medium text-gray-700">
           <span>Отладочная информация</span>
           <input type="checkbox" checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} />
@@ -54,7 +54,7 @@ export default function CategoriesPage() {
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-xl font-semibold mb-4">Добавить новую категорию</h2>
           {categories.length >= MAX_CATEGORIES && <div className="mb-2 text-red-500 font-semibold">Максимальное количество категорий - {MAX_CATEGORIES}.</div>}
-          <form onSubmit={handleAddCategory} className="flex gap-2">
+          <form onSubmit={handleAddCategory} className="flex flex-wrap gap-2">
             <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-grow p-2 border rounded" disabled={categories.length >= MAX_CATEGORIES} />
             <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600" disabled={categories.length >= MAX_CATEGORIES}>Добавить</button>
           </form>
@@ -99,7 +99,7 @@ export default function CategoriesPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <button onClick={() => setEditingId(cat._id)} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm" disabled={editingId !== null}>Редактировать</button>
                   <button onClick={() => handleDelete('category', cat._id, cat.name, cat.totalProductCount)} className="text-red-500 hover:underline">Удалить</button>
                 </div>
@@ -118,7 +118,7 @@ export default function CategoriesPage() {
                         </div>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button onClick={() => setEditingId(sub._id)} className="text-blue-500 hover:underline text-sm" disabled={editingId !== null}>Редактировать</button>
                       <button onClick={() => handleDelete('subcategory', sub._id, sub.name, sub.productCount)} className="text-red-500 hover:underline text-sm">Удалить</button>
                     </div>
