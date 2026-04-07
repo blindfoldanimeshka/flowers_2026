@@ -85,12 +85,8 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
         </div>
       </div>
 
-      <div
-        className={`overscroll-contain touch-pan-y ${
-          selectedOrder ? 'overflow-hidden' : 'overflow-x-auto'
-        }`}
-      >
-        <div className="grid grid-cols-2 gap-2.5 md:hidden touch-pan-y">
+      <div className={selectedOrder ? 'overflow-hidden' : ''}>
+        <div className="grid grid-cols-2 gap-2.5 md:hidden [touch-action:pan-y]">
           {filteredOrders.length === 0 ? (
             <div className="col-span-2 p-8 text-center text-gray-500">
               <div className="flex flex-col items-center gap-2">
@@ -107,13 +103,20 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               const statusLabel = orderStatuses[order.status];
 
               return (
-                <button
+                <div
                   key={order._id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleShowDetails(order)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleShowDetails(order);
+                    }
+                  }}
                   className={`relative min-h-[170px] w-full overflow-hidden rounded-lg border text-left shadow-sm transition ${
                     isNewHighlight ? 'border-emerald-300' : 'border-gray-200'
-                  }`}
+                  } [touch-action:manipulation]`}
                   style={{
                     backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.72) 74%), url('${previewImage}')`,
                     backgroundPosition: 'center',
@@ -153,7 +156,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                       <p className="mt-1 text-[10px] text-white/75">{format(new Date(order.createdAt), 'dd.MM HH:mm')}</p>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })
           )}
@@ -310,7 +313,32 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               <div><strong>Адрес:</strong> {selectedOrder.customer.address || 'Не указан'}</div>
               <div><strong>Общая сумма:</strong> {selectedOrder.totalAmount} ₽</div>
               <div><strong>Способ получения:</strong> {selectedOrder.fulfillmentMethod === 'delivery' ? '🚚 Доставка' : '🏪 Самовывоз'}</div>
-              <div><strong>Статус:</strong> {orderStatuses[selectedOrder.status]}</div>
+              <div className="sm:col-span-2">
+                <div className="mb-1 font-semibold">Статус заказа</div>
+                <select
+                  value={selectedOrder.status}
+                  onChange={(event) => handleStatusChange(selectedOrder._id, event.target.value as IAdminOrder['status'])}
+                  className={`w-full rounded-lg px-3 py-2 text-sm font-medium outline-none ring-1 ring-inset focus:ring-2 focus:ring-blue-200 sm:text-base ${
+                    selectedOrder.status === 'pending'
+                      ? 'bg-yellow-100 text-yellow-800 ring-yellow-200'
+                      : selectedOrder.status === 'confirmed'
+                        ? 'bg-blue-100 text-blue-800 ring-blue-200'
+                        : selectedOrder.status === 'preparing'
+                          ? 'bg-purple-100 text-purple-800 ring-purple-200'
+                          : selectedOrder.status === 'delivering'
+                            ? 'bg-orange-100 text-orange-800 ring-orange-200'
+                            : selectedOrder.status === 'delivered'
+                              ? 'bg-green-100 text-green-800 ring-green-200'
+                              : 'bg-red-100 text-red-800 ring-red-200'
+                  }`}
+                >
+                  {Object.entries(orderStatuses).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
               {selectedOrder.notes && <div><strong>Примечания:</strong> {selectedOrder.notes}</div>}
             </div>
 
@@ -319,14 +347,14 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               <ul className="space-y-3">
                 {selectedOrder.items.map((item, index) => (
                   <li key={index} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3 md:flex-row md:items-start">
-                    <div className="w-full overflow-hidden rounded-xl border border-gray-200 bg-white md:w-auto">
+                    <div className="aspect-square w-full max-w-[320px] overflow-hidden rounded-xl border border-gray-200 bg-white sm:max-w-[380px] md:w-[min(40vw,420px)] md:max-w-none">
                       <Image
                         src={item.image || '/image/items/11.png'}
                         alt={item.name}
                         width={640}
                         height={640}
                         unoptimized
-                        className="h-44 w-full object-cover sm:h-52 md:h-64 md:w-[min(52vw,520px)]"
+                        className="h-full w-full object-cover"
                         loading="lazy"
                         sizes="(max-width: 768px) 92vw, 640px"
                         onError={(event) => {
