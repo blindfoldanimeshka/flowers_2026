@@ -51,10 +51,10 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
   }, [selectedOrder, handleCloseDetails]);
 
   return (
-    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-6 shadow-xl sm:p-8">
-      <div className="mb-6 flex shrink-0 items-center justify-between sm:mb-8">
-        <h2 className="text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
-        <div className="flex items-center gap-4">
+    <div className="flex min-h-0 w-full max-w-none flex-1 flex-col overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 sm:p-6 lg:p-8 shadow-xl">
+      <div className="mb-4 sm:mb-8 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
+        <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 sm:gap-4">
           <div className="flex items-center gap-2 text-sm">
             <div className={`h-3 w-3 rounded-full ${isPolling ? 'animate-pulse bg-green-500' : 'bg-gray-400'}`} />
             <span className="text-gray-600">{isPolling ? 'Online' : 'Offline'}</span>
@@ -64,8 +64,8 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       </div>
 
       <div className="mb-4 shrink-0 sm:mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+        <div className="border-b border-gray-200 overflow-x-auto">
+          <nav className="-mb-px flex space-x-2 sm:space-x-8 min-w-max" aria-label="Tabs">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -181,7 +181,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                     </td>
                     <td className={`border-b border-t p-3 text-sm text-gray-600 ${cellBorder} ${cellBg}`}>{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</td>
                     <td className={`rounded-r-xl border-b border-r border-t p-3 ${cellBorder} ${cellBg}`}>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
                           onClick={() => handleShowDetails(order)}
