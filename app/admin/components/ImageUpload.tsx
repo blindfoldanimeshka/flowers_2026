@@ -269,7 +269,7 @@ export default function ImageUpload({
               )}
               {libraryItems.length > 0 && (
                 <div className="max-h-48 overflow-y-auto overscroll-contain">
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                     {libraryItems.map((item) => (
                       <button
                         key={item.url}
@@ -294,10 +294,10 @@ export default function ImageUpload({
 
       <div
         {...getRootProps()}
-        className={`w-full p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
+        className={`w-full rounded-lg border-2 border-dashed p-4 text-center transition-colors sm:p-6
           ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
           ${error ? 'border-red-500 bg-red-50' : ''}
-          ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          ${isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       >
         <input {...getInputProps()} />
         
@@ -334,7 +334,7 @@ export default function ImageUpload({
               alt="preview" 
               width={128}
               height={128}
-              className="w-32 h-32 object-cover rounded-lg border shadow-sm"
+              className="h-24 w-24 rounded-lg border object-cover shadow-sm sm:h-32 sm:w-32"
               onError={() => {
                 console.error('Image failed to load:', preview || value);
                 setError('Не удалось загрузить изображение');

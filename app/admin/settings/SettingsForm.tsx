@@ -97,7 +97,7 @@ const TimeRangePicker: React.FC<TimeRangePickerProps> = ({ value, onChange }) =>
   };
 
   return (
-    <div className="flex gap-4 items-end">
+    <div className="flex flex-wrap items-end gap-3 sm:gap-4">
       <TimePicker
         value={startTime}
         onChange={handleStartTimeChange}
@@ -284,8 +284,8 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
   };
 
   return (
-    <div className="p-8 bg-white rounded-2xl shadow-xl max-w-2xl mx-auto border border-gray-100">
-      <h2 className="text-3xl font-extrabold tracking-tight text-gray-800 mb-8">Настройки магазина</h2>
+    <div className="mx-auto max-w-2xl rounded-2xl border border-gray-100 bg-white p-4 shadow-xl sm:p-6 lg:p-8">
+      <h2 className="mb-6 text-2xl font-extrabold tracking-tight text-gray-800 sm:mb-8 sm:text-3xl">Настройки магазина</h2>
       <form onSubmit={handleSave} className="space-y-6">
         <div>
           <label className="block mb-1 font-medium text-gray-700">Адрес магазина</label>
@@ -316,7 +316,7 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
         
         <div>
           <label className="block mb-3 font-medium text-gray-700">Часы работы</label>
-          <div className="p-4 border rounded-lg bg-gray-50">
+          <div className="rounded-lg border bg-gray-50 p-3 sm:p-4">
             <TimeRangePicker
               value={form.workingHours}
               onChange={handleTimeRangeChange}

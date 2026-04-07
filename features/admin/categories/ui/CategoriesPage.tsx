@@ -17,9 +17,9 @@ const EditableName = ({ name, onSave, onCancel, isLoading = false }: EditableNam
   const [editingName, setEditingName] = useState(name);
 
   return (
-    <div className="flex items-center gap-2">
-      <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="p-1 border rounded" autoFocus disabled={isLoading} />
-      <button onClick={() => onSave(editingName)} className={`${isLoading ? 'text-gray-400 cursor-not-allowed' : 'text-green-600 hover:text-green-800'} flex items-center gap-1`} disabled={isLoading}>
+    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <input type="text" value={editingName} onChange={(e) => setEditingName(e.target.value)} className="w-full min-w-0 rounded border p-1 sm:w-auto" autoFocus disabled={isLoading} />
+      <button onClick={() => onSave(editingName)} className={`${isLoading ? 'cursor-not-allowed text-gray-400' : 'text-green-600 hover:text-green-800'} flex items-center gap-1`} disabled={isLoading}>
         {isLoading ? 'Сохранение...' : 'Сохранить'}
       </button>
       <button onClick={onCancel} className={`${isLoading ? 'text-gray-400 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700'}`} disabled={isLoading}>Отмена</button>
@@ -35,8 +35,8 @@ export default function CategoriesPage() {
   if (error) return <div className="text-red-500">Ошибка: {error}</div>;
 
   return (
-    <div className="p-3 sm:p-8 bg-gray-50 min-h-screen">
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="min-h-0 bg-gray-50 p-2 sm:p-4 lg:p-6">
+      <div className="fixed right-3 top-16 z-50 space-y-2 sm:right-4 sm:top-20">
         {toasts.map((toast) => (
           <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
             <span className="font-medium">{toast.message}</span>
@@ -50,16 +50,16 @@ export default function CategoriesPage() {
           <input type="checkbox" checked={showDebug} onChange={(e) => setShowDebug(e.target.checked)} />
         </label>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-8">
+        <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xl font-semibold mb-4">Добавить новую категорию</h2>
           {categories.length >= MAX_CATEGORIES && <div className="mb-2 text-red-500 font-semibold">Максимальное количество категорий - {MAX_CATEGORIES}.</div>}
-          <form onSubmit={handleAddCategory} className="flex flex-wrap gap-2">
-            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="flex-grow p-2 border rounded" disabled={categories.length >= MAX_CATEGORIES} />
-            <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600" disabled={categories.length >= MAX_CATEGORIES}>Добавить</button>
+          <form onSubmit={handleAddCategory} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <input type="text" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} placeholder="Название категории" className="w-full flex-grow rounded border p-2" disabled={categories.length >= MAX_CATEGORIES} />
+            <button type="submit" className="w-full rounded bg-blue-500 p-2 text-white hover:bg-blue-600 sm:w-auto" disabled={categories.length >= MAX_CATEGORIES}>Добавить</button>
           </form>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
           <h2 className="text-xl font-semibold mb-4">Добавить новую подкатегорию</h2>
           <form onSubmit={handleAddSubcategory} className="space-y-4">
             <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)} className="w-full p-2 border rounded" required>
@@ -77,7 +77,7 @@ export default function CategoriesPage() {
           <pre className="bg-gray-100 p-4 rounded-lg text-xs overflow-auto max-h-96 border">{JSON.stringify(categories, null, 2)}</pre>
         </div>
       )}
-      <div className="bg-white p-6 rounded-lg shadow-sm">
+      <div className="rounded-lg bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-xl font-semibold mb-4">Список категорий</h2>
         <div className="space-y-4">
           {categories.map((cat: Category) => (
@@ -105,7 +105,7 @@ export default function CategoriesPage() {
                 </div>
               </div>
               <h4 className="mt-2 font-semibold">Подкатегории ({cat.subcategories?.length || 0}):</h4>
-              <ul className="list-disc pl-8 mt-2 space-y-2">
+              <ul className="mt-2 list-disc space-y-2 pl-5 sm:pl-8">
                 {cat.subcategories?.length ? cat.subcategories.map((sub: Subcategory) => (
                   <li key={sub._id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0 flex items-center gap-2">
