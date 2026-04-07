@@ -85,8 +85,12 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
         </div>
       </div>
 
-      <div className="overflow-x-auto overscroll-contain">
-        <div className="grid grid-cols-2 gap-2.5 md:hidden">
+      <div
+        className={`overscroll-contain touch-pan-y ${
+          selectedOrder ? 'overflow-hidden' : 'overflow-x-auto'
+        }`}
+      >
+        <div className="grid grid-cols-2 gap-2.5 md:hidden touch-pan-y">
           {filteredOrders.length === 0 ? (
             <div className="col-span-2 p-8 text-center text-gray-500">
               <div className="flex flex-col items-center gap-2">
@@ -276,13 +280,13 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       </div>
 
       {selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4 backdrop-blur-[2px]" onClick={handleCloseDetails} aria-hidden="true">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/25 p-2 pt-4 backdrop-blur-[2px] sm:items-center sm:p-4" onClick={handleCloseDetails} aria-hidden="true">
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby={modalTitleId}
             aria-describedby={modalDescriptionId}
-            className="mx-2 max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:mx-4 sm:p-6"
+            className="mx-2 max-h-[94vh] w-full max-w-6xl overflow-y-auto overscroll-contain touch-pan-y rounded-2xl bg-white p-4 shadow-2xl sm:mx-4 sm:max-h-[92vh] sm:p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
@@ -292,7 +296,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               <button
                 type="button"
                 onClick={handleCloseDetails}
-                className="rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                className="rounded-md p-2 text-2xl leading-none text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 aria-label="Закрыть модальное окно"
               >
                 ×
