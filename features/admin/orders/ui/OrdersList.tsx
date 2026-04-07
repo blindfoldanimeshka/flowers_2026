@@ -86,7 +86,98 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-x-auto overflow-y-auto overscroll-contain">
-        <table className="w-full border-separate" style={{ borderSpacing: '0 0.5rem' }}>
+        <div className="space-y-3 md:hidden">
+          {filteredOrders.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-4xl">{currentTab?.icon || '📦'}</span>
+                <span>Заказов нет</span>
+              </div>
+            </div>
+          ) : (
+            filteredOrders.map((order) => {
+              const isNewHighlight = highlightNewOrderIds.has(String(order._id));
+
+              return (
+                <button
+                  key={order._id}
+                  type="button"
+                  onClick={() => handleShowDetails(order)}
+                  className={`w-full rounded-xl border p-3 text-left shadow-sm transition-colors ${
+                    isNewHighlight ? 'border-emerald-300 bg-emerald-50' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        {isNewHighlight && (
+                          <span className="shrink-0 rounded-md bg-emerald-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                            Новый
+                          </span>
+                        )}
+                        <span className="font-mono text-sm text-blue-700">{order.orderNumber}</span>
+                      </div>
+                      <p className="mt-1 truncate text-sm font-semibold text-gray-900">{order.customer.name}</p>
+                      <p className="truncate text-xs text-gray-500">{order.customer.phone}</p>
+                    </div>
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-medium ${
+                        order.fulfillmentMethod === 'delivery' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                      }`}
+                    >
+                      {order.fulfillmentMethod === 'delivery' ? 'Доставка' : 'Самовывоз'}
+                    </span>
+                  </div>
+
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-gray-900">{order.totalAmount} ₽</span>
+                    <span className="text-xs text-gray-500">{format(new Date(order.createdAt), 'dd.MM.yyyy HH:mm')}</span>
+                  </div>
+
+                  <div className="mb-2 text-xs text-gray-600">
+                    {order.items.slice(0, 2).map((item) => `${item.name} x${item.quantity}`).join(', ')}
+                    {order.items.length > 2 && ` +${order.items.length - 2}`}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
+                    <select
+                      value={order.status}
+                      onChange={(e) => handleStatusChange(order._id, e.target.value as IAdminOrder['status'])}
+                      className={`rounded-full border-0 px-3 py-1 text-xs font-medium focus:ring-2 focus:ring-blue-200 ${
+                        order.status === 'pending'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : order.status === 'confirmed'
+                            ? 'bg-blue-100 text-blue-800'
+                            : order.status === 'preparing'
+                              ? 'bg-purple-100 text-purple-800'
+                              : order.status === 'delivering'
+                                ? 'bg-orange-100 text-orange-800'
+                                : order.status === 'delivered'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {Object.entries(orderStatuses).map(([key, label]) => (
+                        <option key={key} value={key}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(order._id)}
+                      className="rounded bg-red-500 px-3 py-1 text-xs text-white transition-colors hover:bg-red-600"
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <table className="hidden w-full border-separate md:table" style={{ borderSpacing: '0 0.5rem' }}>
           <thead className="sticky top-0 z-10">
             <tr className="bg-gray-100 text-sm uppercase text-gray-600 shadow-sm">
               <th className="rounded-l-xl p-3">Номер</th>

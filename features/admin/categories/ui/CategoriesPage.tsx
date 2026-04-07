@@ -82,15 +82,15 @@ export default function CategoriesPage() {
         <div className="space-y-4">
           {categories.map((cat: Category) => (
             <div key={cat._id} className="p-4 border rounded-md bg-gray-50">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+                <div className="min-w-0 flex items-center gap-3">
                   {editingId === cat._id ? (
                     <EditableName name={cat.name} onSave={(name) => handleUpdate('category', cat._id, name)} onCancel={() => setEditingId(null)} isLoading={savingId === cat._id} />
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-bold">{cat.name}</h3>
+                    <div className="min-w-0 flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-lg font-bold">{cat.name}</h3>
                       {cat.totalProductCount !== undefined && (
-                        <div className="flex gap-1">
+                        <div className="flex flex-wrap gap-1">
                           <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">Всего: {cat.totalProductCount}</span>
                           {cat.productCount ? <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded-full">В категории: {cat.productCount}</span> : null}
                           {cat.subcategoriesProductCount ? <span className="bg-purple-100 text-purple-800 text-xs font-medium px-2 py-1 rounded-full">В подкатегориях: {cat.subcategoriesProductCount}</span> : null}
@@ -99,28 +99,28 @@ export default function CategoriesPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button onClick={() => setEditingId(cat._id)} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm" disabled={editingId !== null}>Редактировать</button>
-                  <button onClick={() => handleDelete('category', cat._id, cat.name, cat.totalProductCount)} className="text-red-500 hover:underline">Удалить</button>
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                  <button onClick={() => setEditingId(cat._id)} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-sm whitespace-nowrap" disabled={editingId !== null}>Редактировать</button>
+                  <button onClick={() => handleDelete('category', cat._id, cat.name, cat.totalProductCount)} className="text-red-500 hover:underline whitespace-nowrap">Удалить</button>
                 </div>
               </div>
               <h4 className="mt-2 font-semibold">Подкатегории ({cat.subcategories?.length || 0}):</h4>
               <ul className="list-disc pl-8 mt-2 space-y-2">
                 {cat.subcategories?.length ? cat.subcategories.map((sub: Subcategory) => (
-                  <li key={sub._id} className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
+                  <li key={sub._id} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex items-center gap-2">
                       {editingId === sub._id ? (
                         <EditableName name={sub.name} onSave={(name) => handleUpdate('subcategory', sub._id, name)} onCancel={() => setEditingId(null)} isLoading={savingId === sub._id} />
                       ) : (
-                        <div className="flex items-center gap-2">
-                          <span>{sub.name}</span>
+                        <div className="min-w-0 flex flex-wrap items-center gap-2">
+                          <span className="truncate">{sub.name}</span>
                           {sub.productCount ? <span className="bg-orange-100 text-orange-800 text-xs font-medium px-2 py-1 rounded-full">{sub.productCount} товаров</span> : null}
                         </div>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button onClick={() => setEditingId(sub._id)} className="text-blue-500 hover:underline text-sm" disabled={editingId !== null}>Редактировать</button>
-                      <button onClick={() => handleDelete('subcategory', sub._id, sub.name, sub.productCount)} className="text-red-500 hover:underline text-sm">Удалить</button>
+                    <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+                      <button onClick={() => setEditingId(sub._id)} className="text-blue-500 hover:underline text-sm whitespace-nowrap" disabled={editingId !== null}>Редактировать</button>
+                      <button onClick={() => handleDelete('subcategory', sub._id, sub.name, sub.productCount)} className="text-red-500 hover:underline text-sm whitespace-nowrap">Удалить</button>
                     </div>
                   </li>
                 )) : <li className="text-gray-500">Нет подкатегорий</li>}
