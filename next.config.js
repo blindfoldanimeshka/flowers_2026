@@ -40,6 +40,7 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['framer-motion', 'react-icons'],
     serverMinification: true,
+    proxyClientMaxBodySize: '100mb',
   },
   
   // Компилятор

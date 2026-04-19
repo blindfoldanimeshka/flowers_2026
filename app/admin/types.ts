@@ -39,6 +39,10 @@ export interface Product {
   subcategoryId?: string;
   description?: string;
   inStock: boolean;
+  preorderOnly?: boolean;
+  assemblyTime?: string;
+  stockQuantity?: number;
+  stockUnit?: string;
 }
 
 export interface Subcategory {

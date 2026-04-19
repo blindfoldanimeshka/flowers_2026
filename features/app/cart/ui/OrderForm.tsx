@@ -8,7 +8,11 @@ interface PublicSettings {
   address?: string;
 }
 
-export default function OrderForm() {
+interface OrderFormProps {
+  hideTitle?: boolean;
+}
+
+export default function OrderForm({ hideTitle = false }: OrderFormProps) {
   const {
     formData,
     isLoading,
@@ -21,6 +25,7 @@ export default function OrderForm() {
     handleDeliveryTypeChange,
     handleSubmit,
   } = useOrderFormViewModel();
+
   const [pickupAddress, setPickupAddress] = useState('');
 
   useEffect(() => {
@@ -60,10 +65,12 @@ export default function OrderForm() {
 
   return (
     <div className="bg-[#FFF8F8] p-6 rounded-2xl shadow-lg h-full flex flex-col">
-      <h2 className="text-xl md:text-2xl font-bold mb-5">Оформление заказа</h2>
+      {!hideTitle && <h2 className="text-xl md:text-2xl font-bold mb-5">Оформление заказа</h2>}
+
       <form onSubmit={handleSubmit} className="flex flex-col h-full">
         <div className="grid gap-3">
           <h3 className="text-base md:text-lg font-semibold">Ваши данные</h3>
+
           <input
             type="text"
             placeholder="Имя *"
@@ -73,6 +80,7 @@ export default function OrderForm() {
             name="name"
             className="w-full border-[#FFDADA] border-[2px] h-[45px] rounded-[20px] p-3 focus:outline-none focus:border-[#FFB6B6] transition-colors"
           />
+
           <IMaskInput
             mask="+7 (000) 000-00-00"
             value={formData.phone}
@@ -83,6 +91,7 @@ export default function OrderForm() {
             required
             className="w-full border-[#FFDADA] border-[2px] h-[45px] rounded-[20px] p-3 focus:outline-none focus:border-[#FFB6B6] transition-colors"
           />
+
           <input
             type="email"
             placeholder="Email"
@@ -91,6 +100,7 @@ export default function OrderForm() {
             name="email"
             className="w-full border-[#FFDADA] border-[2px] h-[45px] rounded-[20px] p-3 focus:outline-none focus:border-[#FFB6B6] transition-colors"
           />
+
           <input
             type="text"
             placeholder="Адрес доставки"
@@ -116,6 +126,7 @@ export default function OrderForm() {
               />
               <span className="ml-2">Доставка</span>
             </label>
+
             <label>
               <input
                 type="radio"
@@ -154,6 +165,7 @@ export default function OrderForm() {
         <div className="mt-auto">
           <div className="text-lg font-bold mb-4">Итого: {totalPrice} ₽</div>
           {error && <p className="text-red-500 mb-2">{error}</p>}
+
           <button
             type="submit"
             disabled={isLoading || isCartEmpty}

@@ -2,9 +2,9 @@
 
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
-import { useCart } from '@/features/app/cart';
-import Modal from '@/app/client/components/common/Modal';
 import { AnimatePresence, motion } from 'framer-motion';
+import Modal from '@/app/client/components/common/Modal';
+import { useCart } from '@/features/app/cart';
 
 interface ShopItemProps {
   id: string;
@@ -15,6 +15,10 @@ interface ShopItemProps {
   imageSrc: string;
   imageGallery?: string[];
   inStock?: boolean;
+  preorderOnly?: boolean;
+  assemblyTime?: string;
+  stockQuantity?: number;
+  stockUnit?: string;
 }
 
 const DEFAULT_IMAGE = '/image/items/11.png';
@@ -30,6 +34,10 @@ const ShopItem = memo(({
   imageSrc = DEFAULT_IMAGE,
   imageGallery,
   inStock = true,
+  preorderOnly = false,
+  assemblyTime,
+  stockQuantity,
+  stockUnit = 'шт.',
 }: ShopItemProps) => {
   const { addToCart, isInCart, cartItems, updateQuantity } = useCart();
 
@@ -42,6 +50,18 @@ const ShopItem = memo(({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
+  const isPurchasable = inStock || preorderOnly;
+  const normalizedStock = typeof stockQuantity === 'number' && Number.isFinite(stockQuantity)
+    ? Math.max(0, Math.floor(stockQuantity))
+    : null;
+
+  const stockTextClass = useMemo(() => {
+    if (normalizedStock == null) return 'text-gray-600';
+    if (normalizedStock <= 2) return 'text-red-700';
+    if (normalizedStock <= 5) return 'text-red-600';
+    if (normalizedStock <= 10) return 'text-orange-600';
+    return 'text-emerald-700';
+  }, [normalizedStock]);
 
   const gallery = useMemo(() => {
     const merged = [...(imageGallery || []), imageSrc]
@@ -88,7 +108,7 @@ const ShopItem = memo(({
   };
 
   const handleAddToCart = () => {
-    if (!inStock) return;
+    if (!isPurchasable) return;
 
     const existingItem = cartItems.find((item) => item.id === id);
     if (existingItem) {
@@ -104,7 +124,7 @@ const ShopItem = memo(({
   };
 
   const handleQuickAddToCart = () => {
-    if (!inStock) return;
+    if (!isPurchasable) return;
 
     const existingItem = cartItems.find((item) => item.id === id);
     if (existingItem) {
@@ -116,7 +136,7 @@ const ShopItem = memo(({
   };
 
   const handleQuickUpdateQuantity = (delta: number) => {
-    if (!inStock || itemCount <= 0) return;
+    if (!isPurchasable || itemCount <= 0) return;
     updateQuantity(id, Math.max(0, itemCount + delta));
   };
 
@@ -244,22 +264,29 @@ const ShopItem = memo(({
             {oldPrice && <p className="text-xs sm:text-sm text-gray-500 line-through text-center">{oldPrice} руб.</p>}
             <p className="text-base sm:text-xl font-medium text-center">{price} руб.</p>
           </div>
+          {preorderOnly && <p className="mt-1 text-xs font-semibold text-amber-700">Под заказ</p>}
+          {assemblyTime && <p className="mt-1 text-[11px] text-gray-700">Сборка: {assemblyTime}</p>}
+          {normalizedStock !== null && (
+            <p className={`mt-1 text-[11px] font-semibold ${stockTextClass}`}>
+              В наличии: {normalizedStock} {stockUnit}
+            </p>
+          )}
         </button>
 
         <div className="w-full mt-auto">
           <button
             onClick={openModal}
             type="button"
-            className={`sm:hidden ${inStock ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2 px-2 rounded-[0_0_30px_30px] w-full`}
-            disabled={!inStock}
+            className={`sm:hidden ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2 px-2 rounded-[0_0_30px_30px] w-full`}
+            disabled={!isPurchasable}
           >
             <div className="flex items-center justify-center gap-2">
-              <span className="text-xs whitespace-nowrap">{!inStock ? 'Нет в наличии' : 'Открыть карточку'}</span>
+              <span className="text-xs whitespace-nowrap">{!isPurchasable ? 'Нет в наличии' : preorderOnly ? 'Оформить под заказ' : 'Открыть карточку'}</span>
             </div>
           </button>
 
-          <div className={`hidden sm:flex items-center justify-between gap-2 px-3 py-2 rounded-[0_0_30px_30px] ${inStock ? 'bg-[#D8FEE9]' : 'bg-gray-200'}`}>
-            {!inStock ? (
+          <div className={`hidden sm:flex items-center justify-between gap-2 px-3 py-2 rounded-[0_0_30px_30px] ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200'}`}>
+            {!isPurchasable ? (
               <div className="w-full text-center text-sm font-medium text-gray-600">Нет в наличии</div>
             ) : (
               <>
@@ -292,7 +319,7 @@ const ShopItem = memo(({
                   onClick={handleQuickAddToCart}
                   className="rounded-full bg-[#2f1b26] px-3 py-1.5 text-xs text-white hover:bg-[#20131a] transition-colors"
                 >
-                  {isAdded ? 'Добавить еще' : 'В корзину'}
+                  {preorderOnly ? 'Под заказ' : isAdded ? 'Добавить еще' : 'В корзину'}
                 </button>
               </>
             )}
@@ -305,13 +332,10 @@ const ShopItem = memo(({
         onClose={closeModal}
         title={title}
         className="w-full !max-w-[1200px]"
-        contentClassName="lg:!overflow-hidden lg:!max-h-none"
       >
         <div className="grid grid-cols-1 md:grid-cols-[1.1fr_1fr] gap-4 sm:gap-6 lg:gap-8">
           <div>
             <div
-              // Фиксированная высота на широких мобилках делает картинку "вытянутой".
-              // Поэтому используем aspect-ratio, а Image — object-cover.
               className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#fff1f1]"
               onMouseMove={handlePreviewMove}
             >
@@ -346,6 +370,13 @@ const ShopItem = memo(({
 
           <div className="flex flex-col">
             <p className="mt-2 text-sm text-gray-700">{description}</p>
+            {preorderOnly && <p className="mt-2 text-sm font-semibold text-amber-700">Букет только под заказ</p>}
+            {assemblyTime && <p className="mt-2 text-sm text-gray-700">Время сборки: {assemblyTime}</p>}
+            {normalizedStock !== null && (
+              <p className={`mt-2 text-sm font-semibold ${stockTextClass}`}>
+                В наличии: {normalizedStock} {stockUnit}
+              </p>
+            )}
 
             <div className="mt-3 sm:mt-4 flex items-end gap-2">
               {oldPrice && <span className="text-sm text-gray-500 line-through">{oldPrice} руб.</span>}
@@ -380,12 +411,16 @@ const ShopItem = memo(({
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!inStock}
+              disabled={!isPurchasable}
               className={`mt-5 sm:mt-6 rounded-full px-4 sm:px-5 py-2.5 sm:py-3 text-sm font-semibold transition-colors ${
-                inStock ? 'bg-[#2f1b26] text-white hover:bg-[#20131a]' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                isPurchasable ? 'bg-[#2f1b26] text-white hover:bg-[#20131a]' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
               }`}
             >
-              {inStock ? `Добавить в корзину (${quantity})` : 'Нет в наличии'}
+              {isPurchasable
+                ? preorderOnly
+                  ? `Оформить под заказ (${quantity})`
+                  : `Добавить в корзину (${quantity})`
+                : 'Нет в наличии'}
             </button>
           </div>
         </div>

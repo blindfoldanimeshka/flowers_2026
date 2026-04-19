@@ -60,7 +60,14 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = event.target;
     if (name === 'price') return handlePriceChange(value);
-    if (name === 'inStock' && type === 'checkbox' && 'checked' in event.target) return onChange('inStock', event.target.checked);
+    if ((name === 'inStock' || name === 'preorderOnly') && type === 'checkbox' && 'checked' in event.target) {
+      return onChange(name as 'inStock' | 'preorderOnly', event.target.checked);
+    }
+    if (name === 'stockQuantity') {
+      const nextValue = Number(value);
+      return onChange('stockQuantity', Number.isFinite(nextValue) ? Math.max(0, Math.floor(nextValue)) : 0);
+    }
+
     onChange(name as keyof AdminProductDraft, value as never);
   };
 
@@ -87,6 +94,7 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
         <option value="">Выберите подкатегорию (необязательно)</option>
         {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
       </select>
+
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray-700">Фото товара (до 3 шт.)</p>
         {[0, 1, 2].map((slot) => (
@@ -96,10 +104,44 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
           </div>
         ))}
       </div>
+
       <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
         <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} />
         В наличии
       </label>
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input type="checkbox" name="preorderOnly" checked={draft.preorderOnly} onChange={handleChange} />
+        Только под заказ
+      </label>
+
+      <input
+        name="assemblyTime"
+        value={draft.assemblyTime}
+        onChange={handleChange}
+        placeholder="Время сборки (например: 1-2 часа)"
+        className="w-full p-2 border rounded"
+      />
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          type="number"
+          min={0}
+          step={1}
+          name="stockQuantity"
+          value={draft.stockQuantity}
+          onChange={handleChange}
+          placeholder="Остаток"
+          className="w-full p-2 border rounded"
+        />
+        <input
+          name="stockUnit"
+          value={draft.stockUnit}
+          onChange={handleChange}
+          placeholder="Ед. измерения (например: шт.)"
+          className="w-full p-2 border rounded"
+        />
+      </div>
+
       <div className="flex flex-col gap-2 sm:flex-row">
         <button type="submit" disabled={saving} className="w-full rounded bg-blue-500 p-2 text-white hover:bg-blue-600 disabled:opacity-50 sm:w-auto">{saving ? 'Сохранение...' : 'Сохранить'}</button>
         <button type="button" onClick={onCancel} className="w-full rounded bg-gray-300 p-2 sm:w-auto">Отмена</button>
@@ -122,8 +164,11 @@ export default function ProductsPage() {
           </div>
         ))}
       </div>
+
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Управление товарами</h1>
+
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-600">{error}</div>}
+
       {!isFormVisible ? (
         <button onClick={openCreateForm} className="w-full sm:w-auto bg-green-500 text-white p-3 rounded-lg mb-6 sm:mb-8 shadow-md hover:bg-green-600">+ Добавить новый товар</button>
       ) : (
@@ -132,6 +177,7 @@ export default function ProductsPage() {
           <ProductForm draft={draft} categories={categories} subcategories={currentSubcategories} saving={saving} onChange={updateDraft} onSubmit={saveDraft} onCancel={closeForm} />
         </div>
       )}
+
       <div className="rounded-lg bg-white p-3 shadow-md sm:p-6">
         <h2 className="text-xl sm:text-2xl font-semibold mb-4">Список товаров</h2>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -140,6 +186,9 @@ export default function ProductsPage() {
               <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
               <h3 className="truncate text-sm font-bold sm:text-lg">{product.name}</h3>
               <p className="text-xs text-gray-600 sm:text-base">{product.price} руб.</p>
+              {product.preorderOnly && <p className="text-xs font-semibold text-amber-700">Только под заказ</p>}
+              {product.assemblyTime && <p className="text-xs text-gray-600">Сборка: {product.assemblyTime}</p>}
+              <p className="text-xs text-gray-700">В наличии: {Math.max(0, Math.floor(product.stockQuantity ?? 0))} {product.stockUnit || 'шт.'}</p>
               <div className="mt-2 flex flex-col gap-1.5 sm:mt-4 sm:gap-2">
                 <button onClick={() => openEditForm(product)} className="rounded bg-blue-500 px-2 py-1.5 text-xs text-white hover:bg-blue-600 sm:px-3 sm:py-2 sm:text-sm">Редактировать</button>
                 <button onClick={() => removeProduct(product)} className="rounded bg-red-500 px-2 py-1.5 text-xs text-white hover:bg-red-600 sm:px-3 sm:py-2 sm:text-sm">Удалить</button>

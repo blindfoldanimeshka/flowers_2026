@@ -91,11 +91,11 @@ export default function ImageUpload({
   }, [registerInLibrary, loadMediaLibrary]);
 
   const MAX_UPLOAD_BYTES = 900 * 1024; // Запас под nginx 1MB
-  const MAX_DIMENSION = 2560;
+  const INITIAL_MAX_DIMENSION = 4096;
+  const MIN_DIMENSION = 320;
 
   const optimizeImageForUpload = useCallback(async (file: File): Promise<File> => {
     if (!file.type.startsWith('image/')) return file;
-    if (file.type === 'image/gif') return file;
 
     const objectUrl = URL.createObjectURL(file);
 
@@ -113,7 +113,7 @@ export default function ImageUpload({
         throw new Error('Не удалось подготовить canvas для сжатия изображения');
       }
 
-      const ratio = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+      const ratio = Math.min(1, INITIAL_MAX_DIMENSION / Math.max(image.width, image.height));
       let targetWidth = Math.max(1, Math.round(image.width * ratio));
       let targetHeight = Math.max(1, Math.round(image.height * ratio));
 
@@ -122,13 +122,13 @@ export default function ImageUpload({
       });
 
       let bestBlob: Blob | null = null;
-      for (let scaleAttempt = 0; scaleAttempt < 4; scaleAttempt++) {
+      while (targetWidth >= MIN_DIMENSION && targetHeight >= MIN_DIMENSION) {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
         ctx.clearRect(0, 0, targetWidth, targetHeight);
         ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-        for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
+        for (const quality of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36, 0.3]) {
           const blob = await toBlob(quality);
           if (!blob) continue;
           bestBlob = blob;
@@ -138,8 +138,9 @@ export default function ImageUpload({
           }
         }
 
-        targetWidth = Math.max(1, Math.round(targetWidth * 0.85));
-        targetHeight = Math.max(1, Math.round(targetHeight * 0.85));
+        targetWidth = Math.max(MIN_DIMENSION, Math.round(targetWidth * 0.82));
+        targetHeight = Math.max(MIN_DIMENSION, Math.round(targetHeight * 0.82));
+        if (targetWidth === MIN_DIMENSION && targetHeight === MIN_DIMENSION) break;
       }
 
       if (!bestBlob) return file;
@@ -156,12 +157,19 @@ export default function ImageUpload({
     setIsUploading(true);
     if (onUploadStart) onUploadStart();
 
-    // Жмем изображение на клиенте, чтобы избежать 413 от nginx
-    const optimizedFile = await optimizeImageForUpload(file);
+    // Compress on client to reduce risk of 413 from proxy/server.
+    // If compression fails (rare decoder/format cases), fallback to original file.
+    let optimizedFile: File = file;
+    try {
+      optimizedFile = await optimizeImageForUpload(file);
+    } catch (optimizeError) {
+      console.warn('Image optimization failed, fallback to original file', optimizeError);
+      optimizedFile = file;
+    }
 
     // Дополнительная защита по размеру после сжатия
     if (optimizedFile.size > MAX_UPLOAD_BYTES) {
-      setError('Файл слишком большой даже после оптимизации. Попробуйте JPG/WebP меньшего веса.');
+      setError('Could not auto-compress this image to upload limit. Please try another photo.');
       setIsUploading(false);
       if (onUploadEnd) onUploadEnd(false);
       return;
@@ -224,7 +232,7 @@ export default function ImageUpload({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpeg', '.png', '.jpg', '.webp', '.gif'] },
+    accept: { 'image/*': [] },
     multiple: false,
   });
 

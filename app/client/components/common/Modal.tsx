@@ -22,6 +22,7 @@ const Modal: React.FC<ModalProps> = ({
   contentClassName = "",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const overflowBackupRef = useRef<{
@@ -61,6 +62,11 @@ const Modal: React.FC<ModalProps> = ({
       html.style.overflow = 'hidden';
 
       preventTouchMove = (event: Event) => {
+        const contentElement = contentRef.current;
+        const target = event.target as Node | null;
+        if (contentElement && target && contentElement.contains(target)) {
+          return;
+        }
         event.preventDefault();
       };
       document.addEventListener('touchmove', preventTouchMove, { passive: false });
@@ -142,6 +148,7 @@ const Modal: React.FC<ModalProps> = ({
 
             {/* Контент */}
             <div
+              ref={contentRef}
               className={`p-3 sm:p-4 overflow-y-auto flex-1 min-h-0 max-h-[calc(var(--app-dvh)-152px)] sm:max-h-[calc(var(--app-dvh)-160px)] ${contentClassName}`}
             >
               {children}

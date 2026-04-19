@@ -17,6 +17,10 @@ export interface AdminProductDraft {
   categoryId: string;
   subcategoryId: string;
   inStock: boolean;
+  preorderOnly: boolean;
+  assemblyTime: string;
+  stockQuantity: number;
+  stockUnit: string;
 }
 
 const emptyDraft: AdminProductDraft = {
@@ -28,6 +32,10 @@ const emptyDraft: AdminProductDraft = {
   categoryId: '',
   subcategoryId: '',
   inStock: true,
+  preorderOnly: false,
+  assemblyTime: '',
+  stockQuantity: 0,
+  stockUnit: 'шт.',
 };
 
 export function useAdminProductsViewModel() {
@@ -92,6 +100,10 @@ export function useAdminProductsViewModel() {
       categoryId: product.categoryId ? String(product.categoryId) : '',
       subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
       inStock: product.inStock ?? true,
+      preorderOnly: product.preorderOnly ?? false,
+      assemblyTime: product.assemblyTime ?? '',
+      stockQuantity: Math.max(0, Math.floor(product.stockQuantity ?? 0)),
+      stockUnit: product.stockUnit?.trim() || 'шт.',
     });
     setIsFormVisible(true);
     scrollToTop();
@@ -126,6 +138,10 @@ export function useAdminProductsViewModel() {
         categoryId: draft.categoryId,
         subcategoryId: draft.subcategoryId || undefined,
         inStock: draft.inStock,
+        preorderOnly: draft.preorderOnly,
+        assemblyTime: draft.assemblyTime.trim(),
+        stockQuantity: Math.max(0, Math.floor(draft.stockQuantity)),
+        stockUnit: draft.stockUnit.trim() || 'шт.',
       };
       if (draft._id) {
         await updateProduct(draft._id, payload);
