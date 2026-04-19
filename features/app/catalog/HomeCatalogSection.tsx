@@ -56,6 +56,10 @@ export default function HomeCatalogSection() {
                 imageSrc={product.image}
                 imageGallery={product.images}
                 inStock={product.inStock}
+                preorderOnly={product.preorderOnly}
+                assemblyTime={product.assemblyTime}
+                stockQuantity={product.stockQuantity}
+                stockUnit={product.stockUnit}
               />
             </motion.div>
           ))}

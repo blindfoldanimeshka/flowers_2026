@@ -6,6 +6,10 @@ export interface IProduct {
   image: string;
   images?: string[];
   inStock?: boolean;
+  preorderOnly?: boolean;
+  assemblyTime?: string;
+  stockQuantity?: number;
+  stockUnit?: string;
   categoryId?: string;
   categoryNumId?: number;
   subcategoryId?: string;

@@ -21,18 +21,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Проверка типа файла
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ 
-        error: 'Неподдерживаемый тип файла. Разрешены: JPEG, PNG, WebP, GIF' 
+        error: 'Unsupported file type. Allowed: JPEG, PNG, WebP, GIF, HEIC, HEIF' 
       }, { status: 400 });
     }
 
     // Проверка размера файла (максимум 10MB)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxSize = 100 * 1024 * 1024; // 100MB
     if (file.size > maxSize) {
       return NextResponse.json({ 
-        error: 'Размер файла превышает 10MB' 
+        error: 'File size exceeds 100MB' 
       }, { status: 400 });
     }
 

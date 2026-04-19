@@ -7,7 +7,7 @@ import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 import { sanitizeMongoObject } from '@/lib/security';
 
-const CATALOG_FIELDS = '_id name price oldPrice description image images inStock categoryId subcategoryId categoryNumId subcategoryNumId';
+const CATALOG_FIELDS = '_id name price oldPrice description image images inStock preorderOnly assemblyTime stockQuantity stockUnit categoryId subcategoryId categoryNumId subcategoryNumId';
 const PRODUCTS_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=120';
 
 type ProductQuery = Record<string, string | number>;
@@ -29,6 +29,16 @@ function normalizeProductImages(input: unknown): { image?: string; images?: stri
 
   if (images.length === 0) return {};
   return { image: images[0], images };
+}
+
+function normalizeProductMeta(input: Record<string, unknown>) {
+  const preorderOnly = typeof input.preorderOnly === 'boolean' ? input.preorderOnly : false;
+  const assemblyTime = typeof input.assemblyTime === 'string' ? input.assemblyTime.trim() : '';
+  const stockUnit = typeof input.stockUnit === 'string' && input.stockUnit.trim() ? input.stockUnit.trim() : 'шт.';
+  const rawStock = typeof input.stockQuantity === 'number' ? input.stockQuantity : Number(input.stockQuantity);
+  const stockQuantity = Number.isFinite(rawStock) ? Math.max(0, Math.floor(rawStock)) : 0;
+
+  return { preorderOnly, assemblyTime, stockUnit, stockQuantity };
 }
 
 // GET all products
@@ -91,6 +101,7 @@ export async function POST(request: NextRequest) {
       body.images = normalizedImages.images;
       body.image = normalizedImages.image;
     }
+    Object.assign(body, normalizeProductMeta(body as Record<string, unknown>));
 
     // РџРѕР»СѓС‡Р°РµРј РєР°С‚РµРіРѕСЂРёСЋ РґР»СЏ С‡РёСЃР»РѕРІРѕРіРѕ ID
     if (body.categoryId) {
@@ -182,6 +193,18 @@ export async function PUT(request: NextRequest) {
     if (typeof body.description === 'string') updateData.description = body.description;
     if (typeof body.price === 'number' && Number.isFinite(body.price) && body.price >= 0) updateData.price = body.price;
     if (typeof body.inStock === 'boolean') updateData.inStock = body.inStock;
+    if (typeof body.preorderOnly === 'boolean') updateData.preorderOnly = body.preorderOnly;
+    if (typeof body.assemblyTime === 'string') updateData.assemblyTime = body.assemblyTime.trim();
+    if (typeof body.stockUnit === 'string' && body.stockUnit.trim()) updateData.stockUnit = body.stockUnit.trim();
+    if (
+      (typeof body.stockQuantity === 'number' && Number.isFinite(body.stockQuantity)) ||
+      (typeof body.stockQuantity === 'string' && body.stockQuantity.trim())
+    ) {
+      const normalized = Number(body.stockQuantity);
+      if (Number.isFinite(normalized) && normalized >= 0) {
+        updateData.stockQuantity = Math.floor(normalized);
+      }
+    }
     if (typeof body.categoryId === 'string' && body.categoryId.trim()) updateData.categoryId = body.categoryId.trim();
     if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) updateData.subcategoryId = body.subcategoryId.trim();
     if (typeof body.image === 'string' && body.image.trim()) updateData.image = body.image.trim();
