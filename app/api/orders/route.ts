@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import Product from '@/models/Product';
+import User from '@/models/User';
 import { getCachedOrders, invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 import { sanitizeMongoObject, toIntInRange } from '@/lib/security';
+import { sendOrderNotification } from '@/lib/telegram';
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'] as const;
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed'] as const;
@@ -126,6 +128,29 @@ export async function POST(request: NextRequest) {
     await newOrder.save();
     invalidateOrdersCache();
     invalidateOrderStatsCache();
+
+    // Отправка уведомления в Telegram
+    try {
+      const admins = await User.find({ role: 'admin', telegram_id: { $exists: true, $ne: '' } });
+
+      for (const admin of admins) {
+        if (admin.telegram_id) {
+          await sendOrderNotification(admin.telegram_id, {
+            orderNumber: newOrder._id.toString(),
+            customer: {
+              name: newOrder.customer.name,
+              phone: newOrder.customer.phone,
+              email: newOrder.customer.email,
+            },
+            items: orderItems,
+            totalAmount: totalAmount,
+          });
+        }
+      }
+    } catch (telegramError) {
+      console.error('Ошибка отправки уведомления в Telegram:', telegramError);
+      // Не прерываем выполнение, если не удалось отправить уведомление
+    }
 
     return NextResponse.json({ message: 'Заказ успешно создан', order: newOrder }, { status: 201 });
   } catch (error: unknown) {

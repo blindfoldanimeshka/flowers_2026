@@ -6,6 +6,7 @@ export interface IUser {
   email: string;
   password: string;
   role: 'admin' | 'user';
+  telegram_id?: string;
   createdAt: string;
   updatedAt: string;
   comparePassword(candidatePassword: string): Promise<boolean>;
