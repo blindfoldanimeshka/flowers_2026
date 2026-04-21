@@ -4,9 +4,10 @@ import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { createToken, setAuthCookie } from '@/lib/auth';
 import { generateCsrfToken, setCsrfCookie } from '@/lib/csrf';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await dbConnect();
     
     const { username, password } = await request.json();
@@ -68,14 +69,5 @@ export async function POST(request: NextRequest) {
 
     return response;
 
-  } catch (error) {
-    console.error('Login error:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});

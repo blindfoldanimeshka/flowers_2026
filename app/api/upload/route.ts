@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // Функция для определения директории загрузки
 function resolveUploadDir(): string {
@@ -11,8 +13,7 @@ function resolveUploadDir(): string {
 }
 
 // POST запрос для загрузки изображений
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     const data = await request.formData();
     const file: File | null = data.get('file') as unknown as File;
 
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     
     const publicUrl = `/uploads/${filename}`;
     
-    console.log(`Файл успешно загружен: ${publicUrl}`);
+    productionLogger.info(`Файл успешно загружен: ${publicUrl}`);
     
     return NextResponse.json({ 
       success: true, 
@@ -66,18 +67,11 @@ export async function POST(request: NextRequest) {
       type: file.type
     });
 
-  } catch (error) {
-    console.error('Ошибка при загрузке файла:', error);
-    return NextResponse.json({ 
-      error: 'Ошибка при сохранении файла',
-      details: error instanceof Error ? error.message : 'Неизвестная ошибка'
-    }, { status: 500 });
-  }
-}
+  
+});
 
 // GET запрос для получения списка загруженных файлов (опционально)
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     // Получаем информацию о пользователе из middleware
     const userRole = request.headers.get('x-user-role');
     
@@ -115,11 +109,5 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ files: fileList }, { status: 200 });
 
-  } catch (error: any) {
-    console.error('Ошибка при получении списка файлов:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении списка файлов', details: error.message },
-      { status: 500 }
-    );
-  }
-} 
+  
+}); 

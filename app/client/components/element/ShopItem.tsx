@@ -191,7 +191,7 @@ const ShopItem = memo(({
 
   return (
     <>
-      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-0 max-w-none mx-0 h-[320px] sm:h-[360px] lg:h-[372px] xl:h-[380px] relative group overflow-hidden">
+      <article className="bg-[#FFE1E1] rounded-[30px] shadow-sm pb-0 flex flex-col items-center w-full min-w-0 max-w-none mx-0 min-h-[340px] sm:min-h-[380px] lg:min-h-[400px] xl:min-h-[420px] relative group overflow-hidden">
         <AnimatePresence>
           {discount && (
             <motion.div
@@ -255,29 +255,22 @@ const ShopItem = memo(({
           )}
         </button>
 
-        <button type="button" onClick={openModal} className="flex flex-col items-center justify-center w-full flex-1 px-2">
-          <h4 className="text-base sm:text-xl font-bold text-center leading-tight w-full mt-2 line-clamp-2 overflow-hidden max-h-[2.8em]">
+        <button type="button" onClick={openModal} className="flex flex-col items-center justify-center w-full flex-1 px-3 py-3 min-h-0 gap-2">
+          <h4 className="text-sm sm:text-base lg:text-lg font-bold text-center leading-tight w-full line-clamp-2 overflow-hidden">
             {title}
           </h4>
-          <p className="sm:hidden text-xs text-gray-700 text-center px-3 mt-1 line-clamp-2">{description}</p>
-          <div className="flex justify-center items-center gap-1 w-full text-center mt-1">
+          <div className="flex justify-center items-center gap-1 w-full text-center">
             {oldPrice && <p className="text-xs sm:text-sm text-gray-500 line-through text-center">{oldPrice} руб.</p>}
-            <p className="text-base sm:text-xl font-medium text-center">{price} руб.</p>
+            <p className="text-sm sm:text-base lg:text-lg font-medium text-center">{price} руб.</p>
           </div>
-          {preorderOnly && <p className="mt-1 text-xs font-semibold text-amber-700">Под заказ</p>}
-          {assemblyTime && <p className="mt-1 text-[11px] text-gray-700">Сборка: {assemblyTime}</p>}
-          {normalizedStock !== null && (
-            <p className={`mt-1 text-[11px] font-semibold ${stockTextClass}`}>
-              В наличии: {normalizedStock} {stockUnit}
-            </p>
-          )}
+          {preorderOnly && <p className="text-xs sm:text-sm font-semibold text-amber-700">Под заказ</p>}
         </button>
 
-        <div className="w-full mt-auto">
+        <div className="w-full mt-auto flex-shrink-0">
           <button
             onClick={openModal}
             type="button"
-            className={`sm:hidden ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2 px-2 rounded-[0_0_30px_30px] w-full`}
+            className={`sm:hidden ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200 cursor-not-allowed'} text-black font-medium py-2.5 px-2 rounded-[0_0_30px_30px] w-full`}
             disabled={!isPurchasable}
           >
             <div className="flex items-center justify-center gap-2">
@@ -285,7 +278,7 @@ const ShopItem = memo(({
             </div>
           </button>
 
-          <div className={`hidden sm:flex items-center justify-between gap-2 px-3 py-2 rounded-[0_0_30px_30px] ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200'}`}>
+          <div className={`hidden sm:flex items-center justify-between gap-2 px-3 py-2.5 rounded-[0_0_30px_30px] ${isPurchasable ? 'bg-[#D8FEE9]' : 'bg-gray-200'}`}>
             {!isPurchasable ? (
               <div className="w-full text-center text-sm font-medium text-gray-600">Нет в наличии</div>
             ) : (
@@ -311,13 +304,13 @@ const ShopItem = memo(({
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs text-[#2f1b26]/70">Добавьте товар в корзину</span>
+                  <span className="text-xs text-[#2f1b26]/70 truncate">Добавьте товар</span>
                 )}
 
                 <button
                   type="button"
                   onClick={handleQuickAddToCart}
-                  className="rounded-full bg-[#2f1b26] px-3 py-1.5 text-xs text-white hover:bg-[#20131a] transition-colors"
+                  className="rounded-full bg-[#2f1b26] px-3 py-1.5 text-xs text-white hover:bg-[#20131a] transition-colors whitespace-nowrap"
                 >
                   {preorderOnly ? 'Под заказ' : isAdded ? 'Добавить еще' : 'В корзину'}
                 </button>

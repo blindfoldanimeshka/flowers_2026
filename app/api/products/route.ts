@@ -6,6 +6,8 @@ import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 import { sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 const CATALOG_FIELDS = '_id name price oldPrice description image images inStock preorderOnly assemblyTime stockQuantity stockUnit categoryId subcategoryId categoryNumId subcategoryNumId';
 const PRODUCTS_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=120';
@@ -42,8 +44,7 @@ function normalizeProductMeta(input: Record<string, unknown>) {
 }
 
 // GET all products
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
@@ -85,15 +86,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(products, {
       headers: { 'Cache-Control': PRODUCTS_CACHE_CONTROL },
     });
-  } catch (error) {
-    console.error('РћС€РёР±РєР° РїСЂРё РїРѕР»СѓС‡РµРЅРёРё С‚РѕРІР°СЂРѕРІ:', error);
-    return NextResponse.json([], { status: 500 });
-  }
-}
+  
+});
 
 // POST a new product
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await connect();
     const body = sanitizeMongoObject(await request.json());
     const normalizedImages = normalizeProductImages(body.images);
@@ -134,21 +131,10 @@ export async function POST(request: NextRequest) {
     revalidatePath('/category', 'layout');
 
     return NextResponse.json(newProduct, { status: 201 });
-  } catch (error: unknown) {
-    const validationError = error as ValidationErrorShape;
-    console.error('РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё С‚РѕРІР°СЂР°:', error);
-    if (validationError?.name === 'ValidationError') {
-      const validationErrors = Object.values(validationError.errors || {})
-        .map((err) => err?.message)
-        .filter((msg): msg is string => Boolean(msg));
-      return NextResponse.json({ error: 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё', details: validationErrors }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'РћС€РёР±РєР° РїСЂРё СЃРѕР·РґР°РЅРёРё С‚РѕРІР°СЂР°', details: validationError?.message || 'Unknown error' }, { status: 500 });
-  }
-}
+  
+});
 
-export async function DELETE(request: NextRequest) {
-  try {
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
     await connect();
     
     const { searchParams } = new URL(request.url);
@@ -165,14 +151,10 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ message: 'РўРѕРІР°СЂ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ' });
-  } catch (error) {
-    console.error('РћС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё С‚РѕРІР°СЂР°:', error);
-    return NextResponse.json({ error: 'РћС€РёР±РєР° РїСЂРё СѓРґР°Р»РµРЅРёРё С‚РѕРІР°СЂР°' }, { status: 500 });
-  }
-}
+  
+});
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     await connect();
 
     const { searchParams } = new URL(request.url);
@@ -224,9 +206,5 @@ export async function PUT(request: NextRequest) {
     }
 
     return NextResponse.json(updatedProduct);
-  } catch (error) {
-    console.error('РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё С‚РѕРІР°СЂР°:', error);
-    // ... (error handling)
-    return NextResponse.json({ error: 'РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё С‚РѕРІР°СЂР°' }, { status: 500 });
-  }
-}
+  
+});

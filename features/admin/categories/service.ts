@@ -78,18 +78,18 @@ export async function updateSubcategoryName(id: string, name: string) {
   return parseJson(response);
 }
 
-export async function deleteCategory(id: string, force = false) {
+export async function deleteCategory(id: string) {
   return parseJson(
-    await fetch(`/api/categories/${id}${force ? '?force=true' : ''}`, {
+    await fetch(`/api/categories/${id}`, {
       method: 'DELETE',
       headers: withCsrfHeaders(),
     })
   );
 }
 
-export async function deleteSubcategory(id: string, force = false) {
+export async function deleteSubcategory(id: string) {
   return parseJson(
-    await fetch(`/api/subcategories/${id}${force ? '?force=true' : ''}`, {
+    await fetch(`/api/subcategories/${id}`, {
       method: 'DELETE',
       headers: withCsrfHeaders(),
     })

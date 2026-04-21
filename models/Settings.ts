@@ -6,8 +6,13 @@ export interface ISettings {
   siteName: string;
   siteDescription: string;
   contactPhone: string;
+  contactPhone2?: string;
+  contactPhone3?: string;
   address: string;
   workingHours: string;
+  pickupHours?: string;
+  deliveryHours?: string;
+  deliveryInfo?: string;
   deliveryRadius: number;
   minOrderAmount: number;
   freeDeliveryThreshold: number;
@@ -37,6 +42,10 @@ const Settings = createSupabaseModel({
     settingKey: 'global-settings',
     siteName: 'My Awesome Site',
     siteDescription: 'The best products at the best prices.',
+    workingHours: 'Самовывоз: 9-20, Доставка: 9-2 ночи (от 2.5к₽ - Центральный, ЖД Район бесплатно)',
+    pickupHours: 'С 9:00 до 20:00',
+    deliveryHours: 'С 9:00 до 2:00 ночи',
+    deliveryInfo: 'От 2500₽ - Центральный, ЖД Район бесплатно',
     deliveryRadius: 10,
     minOrderAmount: 0,
     freeDeliveryThreshold: 0,

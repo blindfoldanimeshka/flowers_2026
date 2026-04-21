@@ -18,6 +18,9 @@ type ModelOptions = {
 
 const modelRegistry = new Map<string, ReturnType<typeof createSupabaseModel>>();
 
+const collectionCache = new Map<string, { data: AnyObject[]; timestamp: number }>();
+const COLLECTION_CACHE_TTL = 30000; // 30 секунд
+
 const COLLECTION_CODE_MAP: Record<string, number> = {
   users: 1,
   categories: 2,
@@ -69,6 +72,16 @@ function setByPath(obj: AnyObject, path: string, value: any) {
     cursor = cursor[part];
   }
   cursor[parts[parts.length - 1]] = value;
+}
+
+function pickSelectedFields(current: AnyObject, select: string): AnyObject {
+  const fields = select.split(/\s+/).filter(Boolean);
+  const picked: AnyObject = {};
+  fields.forEach((f) => {
+    picked[f] = current[f];
+  });
+  picked._id = current._id;
+  return picked;
 }
 
 function matchCondition(value: any, condition: any): boolean {
@@ -151,6 +164,13 @@ function applyUpdateOperators(doc: AnyObject, update: AnyObject): AnyObject {
 }
 
 async function readCollection(collection: string): Promise<AnyObject[]> {
+  const now = Date.now();
+  const cached = collectionCache.get(collection);
+
+  if (cached && now - cached.timestamp < COLLECTION_CACHE_TTL) {
+    return cached.data;
+  }
+
   const collectionValue = resolveCollectionValue(collection);
   const { data, error } = await supabase
     .from(SUPABASE_COLLECTION_TABLE)
@@ -159,12 +179,19 @@ async function readCollection(collection: string): Promise<AnyObject[]> {
 
   if (error) throw error;
 
-  return (data || []).map((row: AnyObject) => ({
+  const result = (data || []).map((row: AnyObject) => ({
     ...normalizeRowDoc(row.doc),
     _id: row.id,
     createdAt: normalizeRowDoc(row.doc)?.createdAt || row.created_at,
     updatedAt: normalizeRowDoc(row.doc)?.updatedAt || row.updated_at,
   }));
+
+  collectionCache.set(collection, { data: result, timestamp: now });
+  return result;
+}
+
+function invalidateCollectionCache(collection: string) {
+  collectionCache.delete(collection);
 }
 
 async function insertDoc(collection: string, doc: AnyObject): Promise<AnyObject> {
@@ -181,6 +208,7 @@ async function insertDoc(collection: string, doc: AnyObject): Promise<AnyObject>
     .select('id, doc, created_at, updated_at')
     .single();
   if (error) throw error;
+  invalidateCollectionCache(collection);
   return {
     ...normalizeRowDoc(data?.doc),
     _id: data?.id,
@@ -205,6 +233,7 @@ async function updateDoc(collection: string, id: string, doc: AnyObject): Promis
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+  invalidateCollectionCache(collection);
   return {
     ...normalizeRowDoc(data.doc),
     _id: data.id,
@@ -224,6 +253,7 @@ async function deleteDoc(collection: string, id: string): Promise<AnyObject | nu
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
+  invalidateCollectionCache(collection);
   return {
     ...normalizeRowDoc(data.doc),
     _id: data.id,
@@ -410,17 +440,27 @@ export function createSupabaseModel(options: ModelOptions) {
               if (item.productId) ids.add(String(item.productId));
             });
           });
+
+          if (ids.size === 0) continue;
+
           const refs = await refModel.find({ _id: { $in: Array.from(ids) } }).lean();
           const refMap = new Map(refs.map((r: AnyObject) => [String(r._id), r]));
           out = out.map((doc) => ({
             ...doc,
             items: (doc.items || []).map((item: AnyObject) => ({
               ...item,
-              productId: refMap.get(String(item.productId)) || item.productId,
+              productId: (() => {
+                const populated = refMap.get(String(item.productId));
+                if (!populated) return item.productId;
+                if (!pop.select) return populated;
+                return pickSelectedFields(populated, pop.select);
+              })(),
             })),
           }));
         } else {
           const ids = Array.from(new Set(out.map((d) => getByPath(d, pop.path)).filter(Boolean).map((v) => String(v))));
+          if (ids.length === 0) continue;
+
           const refs = await refModel.find({ _id: { $in: ids } }).lean();
           const refMap = new Map(refs.map((r: AnyObject) => [String(r._id), r]));
           out = out.map((doc) => {
@@ -432,18 +472,12 @@ export function createSupabaseModel(options: ModelOptions) {
           });
         }
 
-        if (pop.select) {
-          const fields = pop.select.split(/\s+/).filter(Boolean);
+        if (pop.select && pop.path !== 'items.productId') {
           out = out.map((doc) => {
             const current = getByPath(doc, pop.path);
             if (!current || typeof current !== 'object') return doc;
-            const picked: AnyObject = {};
-            fields.forEach((f) => {
-              picked[f] = current[f];
-            });
-            picked._id = current._id;
             const copy = deepClone(doc);
-            setByPath(copy, pop.path, picked);
+            setByPath(copy, pop.path, pickSelectedFields(current as AnyObject, pop.select!));
             return copy;
           });
         }

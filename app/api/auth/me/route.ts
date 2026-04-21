@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const token = request.cookies.get('auth_token')?.value;
 
     if (!token) {
@@ -24,12 +25,6 @@ export async function GET(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('Auth me error:', error);
-    return NextResponse.json(
-      { error: 'Server error', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 

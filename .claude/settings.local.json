@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(claude plugin *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'docs: add production refactoring design spec *)"
+    ]
+  }
+}

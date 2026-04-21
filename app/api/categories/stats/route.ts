@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
     const { default: Category } = await import('@/models/Category');
     const { default: Subcategory } = await import('@/models/Subcategory');
@@ -89,15 +90,5 @@ export async function GET(request: NextRequest) {
       }
     });
 
-  } catch (error: any) {
-    console.error('Ошибка при получении статистики категорий:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при получении статистики категорий',
-        details: error.message
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});

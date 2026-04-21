@@ -10,6 +10,7 @@ import Category from '@/models/Category'; // Added import for Category
 import { getCachedSubcategories, invalidateSubcategoriesCache } from '@/lib/cache';
 import { invalidateCategoriesCache } from '@/lib/cache'; // Added import for invalidateCategoriesCache
 import { startSession } from '@/lib/supabaseModel';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Создание новой подкатегории
 export async function createSubcategory(formData: FormData) {
@@ -68,7 +69,7 @@ export async function createSubcategory(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании подкатегории:', error);
+    productionLogger.error('Ошибка при создании подкатегории:', error);
     
     if (error.code === 11000) {
       return {
@@ -178,7 +179,7 @@ export async function updateSubcategory(id: string, formData: FormData) {
         };
         
       } catch (error: any) {
-        console.error('Ошибка при обновлении подкатегории:', error);
+        productionLogger.error('Ошибка при обновлении подкатегории:', error);
         return {
           success: false,
           error: 'Ошибка при обновлении подкатегории'
@@ -219,7 +220,7 @@ export async function updateSubcategory(id: string, formData: FormData) {
     }
     
   } catch (error: any) {
-    console.error('Ошибка при обновлении подкатегории:', error);
+    productionLogger.error('Ошибка при обновлении подкатегории:', error);
     
     if (error.code === 11000) {
       return {
@@ -285,7 +286,7 @@ export async function deleteSubcategory(id: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при удалении подкатегории:', error);
+    productionLogger.error('Ошибка при удалении подкатегории:', error);
     return {
       success: false,
       error: 'Ошибка при удалении подкатегории'
@@ -310,7 +311,7 @@ export async function getSubcategories(filters?: {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий:', error);
+    productionLogger.error('Ошибка при получении подкатегорий:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'
@@ -337,7 +338,7 @@ export async function getSubcategoriesByCategory(categoryId: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий категории:', error);
+    productionLogger.error('Ошибка при получении подкатегорий категории:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'
@@ -364,7 +365,7 @@ export async function getSubcategoriesByCategoryNumId(categoryNumId: number) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий по числовому ID категории:', error);
+    productionLogger.error('Ошибка при получении подкатегорий по числовому ID категории:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'

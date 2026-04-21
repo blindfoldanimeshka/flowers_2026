@@ -7,12 +7,13 @@ import Product from '@/models/Product';
 import { revalidatePath } from 'next/cache';
 import { isValidId } from '@/lib/id';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 // PUT - Update a subcategory by ID
-export async function PUT(request: NextRequest, { params }: RouteContext) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest, { params }: RouteContext) => {
     await dbConnect();
     const { id } = await params;
     const { name } = await request.json();
@@ -41,122 +42,91 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     invalidateSubcategoriesCache();
 
     return NextResponse.json(updatedSubcategory);
-  } catch (error: any) {
-    console.error('Ошибка при обновлении подкатегории:', error);
-    return NextResponse.json({ error: 'Ошибка сервера' }, { status: 500 });
-  }
-}
+  
+});
 
 // DELETE - Delete a subcategory by ID
-export async function DELETE(request: NextRequest, { params }: RouteContext) {
-  try {
+export const DELETE = withErrorHandler(async (request: NextRequest, { params }: RouteContext) => {
     await dbConnect();
     const { id } = await params;
-    console.log('[SUBCATEGORY DELETE] Deleting subcategory with ID:', id);
+    productionLogger.info('[SUBCATEGORY DELETE] Deleting subcategory with ID:', id);
 
     if (!isValidId(id)) {
       return NextResponse.json(
-        { success: false, error: 'Неверный формат ID подкатегории' }, 
+        { success: false, error: 'Неверный формат ID подкатегории' },
         { status: 400 }
       );
     }
 
-    // Получаем query параметры
-    const url = new URL(request.url);
-    const forceDelete = url.searchParams.get('force') === 'true';
-
     // Find the subcategory to get the category reference
     const subcategory = await Subcategory.findById(id);
-    
+
     if (!subcategory) {
-      console.log('[SUBCATEGORY DELETE] Subcategory not found:', id);
+      productionLogger.info('[SUBCATEGORY DELETE] Subcategory not found:', id);
       return NextResponse.json(
-        { success: false, error: 'Подкатегория не найдена' }, 
+        { success: false, error: 'Подкатегория не найдена' },
         { status: 404 }
       );
     }
 
     // Check if there are any products associated with this subcategory
     const productCount = await Product.countDocuments({ subcategoryId: id });
-    
-    // Если есть товары и не принудительное удаление, возвращаем информацию
-    if (productCount > 0 && !forceDelete) {
-      console.log('[SUBCATEGORY DELETE] Cannot delete subcategory - has products:', productCount);
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: 'В подкатегории есть товары',
-          canForceDelete: true,
-          productCount: productCount
-        }, 
-        { status: 409 }
-      );
-    }
 
     // Store the category ID before deletion
     const categoryId = subcategory.categoryId;
-    console.log('[SUBCATEGORY DELETE] Found subcategory, category ID:', categoryId);
+    productionLogger.info('[SUBCATEGORY DELETE] Found subcategory, category ID:', categoryId);
 
-    // Если принудительное удаление и есть товары - удаляем их
-    if (productCount > 0 && forceDelete) {
-      await Product.deleteMany({ subcategoryId: id });
-      console.log(`[SUBCATEGORY DELETE] Force deleted ${productCount} products`);
+    // Помечаем все товары подкатегории как "не в наличии"
+    if (productCount > 0) {
+      await Product.updateMany(
+        { subcategoryId: id },
+        { $set: { inStock: false } }
+      );
+      productionLogger.info(`[SUBCATEGORY DELETE] Marked ${productCount} products as out of stock`);
     }
 
     // Step 1: Delete the subcategory first
     const deletedSubcategory = await Subcategory.findByIdAndDelete(id);
     if (!deletedSubcategory) {
-      console.error('[SUBCATEGORY DELETE] Failed to delete subcategory');
+      productionLogger.error('[SUBCATEGORY DELETE] Failed to delete subcategory');
       return NextResponse.json(
-        { success: false, error: 'Не удалось удалить подкатегорию' }, 
+        { success: false, error: 'Не удалось удалить подкатегорию' },
         { status: 500 }
       );
     }
-    console.log('[SUBCATEGORY DELETE] ✅ Subcategory deleted');
+    productionLogger.info('[SUBCATEGORY DELETE] ✅ Subcategory deleted');
 
     // Step 2: Remove the subcategory reference from the parent category
     const categoryUpdateResult = await Category.updateOne(
       { _id: categoryId },
       { $pull: { subcategories: id } }
     );
-    
+
     if (categoryUpdateResult.modifiedCount === 0) {
-      console.warn('[SUBCATEGORY DELETE] ⚠️ Category was not updated - may already be removed or category not found');
+      productionLogger.warn('[SUBCATEGORY DELETE] ⚠️ Category was not updated - may already be removed or category not found');
     } else {
-      console.log('[SUBCATEGORY DELETE] ✅ Category updated successfully');
+      productionLogger.info('[SUBCATEGORY DELETE] ✅ Category updated successfully');
     }
 
     // Invalidate cache
-    console.log('[SUBCATEGORY DELETE] Invalidating caches...');
+    productionLogger.info('[SUBCATEGORY DELETE] Invalidating caches...');
     revalidatePath('/admin/categories');
     invalidateCategoriesCache();
     invalidateSubcategoriesCache();
-    console.log('[SUBCATEGORY DELETE] ✅ Caches invalidated');
+    productionLogger.info('[SUBCATEGORY DELETE] ✅ Caches invalidated');
 
-    const responseMessage = forceDelete && productCount > 0
-      ? `Подкатегория и ${productCount} товаров успешно удалены`
+    const responseMessage = productCount > 0
+      ? `Подкатегория удалена. ${productCount} товар(ов) помечены как "не в наличии"`
       : 'Подкатегория успешно удалена';
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: responseMessage,
       data: {
         deletedSubcategoryId: id,
         categoryId: categoryId,
-        deletedProducts: forceDelete ? productCount : 0
+        productsMarkedOutOfStock: productCount
       }
     });
-  } catch (error: unknown) {
-    console.error('[SUBCATEGORY DELETE] ❌ Error deleting subcategory:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Ошибка при удалении подкатегории',
-        details: errorMessage 
-      }, 
-      { status: 500 }
-    );
-  }
-}
+  
+});

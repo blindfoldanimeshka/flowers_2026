@@ -7,14 +7,16 @@ import User from '@/models/User';
 import { getCachedOrders, invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 import { sanitizeMongoObject, toIntInRange } from '@/lib/security';
 import { sendOrderNotification } from '@/lib/telegram';
+import { telegramRateLimiter } from '@/lib/telegram/rateLimiter';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'] as const;
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed'] as const;
 const FULFILLMENT_TYPES = ['delivery', 'pickup'] as const;
 const PAYMENT_METHODS = ['cash', 'card', 'online'] as const;
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email') ?? undefined;
     const statusParam = searchParams.get('status') ?? undefined;
@@ -32,20 +34,10 @@ export async function GET(request: NextRequest) {
 
     const result = await getCachedOrders({ email, status, deliveryType, page, limit });
     return NextResponse.json(result, { status: 200 });
-  } catch (error: unknown) {
-    console.error('Ошибка при получении заказов:', error);
-    return NextResponse.json(
-      {
-        error: 'Ошибка при получении заказов',
-        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await dbConnect();
     const body = sanitizeMongoObject(await request.json());
 
@@ -131,42 +123,54 @@ export async function POST(request: NextRequest) {
 
     // Отправка уведомления в Telegram
     try {
-      const admins = await User.find({ role: 'admin', telegram_id: { $exists: true, $ne: '' } });
+      const admins = await User.find({ role: 'admin' });
 
       for (const admin of admins) {
-        if (admin.telegram_id) {
-          await sendOrderNotification(admin.telegram_id, {
-            orderNumber: newOrder._id.toString(),
-            customer: {
-              name: newOrder.customer.name,
-              phone: newOrder.customer.phone,
-              email: newOrder.customer.email,
-            },
-            items: orderItems,
-            totalAmount: totalAmount,
-          });
+        const telegramIds = [
+          admin.telegram_id,
+          admin.telegram_id2,
+          admin.telegram_id3
+        ].filter(id => id && id.trim() !== '');
+
+        for (const telegramId of telegramIds) {
+          try {
+            if (telegramRateLimiter.canSend()) {
+              await sendOrderNotification(telegramId, {
+                orderNumber: newOrder._id.toString(),
+                customer: {
+                  name: newOrder.customer.name,
+                  phone: newOrder.customer.phone,
+                  email: newOrder.customer.email,
+                },
+                items: orderItems,
+                totalAmount: totalAmount,
+              });
+              telegramRateLimiter.recordSent();
+            } else {
+              productionLogger.warn('Telegram rate limit exceeded, notification skipped', {
+                orderId: newOrder._id.toString(),
+                telegramId,
+                stats: telegramRateLimiter.getStats(),
+              });
+            }
+          } catch (err) {
+            productionLogger.error('Failed to send Telegram notification', err, {
+              orderId: newOrder._id.toString(),
+              telegramId,
+            });
+          }
         }
       }
     } catch (telegramError) {
-      console.error('Ошибка отправки уведомления в Telegram:', telegramError);
+      productionLogger.error('Ошибка отправки уведомления в Telegram:', telegramError);
       // Не прерываем выполнение, если не удалось отправить уведомление
     }
 
     return NextResponse.json({ message: 'Заказ успешно создан', order: newOrder }, { status: 201 });
-  } catch (error: unknown) {
-    console.error('Ошибка при создании заказа:', error);
-    return NextResponse.json(
-      {
-        error: 'Ошибка при создании заказа',
-        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     const userRole = request.headers.get('x-user-role');
     if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Доступ запрещен - требуется роль администратора' }, { status: 403 });
@@ -203,31 +207,5 @@ export async function PUT(request: NextRequest) {
     invalidateOrderStatsCache();
 
     return NextResponse.json({ order: updatedOrder }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при обновлении заказа:', error);
-
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: 'Ошибка валидации', details: validationErrors }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      {
-        error: 'Ошибка при обновлении заказа',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function GETAll() {
-  try {
-    await dbConnect();
-    const orders = await Order.find().sort({ createdAt: -1 });
-    return NextResponse.json(orders);
-  } catch (error) {
-    console.error('Ошибка при получении заказов:', error);
-    return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 });
-  }
-}
+  
+});

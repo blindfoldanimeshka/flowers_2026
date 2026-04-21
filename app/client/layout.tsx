@@ -3,15 +3,20 @@ import Footer from "./components/layout/Footer";
 import SocialButton from "./components/layout/SocialButton";
 import HeaderSwitcher from "./components/widget/HeaderSwitcher";
 import FadeWrapper from "./components/FadeWrapper";
-import TopInfoPanel from "./components/layout/TopInfoPanel";
 import { getCachedSettings } from "@/lib/cache";
+import { productionLogger } from '@/lib/productionLogger';
 
 const defaultPublicSettings = {
     siteName: "Floramix",
     siteDescription: "",
     contactPhone: "",
+    contactPhone2: "",
+    contactPhone3: "",
     address: "",
     workingHours: "",
+    pickupHours: "",
+    deliveryHours: "",
+    deliveryInfo: "",
     socialLinks: {},
     homeCategoryCardBackgrounds: {},
     homeBannerBackground: "",
@@ -34,7 +39,7 @@ export default async function ClientLayout({
             };
         }
     } catch (error) {
-        console.error("Failed to load public settings, using defaults:", error);
+        productionLogger.error("Failed to load public settings, using defaults:", error);
     }
 
     return (
@@ -49,7 +54,6 @@ export default async function ClientLayout({
                 }}
             />
             <HeaderSwitcher />
-            <TopInfoPanel settings={plainSettings} />
             <main className="flex-1">
                 <FadeWrapper>{children}</FadeWrapper>
             </main>

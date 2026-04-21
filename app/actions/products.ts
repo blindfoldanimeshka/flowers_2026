@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
 import Product from '@/models/Product';
 import { getCachedProducts, invalidateProductsCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Создание нового товара
 export async function createProduct(formData: FormData) {
@@ -62,7 +63,7 @@ export async function createProduct(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании товара:', error);
+    productionLogger.error('Ошибка при создании товара:', error);
     
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
@@ -168,7 +169,7 @@ export async function updateProduct(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при обновлении товара:', error);
+    productionLogger.error('Ошибка при обновлении товара:', error);
     
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
@@ -219,7 +220,7 @@ export async function deleteProduct(id: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при удалении товара:', error);
+    productionLogger.error('Ошибка при удалении товара:', error);
     return {
       success: false,
       error: 'Ошибка при удалении товара'
@@ -244,7 +245,7 @@ export async function getProducts(filters?: {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении товаров:', error);
+    productionLogger.error('Ошибка при получении товаров:', error);
     return {
       success: false,
       error: 'Ошибка при получении товаров'

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 type CategorySubcategoriesRouteContext = { params: Promise<{ id: string }> };
 
-export async function GET(request: NextRequest, { params }: CategorySubcategoriesRouteContext) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
     await connect();
 
     const { id } = await params;
@@ -21,16 +22,10 @@ export async function GET(request: NextRequest, { params }: CategorySubcategorie
 
     const subcategories = await Subcategory.find({ categoryId: id }).lean();
     return NextResponse.json({ subcategories }, { status: 200 });
-  } catch (error: any) {
-    console.error(`Ошибка при получении подкатегорий для категории с ID unknown:`, error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении подкатегорий', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function POST(_request: NextRequest, { params }: CategorySubcategoriesRouteContext) {
+export const POST = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
   const { id } = await params;
   return NextResponse.json(
     {
@@ -50,9 +45,9 @@ export async function POST(_request: NextRequest, { params }: CategorySubcategor
     },
     { status: 301 }
   );
-}
+});
 
-export async function PUT(_request: NextRequest, _params: CategorySubcategoriesRouteContext) {
+export const PUT = withErrorHandler(async (_request: NextRequest, _params: CategorySubcategoriesRouteContext) => {
   return NextResponse.json(
     {
       error: 'Этот API-маршрут не поддерживается. Используйте PUT /api/subcategories/[subcategoryId] для обновления отдельной подкатегории.',
@@ -60,5 +55,5 @@ export async function PUT(_request: NextRequest, _params: CategorySubcategoriesR
     },
     { status: 405 }
   );
-}
+});
 

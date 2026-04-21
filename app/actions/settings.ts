@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
 import Settings from '@/models/Settings';
 import { getCachedSettings, invalidateSettingsCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
 
 const SETTINGS_KEY = 'global-settings';
 
@@ -19,7 +20,7 @@ export async function getSettings() {
     };
 
   } catch (error: any) {
-    console.error('Ошибка при получении настроек:', error);
+    productionLogger.error('Ошибка при получении настроек:', error);
     return {
       success: false,
       error: 'Ошибка при получении настроек'
@@ -141,7 +142,7 @@ export async function updateSettings(formData: FormData) {
     };
 
   } catch (error: any) {
-    console.error('Ошибка при обновлении настроек:', error);
+    productionLogger.error('Ошибка при обновлении настроек:', error);
 
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
@@ -189,7 +190,7 @@ export async function toggleMaintenanceMode() {
     };
 
   } catch (error: any) {
-    console.error('Ошибка при переключении режима обслуживания:', error);
+    productionLogger.error('Ошибка при переключении режима обслуживания:', error);
     return {
       success: false,
       error: 'Ошибка при переключении режима обслуживания'

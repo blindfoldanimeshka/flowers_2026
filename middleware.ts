@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { isTrustedOriginRequest, isValidCsrfRequest } from '@/lib/csrf';
+import { productionLogger } from '@/lib/productionLogger';
 
 const AUTH_LOGIN_PATH = '/auth/login';
 const ADMIN_DASHBOARD_PATH = '/admin/orders';
@@ -70,14 +71,40 @@ export async function middleware(request: NextRequest) {
 
     const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
     const hasAuthCookie = Boolean(request.cookies.get('auth_token')?.value);
+    const hasBearerToken = Boolean(request.headers.get('authorization')?.startsWith('Bearer '));
 
-    if (isMutatingRequest && hasAuthCookie) {
-      if (!isTrustedOriginRequest(request)) {
-        return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
-      }
+    if (isMutatingRequest) {
+      if (hasAuthCookie) {
+        if (!isTrustedOriginRequest(request)) {
+          productionLogger.warn('Blocked request: invalid origin (cookie auth)', {
+            origin: request.headers.get('origin'),
+            referer: request.headers.get('referer'),
+            path: request.nextUrl.pathname,
+            method: request.method,
+          });
+          return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
+        }
 
-      if (!isValidCsrfRequest(request)) {
-        return NextResponse.json({ error: 'CSRF token mismatch' }, { status: 403 });
+        if (!isValidCsrfRequest(request)) {
+          productionLogger.warn('Blocked request: CSRF token mismatch', {
+            path: request.nextUrl.pathname,
+            method: request.method,
+          });
+          return NextResponse.json({ error: 'CSRF token mismatch' }, { status: 403 });
+        }
+      } else if (hasBearerToken) {
+        if (!isTrustedOriginRequest(request)) {
+          productionLogger.warn('Blocked request: invalid origin (Bearer token)', {
+            origin: request.headers.get('origin'),
+            referer: request.headers.get('referer'),
+            path: request.nextUrl.pathname,
+            method: request.method,
+          });
+          return NextResponse.json(
+            { error: 'Invalid request origin. Bearer tokens can only be used from trusted domains.' },
+            { status: 403 }
+          );
+        }
       }
     }
 

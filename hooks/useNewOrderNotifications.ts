@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import { productionLogger } from '@/lib/productionLogger';
 
 interface NewOrder {
   _id: string;
@@ -161,7 +162,7 @@ export function useNewOrderNotifications({
         });
       }
     } catch (err: any) {
-      console.error('Ошибка при проверке новых заказов:', err);
+      productionLogger.error('Ошибка при проверке новых заказов:', err);
       consecutiveFailuresRef.current += 1;
       const backoffMs = getBackoffDelay(consecutiveFailuresRef.current);
       nextAllowedRequestAtRef.current = Date.now() + backoffMs;

@@ -5,13 +5,20 @@ import dbConnect from '@/lib/db';
 import Settings from '@/models/Settings';
 import { getCachedSettings, invalidateSettingsCache } from '@/lib/cache';
 import { requireAdmin } from '@/lib/auth';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 interface SettingsUpdatePayload {
   siteName?: string;
   siteDescription?: string;
   contactPhone?: string;
+  contactPhone2?: string;
+  contactPhone3?: string;
   address?: string;
   workingHours?: string;
+  pickupHours?: string;
+  deliveryHours?: string;
+  deliveryInfo?: string;
   deliveryRadius?: number;
   minOrderAmount?: number;
   freeDeliveryThreshold?: number;
@@ -40,8 +47,13 @@ const ALLOWED_FIELDS: (keyof SettingsUpdatePayload)[] = [
   'siteName',
   'siteDescription',
   'contactPhone',
+  'contactPhone2',
+  'contactPhone3',
   'address',
   'workingHours',
+  'pickupHours',
+  'deliveryHours',
+  'deliveryInfo',
   'deliveryRadius',
   'minOrderAmount',
   'freeDeliveryThreshold',
@@ -77,8 +89,13 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
       field === 'siteName' ||
       field === 'siteDescription' ||
       field === 'contactPhone' ||
+      field === 'contactPhone2' ||
+      field === 'contactPhone3' ||
       field === 'address' ||
       field === 'workingHours' ||
+      field === 'pickupHours' ||
+      field === 'deliveryHours' ||
+      field === 'deliveryInfo' ||
       field === 'currency' ||
       field === 'timezone' ||
       field === 'seoTitle' ||
@@ -193,8 +210,13 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
       siteName: 'Floramix',
       siteDescription: '',
       contactPhone: '',
+      contactPhone2: '',
+      contactPhone3: '',
       address: '',
       workingHours: '',
+      pickupHours: '',
+      deliveryHours: '',
+      deliveryInfo: '',
       socialLinks: {},
       homeCategoryCardBackgrounds: {},
       homeBannerBackground: '',
@@ -206,6 +228,11 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
 
   return {
     ...rest,
+    contactPhone2: settings.contactPhone2 || '',
+    contactPhone3: settings.contactPhone3 || '',
+    pickupHours: settings.pickupHours || '',
+    deliveryHours: settings.deliveryHours || '',
+    deliveryInfo: settings.deliveryInfo || '',
     homeCategoryCardBackgrounds:
       typeof settings.homeCategoryCardBackgrounds === 'object' &&
       settings.homeCategoryCardBackgrounds !== null &&
@@ -264,23 +291,15 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
   return settings;
 }
 
-export async function GET() {
-  try {
+export const GET = withErrorHandler(async () => {
     const settings = await getCachedSettings();
     const plainSettings = settings ? JSON.parse(JSON.stringify(settings)) : null;
 
     return NextResponse.json({ settings: normalizePublicSettings(plainSettings) }, { status: 200 });
-  } catch (error: any) {
-    console.error('Failed to get settings:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении настроек', details: process.env.NODE_ENV === 'development' ? error?.message : undefined },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     const authResult = await requireAdmin(request);
     if (!authResult.success) {
       return NextResponse.json({ error: 'Требуется авторизация администратора' }, { status: 401 });
@@ -290,21 +309,7 @@ export async function PUT(request: NextRequest) {
     const settings = await updateOrCreateSettings(body);
 
     return NextResponse.json({ settings }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при обновлении настроек:', error);
+  
+});
 
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: 'Ошибка валидации', details: validationErrors }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      { error: 'Ошибка при обновлении настроек', details: process.env.NODE_ENV === 'development' ? error?.message : undefined },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  return PUT(request);
-}
+export const POST = PUT;

@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import React, { createContext, useContext, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
+import { productionLogger } from '@/lib/productionLogger';
 
 export interface CartItem {
   id: string;
@@ -144,7 +145,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         dispatch({ type: 'SET_ITEMS', payload: validItems });
       } catch (error) {
-        console.error('Ошибка при чтении корзины из localStorage:', error);
+        productionLogger.error('Ошибка при чтении корзины из localStorage:', error);
         localStorage.removeItem(localStorageKey);
       }
     }
@@ -160,7 +161,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         localStorage.setItem(localStorageKey, JSON.stringify(items));
       } catch (error) {
-        console.error('Ошибка при сохранении корзины в localStorage:', error);
+        productionLogger.error('Ошибка при сохранении корзины в localStorage:', error);
       }
     }, 100);
   }, []);

@@ -2,10 +2,11 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // GET запрос для получения новых заказов после указанной даты (для polling)
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await dbConnect();
     
     const { searchParams } = new URL(request.url);
@@ -53,11 +54,5 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 200 });
     
-  } catch (error: any) {
-    console.error('Ошибка при получении новых заказов:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении новых заказов', details: error.message },
-      { status: 500 }
-    );
-  }
-} 
+  
+}); 
