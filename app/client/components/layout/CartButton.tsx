@@ -3,10 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useCart } from '@/features/app/cart'
 
 export default function CartButton() {
   const pathname = usePathname();
   const router = useRouter();
+  const { getTotalItems } = useCart();
+  const totalItems = getTotalItems();
   const isCartPage = pathname === '/client/cart';
   const isAdminRoute = pathname?.startsWith('/admin');
   const isAuthRoute = pathname?.startsWith('/auth');
@@ -27,7 +30,7 @@ export default function CartButton() {
 
   if (isCartPage) {
     return (
-      <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
+      <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", left: "calc(16px + var(--safe-area-left))" }}>
         <button
           onClick={() => router.back()}
           className={buttonClasses}
@@ -54,7 +57,7 @@ export default function CartButton() {
   }
 
   return (
-    <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
+    <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", left: "calc(16px + var(--safe-area-left))" }}>
       <Link
         href="/client/cart"
         className={buttonClasses}
@@ -65,6 +68,11 @@ export default function CartButton() {
             <path d="M20 20a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
           </svg>
+          {totalItems > 0 && (
+            <span className="absolute -top-1 -right-1 bg-white text-pink-500 font-bold w-5 h-5 flex items-center justify-center rounded-full text-xs border-2 border-pink-400">
+              {totalItems}
+            </span>
+          )}
         </div>
       </Link>
     </div>
