@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 
 interface ExportOrder {
-  _id: string;
+  _id: string | number;
   orderNumber: string;
   customer: {
     name: string;
