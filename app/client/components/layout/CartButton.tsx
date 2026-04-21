@@ -27,21 +27,21 @@ export default function CartButton() {
 
   if (isCartPage) {
     return (
-      <div className="fixed z-50 md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
+      <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
         <button
           onClick={() => router.back()}
           className={buttonClasses}
           aria-label="Вернуться назад"
         >
           <div className={iconClasses}>
-            <svg 
-              width="28" 
-              height="28" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="#ffffff" 
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
               strokeWidth="2"
-              strokeLinecap="round" 
+              strokeLinecap="round"
               strokeLinejoin="round"
             >
               <path d="M19 12H5" />
@@ -54,7 +54,7 @@ export default function CartButton() {
   }
 
   return (
-    <div className="fixed z-50 md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
+    <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", right: "calc(96px + var(--safe-area-right))" }}>
       <Link
         href="/client/cart"
         className={buttonClasses}
@@ -69,4 +69,4 @@ export default function CartButton() {
       </Link>
     </div>
   )
-} 
+}
