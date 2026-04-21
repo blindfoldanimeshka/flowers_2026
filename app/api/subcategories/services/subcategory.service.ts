@@ -2,6 +2,7 @@ import Subcategory, { ISubcategory } from '@/models/Subcategory';
 import Category from '@/models/Category';
 import { Logger } from '@/lib/logger';
 import { escapeRegExp } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
 
 export interface CreateSubcategoryParams {
   name: string;
@@ -139,17 +140,17 @@ export const SubcategoryService = {
   },
 
   async deleteSubcategory(id: string) {
-    console.log('[SUBCATEGORY SERVICE] Deleting subcategory:', id);
+    productionLogger.info('[SUBCATEGORY SERVICE] Deleting subcategory:', id);
     
     const deleted = await Subcategory.findByIdAndDelete(id);
     
     if (deleted) {
-      console.log('[SUBCATEGORY SERVICE] Removing subcategory reference from categories');
+      productionLogger.info('[SUBCATEGORY SERVICE] Removing subcategory reference from categories');
       await Category.updateMany(
         { subcategories: deleted._id },
         { $pull: { subcategories: deleted._id } }
       );
-      console.log('[SUBCATEGORY SERVICE] ✅ Subcategory deleted and references removed');
+      productionLogger.info('[SUBCATEGORY SERVICE] ✅ Subcategory deleted and references removed');
     }
     
     return deleted;

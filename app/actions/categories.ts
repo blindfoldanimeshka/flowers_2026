@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
 import Category from '@/models/Category';
 import { getCachedCategories, invalidateCategoriesCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Создание новой категории
 export async function createCategory(formData: FormData) {
@@ -40,7 +41,7 @@ export async function createCategory(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании категории:', error);
+    productionLogger.error('Ошибка при создании категории:', error);
     
     if (error.code === 11000) {
       return {
@@ -112,7 +113,7 @@ export async function updateCategory(id: string, formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при обновлении категории:', error);
+    productionLogger.error('Ошибка при обновлении категории:', error);
     
     if (error.code === 11000) {
       return {
@@ -163,7 +164,7 @@ export async function deleteCategory(id: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при удалении категории:', error);
+    productionLogger.error('Ошибка при удалении категории:', error);
     return {
       success: false,
       error: 'Ошибка при удалении категории'
@@ -183,7 +184,7 @@ export async function getCategories() {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении категорий:', error);
+    productionLogger.error('Ошибка при получении категорий:', error);
     return {
       success: false,
       error: 'Ошибка при получении категорий'
@@ -204,7 +205,7 @@ export async function getActiveCategories() {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении активных категорий:', error);
+    productionLogger.error('Ошибка при получении активных категорий:', error);
     return {
       success: false,
       error: 'Ошибка при получении категорий'

@@ -1,5 +1,6 @@
 // @ts-ignore
 import TelegramBot from 'node-telegram-bot-api';
+import { productionLogger } from '@/lib/productionLogger';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
@@ -34,12 +35,12 @@ export async function sendOrderNotification(
   order: OrderNotification
 ): Promise<void> {
   if (!bot || !TELEGRAM_BOT_TOKEN) {
-    console.warn('Telegram bot не настроен. Пропускаем отправку уведомления.');
+    productionLogger.warn('Telegram bot не настроен. Пропускаем отправку уведомления.');
     return;
   }
 
   if (!telegramId) {
-    console.warn('Telegram ID не указан. Пропускаем отправку уведомления.');
+    productionLogger.warn('Telegram ID не указан. Пропускаем отправку уведомления.');
     return;
   }
 
@@ -77,13 +78,13 @@ ${itemsList}
           caption: `Фото товара: ${order.items[0].name}`
         });
       } catch (photoError) {
-        console.error('Ошибка отправки фото в Telegram:', photoError);
+        productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
       }
     }
 
-    console.log(`Уведомление о заказе #${order.orderNumber} отправлено в Telegram`);
+    productionLogger.info(`Уведомление о заказе #${order.orderNumber} отправлено в Telegram`);
   } catch (error) {
-    console.error('Ошибка отправки уведомления в Telegram:', error);
+    productionLogger.error('Ошибка отправки уведомления в Telegram:', error);
     throw error;
   }
 }
@@ -101,7 +102,7 @@ export async function verifyTelegramAccess(telegramId: string): Promise<boolean>
     await bot.sendMessage(telegramId, 'Доступ к боту подтвержден ✅');
     return true;
   } catch (error) {
-    console.error('Ошибка проверки доступа к Telegram:', error);
+    productionLogger.error('Ошибка проверки доступа к Telegram:', error);
     return false;
   }
 }

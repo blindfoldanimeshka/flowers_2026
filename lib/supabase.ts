@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { productionLogger } from '@/lib/productionLogger';
 
 function readEnv(...keys: string[]) {
   for (const key of keys) {
@@ -18,18 +19,18 @@ export const supabaseKey = readEnv(
 );
 
 if (!supabaseUrl) {
-  console.warn('SUPABASE_URL is not configured');
+  productionLogger.warn('SUPABASE_URL is not configured');
 }
 
 if (!supabaseKey) {
-  console.warn('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is not configured');
+  productionLogger.warn('SUPABASE_SERVICE_ROLE_KEY or SUPABASE_ANON_KEY is not configured');
 }
 
 export const SUPABASE_COLLECTION_TABLE = process.env.SUPABASE_COLLECTION_TABLE || 'documents';
 
-const SUPABASE_FETCH_TIMEOUT_MS = 25000;
-const SUPABASE_FETCH_RETRIES = 2;
-const RETRY_DELAY_MS = 350;
+const SUPABASE_FETCH_TIMEOUT_MS = 45000;
+const SUPABASE_FETCH_RETRIES = 3;
+const RETRY_DELAY_MS = 500;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

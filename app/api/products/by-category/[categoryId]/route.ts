@@ -4,12 +4,13 @@ import connect from '@/lib/db';
 import Product from '@/models/Product';
 import Category from '@/models/Category';
 import { isValidId } from '@/lib/id';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 type RouteContext = { params: Promise<{ categoryId: string }> };
 
 // GET запрос для получения товаров по ID категории
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest, { params }: RouteContext) => {
     await connect();
     
     const { categoryId } = await params;
@@ -53,16 +54,5 @@ export async function GET(request: NextRequest, { params }: RouteContext) {
       },
       count: products.length
     }, { status: 200 });
-  } catch (error: unknown) {
-    console.error('Ошибка при получении товаров категории:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    return NextResponse.json(
-      { 
-        success: false,
-        error: 'Ошибка при получении товаров категории', 
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});

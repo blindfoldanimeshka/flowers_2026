@@ -5,12 +5,13 @@ import Subcategory from '@/models/Subcategory';
 import { revalidatePath } from 'next/cache';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 import { isValidId } from '@/lib/id';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(
+export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string, subcategoryId: string }> }
-) {
-  try {
+) => {
     await connect();
 
     const { id, subcategoryId } = await params;
@@ -32,25 +33,13 @@ export async function GET(
     }
 
     return NextResponse.json(subcategory, { status: 200 });
-  } catch (error: unknown) {
-    console.error(`Ошибка при получении подкатегории с ID unknown:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при получении подкатегории',
-        details: errorMessage
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function PUT(
+export const PUT = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string, subcategoryId: string }> }
-) {
-  try {
+) => {
     await connect();
 
     const { id, subcategoryId } = await params;
@@ -80,54 +69,17 @@ export async function PUT(
     revalidatePath('/admin/categories');
 
     return NextResponse.json(subcategory, { status: 200 });
-  } catch (error: unknown) {
-    console.error(`Ошибка при обновлении подкатегории с ID unknown:`, error);
+  
+});
 
-    if (error instanceof Error) {
-      if ('name' in error && error.name === 'ValidationError' && 'errors' in error) {
-        const validationErrors = Object.values(error.errors as Record<string, { message: string }>).map(
-          (err) => err.message
-        );
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Ошибка валидации',
-            details: validationErrors
-          },
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Ошибка при обновлении подкатегории',
-          details: error.message
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при обновлении подкатегории',
-        details: 'Неизвестная ошибка'
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string, subcategoryId: string }> }
-) {
-  try {
+) => {
     await connect();
 
     const { id, subcategoryId } = await params;
-    console.log('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
+    productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
 
     if (!isValidId(id) || !isValidId(subcategoryId)) {
       return NextResponse.json(
@@ -138,7 +90,7 @@ export async function DELETE(
 
     const category = await Category.findById(id);
     if (!category) {
-      console.log('[CATEGORY SUBCATEGORY DELETE] Category not found:', id);
+      productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Category not found:', id);
       return NextResponse.json(
         { success: false, error: 'Категория не найдена' },
         { status: 404 }
@@ -147,7 +99,7 @@ export async function DELETE(
 
     const subcategory = await Subcategory.findOne({ _id: subcategoryId, categoryId: id });
     if (!subcategory) {
-      console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory not found in category:', subcategoryId);
+      productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Subcategory not found in category:', subcategoryId);
       return NextResponse.json(
         { success: false, error: 'Подкатегория не найдена' },
         { status: 404 }
@@ -160,7 +112,7 @@ export async function DELETE(
       { $pull: { subcategories: subcategoryId } }
     );
 
-    console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory deleted successfully');
+    productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Subcategory deleted successfully');
 
     revalidatePath('/admin/categories');
     invalidateCategoriesCache();
@@ -177,18 +129,6 @@ export async function DELETE(
       },
       { status: 200 }
     );
-  } catch (error: unknown) {
-    console.error(`[CATEGORY SUBCATEGORY DELETE] Error deleting subcategory unknown:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при удалении подкатегории',
-        details: errorMessage
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 

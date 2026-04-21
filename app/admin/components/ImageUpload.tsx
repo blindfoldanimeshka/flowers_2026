@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
 import { withCsrfHeaders } from '@/lib/csrf-client';
+import { productionLogger } from '@/lib/productionLogger';
 
 interface MediaLibraryItem {
   url: string;
@@ -163,7 +164,7 @@ export default function ImageUpload({
     try {
       optimizedFile = await optimizeImageForUpload(file);
     } catch (optimizeError) {
-      console.warn('Image optimization failed, fallback to original file', optimizeError);
+      productionLogger.warn('Image optimization failed, fallback to original file', optimizeError);
       optimizedFile = file;
     }
 
@@ -216,7 +217,7 @@ export default function ImageUpload({
       if (onUploadEnd) onUploadEnd(true);
 
     } catch (err: any) {
-      console.error('Upload error:', err);
+      productionLogger.error('Upload error:', err);
       setError(err.message || 'Ошибка загрузки');
       if (onUploadEnd) onUploadEnd(false);
     } finally {
@@ -344,7 +345,7 @@ export default function ImageUpload({
               height={128}
               className="h-24 w-24 rounded-lg border object-cover shadow-sm sm:h-32 sm:w-32"
               onError={() => {
-                console.error('Image failed to load:', preview || value);
+                productionLogger.error('Image failed to load:', preview || value);
                 setError('Не удалось загрузить изображение');
               }}
               onLoad={() => {

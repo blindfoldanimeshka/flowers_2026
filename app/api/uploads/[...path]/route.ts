@@ -2,17 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
 import { join, normalize } from 'path';
 import { existsSync } from 'fs';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // Функция для определения директории загрузки
 function resolveUploadDir(): string {
   return process.env.UPLOAD_DIR || join(process.cwd(), 'public/uploads');
 }
 
-export async function GET(
+export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
-) {
-  try {
+) => {
     const resolvedParams = await params;
     const parts = resolvedParams.path || [];
     const filePath = parts.join('/');
@@ -74,8 +75,5 @@ export async function GET(
       },
     });
 
-  } catch (error) {
-    console.error('Error serving file:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
-  }
-} 
+  
+}); 

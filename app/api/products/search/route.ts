@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
 import { escapeRegExp, safeSearchTerm } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
 
     const searchParams = request.nextUrl.searchParams;
@@ -27,14 +28,5 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json({ products }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при поиске товаров:', error);
-    return NextResponse.json(
-      {
-        error: 'Ошибка при поиске товаров',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});

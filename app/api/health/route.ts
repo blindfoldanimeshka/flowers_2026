@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(_request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (_request: NextRequest) => {
     const startTime = Date.now();
     
     // Проверяем подключение к базе данных
@@ -24,22 +25,5 @@ export async function GET(_request: NextRequest) {
     };
 
     return NextResponse.json(healthStatus, { status: 200 });
-  } catch (error) {
-    console.error('Health check failed:', error);
-    
-    const errorStatus = {
-      status: 'unhealthy',
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      environment: process.env.NODE_ENV,
-      version: process.env.npm_package_version || '1.0.0',
-      error: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : String(error)) : 'Service unavailable',
-      services: {
-        database: 'disconnected',
-        api: 'running'
-      }
-    };
-
-    return NextResponse.json(errorStatus, { status: 503 });
-  }
-}
+  
+});

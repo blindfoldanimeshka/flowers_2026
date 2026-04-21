@@ -4,6 +4,8 @@ import connect from '@/lib/db';
 import Product from '@/models/Product';
 import { isValidId } from '@/lib/id';
 import { sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -22,8 +24,7 @@ function normalizeProductImages(input: unknown): { image?: string; images?: stri
 }
 
 // GET product by id
-export async function GET(_request: NextRequest, { params }: RouteContext) {
-  try {
+export const GET = withErrorHandler(async (_request: NextRequest, { params }: RouteContext) => {
     await connect();
 
     const { id } = await params;
@@ -37,15 +38,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
     }
 
     return NextResponse.json({ product }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при получении товара:', error);
-    return NextResponse.json({ error: 'Ошибка при получении товара', details: error?.message }, { status: 500 });
-  }
-}
+  
+});
 
 // PUT product by id
-export async function PUT(request: NextRequest, { params }: RouteContext) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest, { params }: RouteContext) => {
     await connect();
 
     const { id } = await params;
@@ -95,21 +92,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     revalidatePath('/category', 'layout');
 
     return NextResponse.json({ product: updatedProduct }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при обновлении товара:', error);
-
-    if (error?.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors || {}).map((err: any) => err?.message).filter(Boolean);
-      return NextResponse.json({ error: 'Ошибка валидации', details: validationErrors }, { status: 400 });
-    }
-
-    return NextResponse.json({ error: 'Ошибка при обновлении товара', details: error?.message }, { status: 500 });
-  }
-}
+  
+});
 
 // DELETE product by id
-export async function DELETE(_request: NextRequest, { params }: RouteContext) {
-  try {
+export const DELETE = withErrorHandler(async (_request: NextRequest, { params }: RouteContext) => {
     await connect();
 
     const { id } = await params;
@@ -126,8 +113,5 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
     revalidatePath('/category', 'layout');
 
     return NextResponse.json({ message: 'Товар успешно удален' }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при удалении товара:', error);
-    return NextResponse.json({ error: 'Ошибка при удалении товара', details: error?.message }, { status: 500 });
-  }
-}
+  
+});

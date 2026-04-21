@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import PaymentSettings from '@/models/PaymentSettings';
 import { sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 function buildPaymentSettingsUpdate(body: Record<string, any>) {
   const update: Record<string, any> = {};
@@ -45,8 +47,7 @@ function buildPaymentSettingsUpdate(body: Record<string, any>) {
   return update;
 }
 
-export async function GET(_request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (_request: NextRequest) => {
     await dbConnect();
 
     const settings = await PaymentSettings.getSettings();
@@ -71,20 +72,10 @@ export async function GET(_request: NextRequest) {
     };
 
     return NextResponse.json({ settings: publicSettings }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при получении настроек платежей:', error);
-    return NextResponse.json(
-      {
-        error: 'Ошибка при получении настроек платежей',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     const userRole = request.headers.get('x-user-role');
     if (userRole !== 'admin') {
       return NextResponse.json({ error: 'Доступ запрещен - требуется роль администратора' }, { status: 403 });
@@ -102,20 +93,5 @@ export async function PUT(request: NextRequest) {
     const updatedSettings = await PaymentSettings.findByIdAndUpdate(settings._id, { $set: updateData }, { new: true, runValidators: true });
 
     return NextResponse.json({ settings: updatedSettings }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при обновлении настроек платежей:', error);
-
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: 'Ошибка валидации', details: validationErrors }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      {
-        error: 'Ошибка при обновлении настроек платежей',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-      { status: 500 }
-    );
-  }
-}
+  
+});

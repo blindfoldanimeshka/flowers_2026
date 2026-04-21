@@ -4,9 +4,10 @@ import { verifyToken } from '@/lib/auth';
 import dbConnect from '@/lib/db';
 import User from '@/models/User';
 import { sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const token = request.cookies.get('auth_token')?.value;
 
     if (!token) {
@@ -31,20 +32,15 @@ export async function GET(request: NextRequest) {
         email: user.email,
         role: user.role,
         telegram_id: user.telegram_id || '',
+        telegram_id2: user.telegram_id2 || '',
+        telegram_id3: user.telegram_id3 || '',
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('Profile GET error:', error);
-    return NextResponse.json(
-      { error: 'Ошибка сервера', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
-export async function PUT(request: NextRequest) {
-  try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     const token = request.cookies.get('auth_token')?.value;
 
     if (!token) {
@@ -62,6 +58,12 @@ export async function PUT(request: NextRequest) {
     const updateData: Record<string, unknown> = {};
     if (typeof body.telegram_id === 'string') {
       updateData.telegram_id = body.telegram_id.trim();
+    }
+    if (typeof body.telegram_id2 === 'string') {
+      updateData.telegram_id2 = body.telegram_id2.trim();
+    }
+    if (typeof body.telegram_id3 === 'string') {
+      updateData.telegram_id3 = body.telegram_id3.trim();
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -82,14 +84,10 @@ export async function PUT(request: NextRequest) {
       {
         message: 'Профиль обновлен',
         telegram_id: updatedUser.telegram_id || '',
+        telegram_id2: updatedUser.telegram_id2 || '',
+        telegram_id3: updatedUser.telegram_id3 || '',
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('Profile PUT error:', error);
-    return NextResponse.json(
-      { error: 'Ошибка сервера', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic';
 import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
 import PaymentSettings, { IPaymentSettings } from '@/models/PaymentSettings';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Type guard для безопасной обработки ошибок
 function isError(error: unknown): error is Error {
@@ -66,7 +67,7 @@ export async function getPaymentSettings() {
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при получении настроек платежей:', errorMessage);
+    productionLogger.error('Ошибка при получении настроек платежей:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении настроек платежей'
@@ -187,7 +188,7 @@ export async function updatePaymentSettings(formData: FormData) {
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при обновлении настроек платежей:', errorMessage);
+    productionLogger.error('Ошибка при обновлении настроек платежей:', errorMessage);
     
     if (isError(error) && error.name === 'ValidationError') {
       const validationErrors = Object.values((error as any).errors).map(
@@ -288,7 +289,7 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при получении способов оплаты:', errorMessage);
+    productionLogger.error('Ошибка при получении способов оплаты:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении способов оплаты'
@@ -340,7 +341,7 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
 
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при обработке платежа:', errorMessage);
+    productionLogger.error('Ошибка при обработке платежа:', errorMessage);
     
     // Проверяем, является ли ошибка timeout
     if (isError(error) && error.name === 'AbortError') {

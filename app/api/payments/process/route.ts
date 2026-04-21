@@ -3,10 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import PaymentSettings from '@/models/PaymentSettings';
 import Order from '@/models/Order';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // POST запрос для обработки платежа
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await dbConnect();
     
     const body = await request.json();
@@ -89,14 +90,8 @@ export async function POST(request: NextRequest) {
       message: paymentResult.message
     }, { status: 200 });
     
-  } catch (error: any) {
-    console.error('Ошибка при обработке платежа:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при обработке платежа', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
 // Заглушка для Stripe
 async function processStripePayment(order: any, paymentData: any, settings: any) {

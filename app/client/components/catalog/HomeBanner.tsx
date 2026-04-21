@@ -104,20 +104,20 @@ export default function HomeBanner() {
               />
             </motion.div>
           </AnimatePresence>
-          <div className="absolute inset-0 bg-gradient-to-r from-[#ffffff]/92 via-[#ffffff]/72 to-[#fff3d4]/60" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#ffffff]/70 via-[#ffffff]/40 to-transparent" />
         </div>
 
-        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/35 blur-2xl" />
-        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-[#fff3d4]/70 blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/25 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-20 left-1/3 h-56 w-56 rounded-full bg-[#fff3d4]/50 blur-3xl" />
 
         <div className="relative z-10 max-w-3xl">
-          <p className="inline-flex rounded-full bg-white/55 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8c3f56]">
+          <p className="inline-flex rounded-full bg-white/45 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#8c3f56]">
             FloraMix Collection
           </p>
-          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-[#2f1b26] [text-shadow:0_1px_0_rgba(255,255,255,0.55)] sm:text-4xl md:text-[clamp(2.2rem,4.8vw,3rem)] xl:text-5xl">
+          <h1 className="mt-4 text-3xl font-extrabold leading-tight text-[#2f1b26] [text-shadow:0_1px_0_rgba(255,255,255,0.4)] sm:text-4xl md:text-[clamp(2.2rem,4.8vw,3rem)] xl:text-5xl">
             Цветы для любого повода
           </h1>
-          <p className="mt-3 inline-block max-w-2xl rounded-xl bg-white/52 px-3 py-2 text-sm font-medium leading-relaxed text-[#4f3641] backdrop-blur-[2px] sm:text-base">
+          <p className="mt-3 inline-block max-w-2xl rounded-xl bg-white/42 px-3 py-2 text-sm font-medium leading-relaxed text-[#4f3641] backdrop-blur-[2px] sm:text-base">
             Свежие букеты, композиции и подарочные наборы с быстрой доставкой в день заказа.
           </p>
         </div>

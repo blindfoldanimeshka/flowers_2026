@@ -1,4 +1,4 @@
-export const dynamic = 'force-dynamic';
+﻿export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Subcategory from '@/models/Subcategory';
@@ -7,10 +7,11 @@ import Category from '@/models/Category';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 import { isValidId } from '@/lib/id';
 import { escapeRegExp, sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // GET all subcategories
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
 
     const { searchParams } = new URL(request.url);
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
       const subcategory = await Subcategory.findOne(query).lean();
       if (!subcategory) {
         return NextResponse.json(
-          { success: false, error: 'Подкатегория не найдена' },
+          { success: false, error: 'РџРѕРґРєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' },
           { status: 404 }
         );
       }
@@ -42,36 +43,28 @@ export async function GET(request: NextRequest) {
 
     const subcategories = await Subcategory.find(query).lean();
     return NextResponse.json({ success: true, data: subcategories });
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    console.error('[SUBCATEGORY API GET] Error:', errorMessage);
-    return NextResponse.json(
-      { success: false, error: 'Ошибка при получении подкатегорий', details: errorMessage },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
 // POST a new subcategory
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await connect();
     
     const body = sanitizeMongoObject(await request.json());
     const { name, categoryId, description, image, isActive } = body;
     
-    console.log('[SUBCATEGORY API] Creating subcategory:', { name, categoryId });
+    productionLogger.info('[SUBCATEGORY API] Creating subcategory:', { name, categoryId });
     
     if (!name || !categoryId) {
       return NextResponse.json(
-        { success: false, error: 'Название и ID категории обязательны' },
+        { success: false, error: 'РќР°Р·РІР°РЅРёРµ Рё ID РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»СЊРЅС‹' },
         { status: 400 }
       );
     }
     
     if (!isValidId(categoryId)) {
       return NextResponse.json(
-        { success: false, error: 'Неверный формат ID категории' },
+        { success: false, error: 'РќРµРІРµСЂРЅС‹Р№ С„РѕСЂРјР°С‚ ID РєР°С‚РµРіРѕСЂРёРё' },
         { status: 400 }
       );
     }
@@ -79,12 +72,12 @@ export async function POST(request: NextRequest) {
     const category = await Category.findById(categoryId);
     if (!category) {
       return NextResponse.json(
-        { success: false, error: 'Указанная категория не найдена' },
+        { success: false, error: 'РЈРєР°Р·Р°РЅРЅР°СЏ РєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' },
         { status: 404 }
       );
     }
     
-    console.log('[SUBCATEGORY API] Found category:', { 
+    productionLogger.info('[SUBCATEGORY API] Found category:', { 
       _id: String(category._id),
       id: category.id,
       name: category.name, 
@@ -98,7 +91,7 @@ export async function POST(request: NextRequest) {
     
     if (existingSubcategory) {
       return NextResponse.json(
-        { success: false, error: 'Подкатегория с таким названием уже существует в этой категории' },
+        { success: false, error: 'РџРѕРґРєР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РІ СЌС‚РѕР№ РєР°С‚РµРіРѕСЂРёРё' },
         { status: 409 }
       );
     }
@@ -110,7 +103,7 @@ export async function POST(request: NextRequest) {
     }
     
     try {
-      // Создаем объект подкатегории
+      // РЎРѕР·РґР°РµРј РѕР±СЉРµРєС‚ РїРѕРґРєР°С‚РµРіРѕСЂРёРё
       const subcategoryData = {
         name: name.trim(),
         slug,
@@ -121,32 +114,31 @@ export async function POST(request: NextRequest) {
         isActive: isActive !== undefined ? isActive : true
       };
       
-      console.log('[SUBCATEGORY API] Creating subcategory with data:', subcategoryData);
+      productionLogger.info('[SUBCATEGORY API] Creating subcategory with data:', subcategoryData);
       
-      // Создаем новую подкатегорию
+      // РЎРѕР·РґР°РµРј РЅРѕРІСѓСЋ РїРѕРґРєР°С‚РµРіРѕСЂРёСЋ
       const newSubcategory = new Subcategory(subcategoryData);
       
-      // Проверяем валидность модели
+      // РџСЂРѕРІРµСЂСЏРµРј РІР°Р»РёРґРЅРѕСЃС‚СЊ РјРѕРґРµР»Рё
       const validationError = newSubcategory.validateSync();
       if (validationError) {
-        console.error('[SUBCATEGORY API] Validation error:', validationError);
         return NextResponse.json(
-          { success: false, error: 'Ошибка валидации данных', details: validationError.message },
+          { success: false, error: 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РґР°РЅРЅС‹С…', details: validationError.message },
           { status: 400 }
         );
       }
       
-      // Сохраняем подкатегорию
+      // РЎРѕС…СЂР°РЅСЏРµРј РїРѕРґРєР°С‚РµРіРѕСЂРёСЋ
       const savedSubcategory = await newSubcategory.save();
-      console.log('[SUBCATEGORY API] Saved new subcategory:', {
+      productionLogger.info('[SUBCATEGORY API] Saved new subcategory:', {
         _id: savedSubcategory._id.toString(),
         name: savedSubcategory.name,
         categoryId: savedSubcategory.categoryId.toString(),
         categoryNumId: savedSubcategory.categoryNumId
       });
       
-      // Обновляем категорию, используя $addToSet для добавления ID подкатегории
-      console.log('[SUBCATEGORY API] Updating category with subcategory ID:', savedSubcategory._id.toString());
+      // РћР±РЅРѕРІР»СЏРµРј РєР°С‚РµРіРѕСЂРёСЋ, РёСЃРїРѕР»СЊР·СѓСЏ $addToSet РґР»СЏ РґРѕР±Р°РІР»РµРЅРёСЏ ID РїРѕРґРєР°С‚РµРіРѕСЂРёРё
+      productionLogger.info('[SUBCATEGORY API] Updating category with subcategory ID:', savedSubcategory._id.toString());
       
       const updateResult = await Category.findByIdAndUpdate(
         categoryId,
@@ -154,82 +146,73 @@ export async function POST(request: NextRequest) {
         { new: true }
       );
       
-      console.log('[SUBCATEGORY API] Category update result:', {
+      productionLogger.info('[SUBCATEGORY API] Category update result:', {
         modifiedCount: updateResult ? 1 : 0,
         subcategories: updateResult ? updateResult.subcategories.map(id => id.toString()) : 'failed'
       });
       
       if (!updateResult) {
-        console.error('[SUBCATEGORY API] ❌ Failed to update category!');
+        productionLogger.warn('[SUBCATEGORY API] Failed to update category after subcategory save', {
+          categoryId,
+          subcategoryId: savedSubcategory._id?.toString?.(),
+        });
         return NextResponse.json(
-          { success: false, error: 'Не удалось обновить категорию' },
+          { success: false, error: 'РќРµ СѓРґР°Р»РѕСЃСЊ РѕР±РЅРѕРІРёС‚СЊ РєР°С‚РµРіРѕСЂРёСЋ' },
           { status: 500 }
         );
       }
       
-      console.log('[SUBCATEGORY API] ✅ SUCCESS: Category updated successfully with subcategory');
+      productionLogger.info('[SUBCATEGORY API] вњ… SUCCESS: Category updated successfully with subcategory');
       
-      // Оптимизированная инвалидация кэша - только то что нужно
+      // РћРїС‚РёРјРёР·РёСЂРѕРІР°РЅРЅР°СЏ РёРЅРІР°Р»РёРґР°С†РёСЏ РєСЌС€Р° - С‚РѕР»СЊРєРѕ С‚Рѕ С‡С‚Рѕ РЅСѓР¶РЅРѕ
       try {
-        console.log('[SUBCATEGORY API] Invalidating cache...');
+        productionLogger.info('[SUBCATEGORY API] Invalidating cache...');
         
-        // Инвалидируем только кэш категорий (подкатегории включены в категории)
+        // РРЅРІР°Р»РёРґРёСЂСѓРµРј С‚РѕР»СЊРєРѕ РєСЌС€ РєР°С‚РµРіРѕСЂРёР№ (РїРѕРґРєР°С‚РµРіРѕСЂРёРё РІРєР»СЋС‡РµРЅС‹ РІ РєР°С‚РµРіРѕСЂРёРё)
         invalidateCategoriesCache();
-        console.log('[SUBCATEGORY API] Categories cache invalidated');
+        productionLogger.info('[SUBCATEGORY API] Categories cache invalidated');
         
-        // Инвалидируем кэш подкатегорий отдельно для других endpoint'ов
+        // РРЅРІР°Р»РёРґРёСЂСѓРµРј РєСЌС€ РїРѕРґРєР°С‚РµРіРѕСЂРёР№ РѕС‚РґРµР»СЊРЅРѕ РґР»СЏ РґСЂСѓРіРёС… endpoint'РѕРІ
         invalidateSubcategoriesCache();
-        console.log('[SUBCATEGORY API] Subcategories cache invalidated');
+        productionLogger.info('[SUBCATEGORY API] Subcategories cache invalidated');
         
-        // Перезагружаем только необходимые пути
+        // РџРµСЂРµР·Р°РіСЂСѓР¶Р°РµРј С‚РѕР»СЊРєРѕ РЅРµРѕР±С…РѕРґРёРјС‹Рµ РїСѓС‚Рё
         const { revalidatePath } = await import('next/cache');
         revalidatePath('/admin/categories');
         revalidatePath(`/category/${category.slug}`);
-        console.log('[SUBCATEGORY API] Essential paths revalidated');
+        productionLogger.info('[SUBCATEGORY API] Essential paths revalidated');
       } catch (cacheError) {
-        console.error('[SUBCATEGORY API] Error invalidating cache:', cacheError);
-        // Не прерываем выполнение из-за ошибки кэша
+        productionLogger.warn('[SUBCATEGORY API] Error invalidating cache', { cacheError });
+        // РќРµ РїСЂРµСЂС‹РІР°РµРј РІС‹РїРѕР»РЅРµРЅРёРµ РёР·-Р·Р° РѕС€РёР±РєРё РєСЌС€Р°
       }
       
-      console.log('[SUBCATEGORY API] Subcategory created successfully', savedSubcategory);
+      productionLogger.info('[SUBCATEGORY API] Subcategory created successfully', savedSubcategory);
       
       return NextResponse.json({ success: true, data: savedSubcategory }, { status: 201 });
     } catch (error) {
-      console.error('[SUBCATEGORY API] Error during subcategory creation:');
       if (error instanceof Error) {
-        console.error('Name:', error.name);
-        console.error('Message:', error.message);
-        console.error('Stack:', error.stack);
         
-        // Проверяем, является ли ошибка ошибкой валидации MongoDB
+        // РџСЂРѕРІРµСЂСЏРµРј, СЏРІР»СЏРµС‚СЃСЏ Р»Рё РѕС€РёР±РєР° РѕС€РёР±РєРѕР№ РІР°Р»РёРґР°С†РёРё MongoDB
         if (error.name === 'ValidationError') {
           const validationErrors = Object.values((error as any).errors || {}).map(
-            (err: any) => err.message || 'Ошибка валидации'
+            (err: any) => err.message || 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё'
           );
           return NextResponse.json(
-            { success: false, error: 'Ошибка валидации данных', details: validationErrors.join(', ') },
+            { success: false, error: 'РћС€РёР±РєР° РІР°Р»РёРґР°С†РёРё РґР°РЅРЅС‹С…', details: validationErrors.join(', ') },
             { status: 400 }
           );
         }
         
-        // Проверяем, является ли ошибка ошибкой дублирования
+        // РџСЂРѕРІРµСЂСЏРµРј, СЏРІР»СЏРµС‚СЃСЏ Р»Рё РѕС€РёР±РєР° РѕС€РёР±РєРѕР№ РґСѓР±Р»РёСЂРѕРІР°РЅРёСЏ
         if ((error as any).code === 11000) {
           return NextResponse.json(
-            { success: false, error: 'Дублирование уникального поля', details: error.message },
+            { success: false, error: 'Р”СѓР±Р»РёСЂРѕРІР°РЅРёРµ СѓРЅРёРєР°Р»СЊРЅРѕРіРѕ РїРѕР»СЏ', details: error.message },
             { status: 409 }
           );
         }
       }
       throw error;
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    console.error('[SUBCATEGORY API] Error:', errorMessage);
-    console.error('[SUBCATEGORY API] Stack:', error instanceof Error ? error.stack : '');
-    
-    return NextResponse.json(
-      { success: false, error: 'Ошибка при создании подкатегории', details: errorMessage },
-      { status: 500 }
-    );
-  }
-}
+  
+});
+

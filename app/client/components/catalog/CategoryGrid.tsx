@@ -79,7 +79,7 @@ export default function CategoryGrid() {
           >
             <Link href={`/category/${category.slug}`} className="group block h-full">
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
-                <div className="absolute inset-0 opacity-80 group-hover:opacity-95 transition-opacity duration-300">
+                <div className="absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity duration-300">
                   <Image
                     src={
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
@@ -91,10 +91,10 @@ export default function CategoryGrid() {
                     fill
                     sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, (max-width: 1279px) 25vw, 33vw"
                     priority={index < 4}
-                    className="object-cover opacity-45 group-hover:scale-105 transition-transform duration-500"
+                    className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/20 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/15 to-transparent" />
 
                 <div className="relative h-full flex flex-col justify-between p-4 sm:p-5">
                   <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight pr-4">{category.name}</h3>

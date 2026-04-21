@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
 import Subcategory from '@/models/Subcategory';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  try {
+export const GET = withErrorHandler(async () => {
     await connect();
 
     // Загружаем все подкатегории один раз
@@ -25,10 +26,7 @@ export async function GET() {
     }));
 
     return NextResponse.json(productsWithSubcategory);
-  } catch (error: any) {
-    console.error('Ошибка при получении избранных товаров:', error);
-    return NextResponse.json({ error: 'Failed to fetch featured products' }, { status: 500 });
-  }
-}
+  
+});
 
 // Этот маршрут может использовать только GET 

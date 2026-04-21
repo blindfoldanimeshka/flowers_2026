@@ -5,9 +5,13 @@ import Settings from '@/models/Settings';
 import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
 import { invalidateSettingsCache } from '@/lib/cache';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 const SETTINGS_KEY = 'global-settings';
 const MAX_LIBRARY_ITEMS = 400;
+const MEDIA_CACHE_TTL = 60000; // 1 минута
+
+let mediaCache: { items: any[]; timestamp: number } | null = null;
 
 function collectProductImageUrls(p: { image?: string; images?: string[] }): string[] {
   const urls: string[] = [];
@@ -49,57 +53,81 @@ function collectSettingsImageUrls(s: Record<string, unknown> | null | undefined)
 }
 
 /** Объединённые URL: явная медиатека + картинки товаров + оформление главной */
-export async function GET(request: NextRequest) {
+export const GET = withErrorHandler(async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.success) {
     return NextResponse.json({ error: 'Требуется авторизация администратора' }, { status: 401 });
   }
 
-  await dbConnect();
-  const settingsDoc = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
-  const settings = (settingsDoc || {}) as Record<string, unknown>;
-
-  const products = await Product.find({}).select('image images').limit(800).lean();
-
-  const map = new Map<string, { url: string; inLibrary: boolean; createdAt?: string }>();
-
-  if (Array.isArray(settings.mediaLibrary)) {
-    for (const item of settings.mediaLibrary) {
-      if (!item || typeof item !== 'object' || !('url' in item)) continue;
-      const url = typeof (item as { url: unknown }).url === 'string' ? (item as { url: string }).url.trim() : '';
-      if (!url) continue;
-      const createdAt =
-        'createdAt' in item && typeof (item as { createdAt?: string }).createdAt === 'string'
-          ? (item as { createdAt: string }).createdAt
-          : undefined;
-      map.set(url, { url, inLibrary: true, createdAt });
-    }
+  const now = Date.now();
+  if (mediaCache && now - mediaCache.timestamp < MEDIA_CACHE_TTL) {
+    return NextResponse.json({ items: mediaCache.items });
   }
 
-  for (const p of products) {
-    for (const u of collectProductImageUrls(p)) {
-      if (!map.has(u)) {
-        map.set(u, { url: u, inLibrary: false });
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Media library timeout')), 15000)
+    );
+
+    const dataPromise = (async () => {
+      await dbConnect();
+      const settingsDoc = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
+      const settings = (settingsDoc || {}) as Record<string, unknown>;
+
+      const products = await Product.find({}).select('image images').limit(200).lean();
+
+      const map = new Map<string, { url: string; inLibrary: boolean; createdAt?: string }>();
+
+      if (Array.isArray(settings.mediaLibrary)) {
+        for (const item of settings.mediaLibrary) {
+          if (!item || typeof item !== 'object' || !('url' in item)) continue;
+          const url = typeof (item as { url: unknown }).url === 'string' ? (item as { url: string }).url.trim() : '';
+          if (!url) continue;
+          const createdAt =
+            'createdAt' in item && typeof (item as { createdAt?: string }).createdAt === 'string'
+              ? (item as { createdAt: string }).createdAt
+              : undefined;
+          map.set(url, { url, inLibrary: true, createdAt });
+        }
       }
+
+      for (const p of products) {
+        for (const u of collectProductImageUrls(p)) {
+          if (!map.has(u)) {
+            map.set(u, { url: u, inLibrary: false });
+          }
+        }
+      }
+
+      for (const u of collectSettingsImageUrls(settings)) {
+        if (!map.has(u)) {
+          map.set(u, { url: u, inLibrary: false });
+        }
+      }
+
+      const items = Array.from(map.values()).sort((a, b) => {
+        if (a.inLibrary !== b.inLibrary) return a.inLibrary ? -1 : 1;
+        if (a.createdAt && b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+        return 0;
+      });
+
+      return items;
+    })();
+
+    const items = await Promise.race([dataPromise, timeoutPromise]);
+
+    mediaCache = { items, timestamp: now };
+    return NextResponse.json({ items });
+  } catch (error: any) {
+    if (mediaCache) {
+      return NextResponse.json({ items: mediaCache.items });
     }
+
+    return NextResponse.json({ error: 'Ошибка загрузки медиатеки', items: [] }, { status: 500 });
   }
+});
 
-  for (const u of collectSettingsImageUrls(settings)) {
-    if (!map.has(u)) {
-      map.set(u, { url: u, inLibrary: false });
-    }
-  }
-
-  const items = Array.from(map.values()).sort((a, b) => {
-    if (a.inLibrary !== b.inLibrary) return a.inLibrary ? -1 : 1;
-    if (a.createdAt && b.createdAt) return b.createdAt.localeCompare(a.createdAt);
-    return 0;
-  });
-
-  return NextResponse.json({ items });
-}
-
-export async function POST(request: NextRequest) {
+export const POST = withErrorHandler(async (request: NextRequest) => {
   const auth = await requireAdmin(request);
   if (!auth.success) {
     return NextResponse.json({ error: 'Требуется авторизация администратора' }, { status: 401 });
@@ -136,5 +164,6 @@ export async function POST(request: NextRequest) {
   }
 
   invalidateSettingsCache();
+  mediaCache = null;
   return NextResponse.json({ ok: true, entry });
-}
+});

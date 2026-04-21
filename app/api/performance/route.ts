@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { performanceMonitor } from '@/lib/performance';
 import { requireAdmin } from '@/lib/auth';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 // GET - получение метрик производительности
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     // Проверяем права администратора
     const authResult = await requireAdmin(request);
     if (!authResult.success) {
@@ -32,18 +33,11 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-  } catch (error: any) {
-    console.error('Ошибка при получении метрик производительности:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении метрик' },
-      { status: 500 }
-    );
-  }
-}
+  
+});
 
 // DELETE - очистка метрик
-export async function DELETE(request: NextRequest) {
-  try {
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
     // Проверяем права администратора
     const authResult = await requireAdmin(request);
     if (!authResult.success) {
@@ -61,11 +55,5 @@ export async function DELETE(request: NextRequest) {
       message: 'Метрики очищены'
     });
 
-  } catch (error: any) {
-    console.error('Ошибка при очистке метрик:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при очистке метрик' },
-      { status: 500 }
-    );
-  }
-} 
+  
+}); 

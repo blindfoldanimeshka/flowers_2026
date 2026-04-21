@@ -1,8 +1,9 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { isTrustedOriginRequest, isValidCsrfRequest, clearCsrfCookie } from '@/lib/csrf';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     if (!isTrustedOriginRequest(request)) {
       return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
     }
@@ -23,8 +24,5 @@ export async function POST(request: NextRequest) {
     clearCsrfCookie(response);
 
     return response;
-  } catch (error) {
-    console.error('Logout error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
+  
+});

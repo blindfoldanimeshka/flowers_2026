@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
 import { getCachedOrderStats, invalidateOrderStatsCache, invalidateOrdersCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Создание нового заказа
 export async function createOrder(formData: FormData) {
@@ -99,7 +100,7 @@ export async function createOrder(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании заказа:', error);
+    productionLogger.error('Ошибка при создании заказа:', error);
     
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
@@ -162,7 +163,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при обновлении статуса заказа:', error);
+    productionLogger.error('Ошибка при обновлении статуса заказа:', error);
     return {
       success: false,
       error: 'Ошибка при обновлении статуса заказа'
@@ -190,7 +191,7 @@ export async function getCustomerOrders(email: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении заказов клиента:', error);
+    productionLogger.error('Ошибка при получении заказов клиента:', error);
     return {
       success: false,
       error: 'Ошибка при получении заказов'
@@ -216,7 +217,7 @@ export async function getAllOrders(filters?: {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении заказов:', error);
+    productionLogger.error('Ошибка при получении заказов:', error);
     return {
       success: false,
       error: 'Ошибка при получении заказов'
@@ -236,7 +237,7 @@ export async function getOrderStats() {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении статистики:', error);
+    productionLogger.error('Ошибка при получении статистики:', error);
     return {
       success: false,
       error: 'Ошибка при получении статистики'

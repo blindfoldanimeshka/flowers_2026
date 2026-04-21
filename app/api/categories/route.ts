@@ -6,6 +6,8 @@ import Category from '@/models/Category';
 import Subcategory from '@/models/Subcategory';
 import { invalidateCategoriesCache } from '@/lib/cache';
 import { escapeRegExp, sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
 const CATEGORY_FIELDS = '_id id name slug isActive';
 const SUBCATEGORY_FIELDS = '_id name slug categoryId categoryNumId isActive';
@@ -21,8 +23,7 @@ function isDuplicateKeyError(error: unknown): error is DuplicateKeyError {
 }
 
 // GET all categories with their subcategories
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
 
     const { searchParams } = new URL(request.url);
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     // РџРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє РєР°С‚РµРіРѕСЂРёР№ Рё РїРѕРґРєР°С‚РµРіРѕСЂРёР№ РґР»СЏ РЅР°РІРёРіР°С†РёРё
     const [categories, allSubcategories] = await Promise.all([
-      Category.find({}).select(CATEGORY_FIELDS).lean(),
+      Category.find({}).select(CATEGORY_FIELDS).sort({ order: 1, id: 1 }).lean(),
       Subcategory.find({}).select(SUBCATEGORY_FIELDS).lean(),
     ]);
 
@@ -74,16 +75,11 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': PUBLIC_CACHE_CONTROL },
     });
 
-  } catch (error: unknown) {
-    console.error('РћС€РёР±РєР° РІ API РєР°С‚РµРіРѕСЂРёР№:', error);
-    const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
-  }
-}
+  
+});
 
 // POST a new category
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withErrorHandler(async (request: NextRequest) => {
     await connect();
     const body = await request.json();
     const { name } = body;
@@ -151,20 +147,11 @@ export async function POST(request: NextRequest) {
     }
     // TODO: trigger ISR invalidation if needed
     return NextResponse.json(savedCategory, { status: 201 });
-  } catch (error: unknown) {
-    console.error(error);
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РґСѓР±Р»РёРєР°С‚С‹ РїРѕ СѓРЅРёРєР°Р»СЊРЅС‹Рј РїРѕР»СЏРј
-    if (isDuplicateKeyError(error)) {
-      return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ СЃ С‚Р°РєРёРј РЅР°Р·РІР°РЅРёРµРј РёР»Рё URL-Р°РґСЂРµСЃРѕРј СѓР¶Рµ СЃСѓС‰РµСЃС‚РІСѓРµС‚' }, { status: 400 });
-    }
-    const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
-  }
-}
+  
+});
 
 // PUT to update a category
-export async function PUT(request: NextRequest) {
-    try {
+export const PUT = withErrorHandler(async (request: NextRequest) => {
         await connect();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
@@ -193,22 +180,11 @@ export async function PUT(request: NextRequest) {
         invalidateCategoriesCache();
 
         return NextResponse.json(updatedCategory);
-    } catch (error: unknown) {
-        console.error('Error updating category:', error);
-        const errorMessage = error instanceof Error ? error.message : 'РћС€РёР±РєР° СЃРµСЂРІРµСЂР°';
-        return NextResponse.json(
-            { 
-                success: false,
-                error: 'РћС€РёР±РєР° РїСЂРё РѕР±РЅРѕРІР»РµРЅРёРё РєР°С‚РµРіРѕСЂРёРё',
-                details: errorMessage
-            }, 
-            { status: 500 }
-        );
-    }
-}
+    
+});
 
 // DELETE a category - redirect to specific endpoint
-export async function DELETE(request: NextRequest) {
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
     
@@ -227,4 +203,4 @@ export async function DELETE(request: NextRequest) {
         }, 
         { status: 405 }
     );
-}
+});

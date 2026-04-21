@@ -3,9 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
 import { escapeRegExp, safeSearchTerm, toIntInRange } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
+export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
 
     const searchParams = request.nextUrl.searchParams;
@@ -81,11 +82,5 @@ export async function GET(request: NextRequest) {
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('Ошибка при фильтрации товаров:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при фильтрации товаров', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+  
+});
