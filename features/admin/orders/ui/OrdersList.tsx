@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import Image from 'next/image';
 import { useEffect, useId } from 'react';
 import { IAdminOrder, orderStatuses, useAdminOrdersViewModel } from '@/features/admin/orders';
+import { exportOrdersToExcel } from '@/lib/exportOrders';
 
 interface OrdersListProps {
   initialOrders: IAdminOrder[];
@@ -26,7 +27,12 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
     handleDelete,
     handleShowDetails,
     handleCloseDetails,
+    orders,
   } = vm;
+
+  const handleExportToExcel = () => {
+    exportOrdersToExcel(orders);
+  };
 
   const modalTitleId = useId();
   const modalDescriptionId = useId();
@@ -55,6 +61,16 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
       <div className="mb-4 sm:mb-8 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-gray-800">Управление заказами</h2>
         <div className="flex w-full sm:w-auto items-center justify-between sm:justify-start gap-3 sm:gap-4">
+          <button
+            onClick={handleExportToExcel}
+            className="flex items-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="hidden sm:inline">Экспорт в Excel</span>
+            <span className="sm:hidden">Excel</span>
+          </button>
           <div className="flex items-center gap-2 text-sm">
             <div className={`h-3 w-3 rounded-full ${isPolling ? 'animate-pulse bg-green-500' : 'bg-gray-400'}`} />
             <span className="text-gray-600">{isPolling ? 'Online' : 'Offline'}</span>

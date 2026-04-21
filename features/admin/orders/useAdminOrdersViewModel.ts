@@ -162,6 +162,7 @@ export function useAdminOrdersViewModel(initialOrders: IAdminOrder[]) {
   }, []);
 
   return {
+    orders,
     filteredOrders,
     selectedOrder,
     activeTab,
