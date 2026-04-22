@@ -31,6 +31,12 @@ export function useHomeCatalogViewModel() {
         const aOrder = categoryOrder.get(String(a.categoryId)) ?? Number.MAX_SAFE_INTEGER;
         const bOrder = categoryOrder.get(String(b.categoryId)) ?? Number.MAX_SAFE_INTEGER;
         if (aOrder !== bOrder) return aOrder - bOrder;
+
+        // Закрепленные товары в категории идут первыми
+        const aPinned = a.pinnedInCategory === a.categoryId;
+        const bPinned = b.pinnedInCategory === b.categoryId;
+        if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
         return a.name.localeCompare(b.name, 'ru');
       });
 

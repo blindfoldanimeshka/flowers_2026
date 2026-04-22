@@ -19,6 +19,17 @@ export function useCatalogProductsViewModel({ categoryId, subcategoryId }: Catal
       setLoading(true);
       setError(null);
       const nextProducts = subcategoryId ? await getProductsBySubcategory(subcategoryId) : categoryId ? await getProductsByCategory(categoryId) : [];
+
+      // Сортируем: закрепленные товары в текущей категории идут первыми
+      if (categoryId && nextProducts.length > 0) {
+        nextProducts.sort((a, b) => {
+          const aPinned = a.pinnedInCategory === categoryId;
+          const bPinned = b.pinnedInCategory === categoryId;
+          if (aPinned !== bPinned) return aPinned ? -1 : 1;
+          return a.name.localeCompare(b.name, 'ru');
+        });
+      }
+
       setProducts(nextProducts);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load products');

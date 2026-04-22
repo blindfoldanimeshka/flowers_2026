@@ -55,6 +55,7 @@ export default function AdminLayout({
     { label: 'Заказы', path: '/admin/orders' },
     { label: 'Товары', path: '/admin/products' },
     { label: 'Категории', path: '/admin/categories' },
+    { label: 'Галерея медиа', path: '/admin/media' },
     { label: 'Настройки магазина', path: '/admin/settings' },
     { label: 'Профиль', path: '/admin/profile' },
   ];
