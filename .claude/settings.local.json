@@ -7,7 +7,10 @@
       "Bash(npm uninstall *)",
       "Bash(claude plugin *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'docs: add production refactoring design spec *)"
+      "Bash(git commit -m 'docs: add production refactoring design spec *)",
+      "Bash(git commit *)",
+      "mcp__plugin_context7-plugin_context7__resolve-library-id",
+      "mcp__plugin_context7-plugin_context7__query-docs"
     ]
   }
 }
