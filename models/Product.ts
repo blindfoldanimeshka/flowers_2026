@@ -26,7 +26,7 @@ const Product = createSupabaseModel({
   collection: 'products',
   defaults: {
     inStock: true,
-    image: '/uploads/placeholder.jpg',
+    image: 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото',
     preorderOnly: false,
     assemblyTime: '',
     stockQuantity: 0,

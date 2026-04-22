@@ -283,7 +283,7 @@ export default function ProductsPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map((product: IProduct) => (
               <div key={product._id} className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-4">
-                <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
+                <Image src={product.image || 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
                 <h3 className="truncate text-sm font-bold text-gray-900 sm:text-lg">{product.name}</h3>
                 <p className="text-xs font-semibold text-gray-900 sm:text-base">{product.price} ₽</p>
                 {product.preorderOnly && <p className="text-xs font-semibold text-amber-700">Только под заказ</p>}
