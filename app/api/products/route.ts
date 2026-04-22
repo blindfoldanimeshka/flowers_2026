@@ -296,13 +296,19 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     // Обрабатываем массив категорий
     if (body.categoryIds && Array.isArray(body.categoryIds) && body.categoryIds.length > 0) {
-      // Проверяем первую категорию для categoryNumId
-      const category = await Category.findById(body.categoryIds[0]);
-      if (!category) {
-        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      body.categoryIds = Array.from(new Set(normalizeStringArray(body.categoryIds)));
+      if (body.categoryIds.length === 0) {
+        return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
       }
+
+      const categories = await Category.find({ _id: { $in: body.categoryIds } }).select('_id id').lean();
+      if (categories.length !== body.categoryIds.length) {
+        return NextResponse.json({ error: 'Одна или несколько категорий не найдены' }, { status: 404 });
+      }
+
+      const primaryCategory = categories.find((category) => String(category._id) === String(body.categoryIds[0]));
       body.categoryId = body.categoryIds[0]; // Для обратной совместимости
-      body.categoryNumId = category.id;
+      body.categoryNumId = typeof primaryCategory?.id === 'number' ? primaryCategory.id : 0;
     } else if (body.categoryId) {
       // Обратная совместимость: если передан только categoryId
       const category = await Category.findById(body.categoryId);
@@ -359,6 +365,8 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      revalidatePath('/');
+      revalidatePath('/category', 'layout');
       return NextResponse.json({ message: 'Товар успешно удалён' });
     }
 
@@ -370,6 +378,8 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'РўРѕРІР°СЂ РЅРµ РЅР°Р№РґРµРЅ' }, { status: 404 });
     }
 
+    revalidatePath('/');
+    revalidatePath('/category', 'layout');
     return NextResponse.json({ message: 'РўРѕРІР°СЂ СѓСЃРїРµС€РЅРѕ СѓРґР°Р»С‘РЅ' });
   
 });
@@ -472,13 +482,20 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
 
     // Обрабатываем массив категорий
     if (body.categoryIds && Array.isArray(body.categoryIds) && body.categoryIds.length > 0) {
-      const category = await Category.findById(body.categoryIds[0]);
-      if (!category) {
-        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      const normalizedCategoryIds = Array.from(new Set(normalizeStringArray(body.categoryIds)));
+      if (normalizedCategoryIds.length === 0) {
+        return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
       }
-      updateData.categoryId = body.categoryIds[0];
-      updateData.categoryIds = body.categoryIds;
-      updateData.categoryNumId = category.id;
+
+      const categories = await Category.find({ _id: { $in: normalizedCategoryIds } }).select('_id id').lean();
+      if (categories.length !== normalizedCategoryIds.length) {
+        return NextResponse.json({ error: 'Одна или несколько категорий не найдены' }, { status: 404 });
+      }
+
+      const primaryCategory = categories.find((category) => String(category._id) === String(normalizedCategoryIds[0]));
+      updateData.categoryId = normalizedCategoryIds[0];
+      updateData.categoryIds = normalizedCategoryIds;
+      updateData.categoryNumId = typeof primaryCategory?.id === 'number' ? primaryCategory.id : 0;
     } else if (typeof body.categoryId === 'string' && body.categoryId.trim()) {
       // Обратная совместимость
       const category = await Category.findById(body.categoryId.trim());
@@ -491,13 +508,19 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Обрабатываем подкатегорию
-    if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) {
-      const subcategory = await Subcategory.findById(body.subcategoryId.trim());
-      if (!subcategory) {
-        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
+    if (typeof body.subcategoryId === 'string') {
+      const subcategoryId = body.subcategoryId.trim();
+      if (subcategoryId) {
+        const subcategory = await Subcategory.findById(subcategoryId);
+        if (!subcategory) {
+          return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
+        }
+        updateData.subcategoryId = subcategoryId;
+        updateData.subcategoryNumId = subcategory.categoryNumId;
+      } else {
+        updateData.subcategoryId = '';
+        updateData.subcategoryNumId = 0;
       }
-      updateData.subcategoryId = body.subcategoryId.trim();
-      updateData.subcategoryNumId = subcategory.categoryNumId;
     }
 
     // Проверяем pinnedInCategory
@@ -505,7 +528,7 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
       if (body.pinnedInCategory === '' || body.pinnedInCategory === null) {
         updateData.pinnedInCategory = '';
       } else if (typeof body.pinnedInCategory === 'string') {
-        const categoryIds = body.categoryIds || updateData.categoryIds;
+        const categoryIds = (updateData.categoryIds as string[] | undefined) || normalizeStringArray(body.categoryIds);
         if (!categoryIds || !Array.isArray(categoryIds) || !categoryIds.includes(body.pinnedInCategory)) {
           return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
         }

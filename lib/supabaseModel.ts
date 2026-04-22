@@ -85,6 +85,15 @@ function pickSelectedFields(current: AnyObject, select: string): AnyObject {
 }
 
 function matchCondition(value: any, condition: any): boolean {
+  const asArray = (input: any): any[] => (Array.isArray(input) ? input : [input]);
+  const includesByString = (source: any, target: any): boolean => {
+    const sourceItems = asArray(source);
+    const targetItems = asArray(target);
+    return sourceItems.some((sourceItem) =>
+      targetItems.some((targetItem) => String(sourceItem) === String(targetItem))
+    );
+  };
+
   if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
     if ('$regex' in condition) {
       const pattern = condition.$regex;
@@ -93,19 +102,19 @@ function matchCondition(value: any, condition: any): boolean {
       return regex.test(String(value ?? ''));
     }
     if ('$in' in condition) {
-      return (condition.$in as any[]).some((item) => String(item) === String(value));
+      return includesByString(value, condition.$in as any[]);
     }
     if ('$ne' in condition) {
-      return String(value) !== String(condition.$ne);
+      return !includesByString(value, condition.$ne);
     }
     if ('$gte' in condition && !(value >= condition.$gte)) return false;
     if ('$gt' in condition && !(value > condition.$gt)) return false;
     if ('$lte' in condition && !(value <= condition.$lte)) return false;
     if ('$lt' in condition && !(value < condition.$lt)) return false;
-    if ('$eq' in condition) return String(value) === String(condition.$eq);
+    if ('$eq' in condition) return includesByString(value, condition.$eq);
     return Object.entries(condition).every(([key, val]) => matchCondition((value || {})[key], val));
   }
-  return String(value) === String(condition);
+  return includesByString(value, condition);
 }
 
 function matchesQuery(doc: AnyObject, query: AnyObject = {}): boolean {
