@@ -14,13 +14,15 @@ export interface AdminProductDraft {
   price: number;
   image: string;
   images: string[];
-  categoryId: string;
+  categoryId: string; // Оставляем для обратной совместимости
+  categoryIds: string[]; // Новое поле - массив категорий
   subcategoryId: string;
   inStock: boolean;
   preorderOnly: boolean;
   assemblyTime: string;
   stockQuantity: number;
   stockUnit: string;
+  pinnedInCategory: string; // ID категории, в которой товар закреплен
 }
 
 const emptyDraft: AdminProductDraft = {
@@ -30,12 +32,14 @@ const emptyDraft: AdminProductDraft = {
   image: '',
   images: [],
   categoryId: '',
+  categoryIds: [],
   subcategoryId: '',
   inStock: true,
   preorderOnly: false,
   assemblyTime: '',
   stockQuantity: 0,
   stockUnit: 'шт.',
+  pinnedInCategory: '',
 };
 
 export function useAdminProductsViewModel() {
@@ -90,6 +94,11 @@ export function useAdminProductsViewModel() {
   }, [scrollToTop]);
 
   const openEditForm = useCallback((product: IProduct) => {
+    // Инициализируем categoryIds из product.categoryIds или из categoryId для обратной совместимости
+    const categoryIds = product.categoryIds && product.categoryIds.length > 0
+      ? product.categoryIds
+      : (product.categoryId ? [product.categoryId] : []);
+
     setDraft({
       _id: product._id,
       name: product.name,
@@ -97,13 +106,15 @@ export function useAdminProductsViewModel() {
       price: product.price,
       image: product.image,
       images: Array.from(new Set([...(product.images || []), product.image].filter(Boolean))).slice(0, 3),
-      categoryId: product.categoryId ? String(product.categoryId) : '',
+      categoryId: product.categoryId ? String(product.categoryId) : (categoryIds[0] || ''),
+      categoryIds: categoryIds.map(id => String(id)),
       subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
       inStock: product.inStock ?? true,
       preorderOnly: product.preorderOnly ?? false,
       assemblyTime: product.assemblyTime ?? '',
       stockQuantity: Math.max(0, Math.floor(product.stockQuantity ?? 0)),
       stockUnit: product.stockUnit?.trim() || 'шт.',
+      pinnedInCategory: product.pinnedInCategory ? String(product.pinnedInCategory) : '',
     });
     setIsFormVisible(true);
     scrollToTop();
@@ -122,10 +133,16 @@ export function useAdminProductsViewModel() {
 
   const saveDraft = useCallback(async () => {
     if (!draft.name.trim()) return showToast('Название товара обязательно', 'error');
-    if (!draft.categoryId) return showToast('Выберите категорию', 'error');
+    if (!draft.categoryIds || draft.categoryIds.length === 0) return showToast('Выберите хотя бы одну категорию', 'error');
     const images = Array.from(new Set((draft.images || []).map((src) => src?.trim()).filter(Boolean))).slice(0, 3);
     if (images.length === 0) return showToast('Добавьте хотя бы одно изображение товара', 'error');
     if (!Number.isFinite(draft.price) || draft.price <= 0) return showToast('Укажите корректную цену товара', 'error');
+
+    // Проверяем, что pinnedInCategory входит в список выбранных категорий
+    if (draft.pinnedInCategory && !draft.categoryIds.includes(draft.pinnedInCategory)) {
+      return showToast('Категория для закрепления должна быть выбрана в списке категорий', 'error');
+    }
+
     setSaving(true);
     setError('');
     try {
@@ -135,13 +152,15 @@ export function useAdminProductsViewModel() {
         price: draft.price,
         image: images[0],
         images,
-        categoryId: draft.categoryId,
+        categoryId: draft.categoryIds[0], // Первая категория для обратной совместимости
+        categoryIds: draft.categoryIds,
         subcategoryId: draft.subcategoryId || undefined,
         inStock: draft.inStock,
         preorderOnly: draft.preorderOnly,
         assemblyTime: draft.assemblyTime.trim(),
         stockQuantity: Math.max(0, Math.floor(draft.stockQuantity)),
         stockUnit: draft.stockUnit.trim() || 'шт.',
+        pinnedInCategory: draft.pinnedInCategory || undefined,
       };
       if (draft._id) {
         await updateProduct(draft._id, payload);

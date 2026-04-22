@@ -10,8 +10,10 @@ export interface IProduct {
   assemblyTime?: string;
   stockQuantity?: number;
   stockUnit?: string;
-  categoryId?: string;
+  categoryId?: string; // Оставляем для обратной совместимости
+  categoryIds?: string[]; // Новое поле - массив категорий
   categoryNumId?: number;
   subcategoryId?: string;
   subcategoryNumId?: number;
+  pinnedInCategory?: string; // ID категории, в которой товар закреплен
 }

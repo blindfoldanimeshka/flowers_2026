@@ -19,6 +19,11 @@ interface ProductFormProps {
 const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSubmit, onCancel }: ProductFormProps) => {
   const [priceInput, setPriceInput] = useState(String(draft.price || ''));
 
+  // Инициализируем categoryIds из categoryId если массив пустой (для обратной совместимости)
+  const selectedCategoryIds = draft.categoryIds && draft.categoryIds.length > 0
+    ? draft.categoryIds
+    : (draft.categoryId ? [draft.categoryId] : []);
+
   const updateImageAt = (index: number, value: string) => {
     const nextImages = [...(draft.images || [])];
     nextImages[index] = value;
@@ -67,6 +72,22 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
     onChange(name as keyof AdminProductDraft, value as never);
   };
 
+  const handleCategoryToggle = (categoryId: string) => {
+    const currentIds = selectedCategoryIds;
+    const newIds = currentIds.includes(categoryId)
+      ? currentIds.filter(id => id !== categoryId)
+      : [...currentIds, categoryId];
+
+    onChange('categoryIds', newIds);
+    // Обновляем categoryId для обратной совместимости (первая выбранная категория)
+    onChange('categoryId', newIds[0] || '');
+
+    // Если убрали категорию, в которой был закреплен товар, сбрасываем закрепление
+    if (draft.pinnedInCategory && !newIds.includes(draft.pinnedInCategory)) {
+      onChange('pinnedInCategory', '');
+    }
+  };
+
   return (
     <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:p-6">
       <h3 className="text-lg font-semibold text-gray-800">{draft._id ? 'Редактирование товара' : 'Новый товар'}</h3>
@@ -88,15 +109,56 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
 
       <textarea name="description" value={draft.description} onChange={handleChange} placeholder="Описание" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" rows={3} />
 
+      <div>
+        <label className="mb-2 block text-sm font-medium text-gray-700">Категории (можно выбрать несколько)</label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {categories.map((category) => (
+            <label
+              key={category._id}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors cursor-pointer ${
+                selectedCategoryIds.includes(category._id)
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedCategoryIds.includes(category._id)}
+                onChange={() => handleCategoryToggle(category._id)}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+              />
+              <span className="truncate">{category.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <select name="categoryId" value={draft.categoryId} onChange={handleChange} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" required>
-          <option value="">Выберите категорию</option>
-          {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
-        </select>
         <select name="subcategoryId" value={draft.subcategoryId} onChange={handleChange} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
           <option value="">Подкатегория (необязательно)</option>
           {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
         </select>
+
+        {selectedCategoryIds.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Закрепить в категории</label>
+            <select
+              value={draft.pinnedInCategory || ''}
+              onChange={(e) => onChange('pinnedInCategory', e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="">Не закреплять</option>
+              {categories
+                .filter(cat => selectedCategoryIds.includes(cat._id))
+                .map((category) => (
+                  <option key={category._id} value={category._id}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">Закрепленный товар будет показываться первым в выбранной категории</p>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
