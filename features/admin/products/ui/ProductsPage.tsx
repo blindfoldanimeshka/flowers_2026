@@ -219,6 +219,8 @@ export default function ProductsPage() {
 
   const [tab, setTab] = useState<'list' | 'form'>('list');
   const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (isFormVisible) setTab('form');
@@ -229,6 +231,44 @@ export default function ProductsPage() {
     if (!q) return products;
     return products.filter((product) => product.name.toLowerCase().includes(q) || String(product.price).includes(q));
   }, [products, search]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p._id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = window.confirm(`Вы уверены, что хотите удалить ${selectedIds.size} товаров? Это действие нельзя отменить.`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      for (const id of selectedIds) {
+        const product = products.find(p => p._id === id);
+        if (product) {
+          await removeProduct(product);
+        }
+      }
+      setSelectedIds(new Set());
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (loading) return <div className="flex min-h-0 w-full max-w-full flex-1 flex-col bg-gray-100 px-1 py-2 sm:px-3 sm:py-4"><div className="w-full max-w-none rounded-2xl border border-gray-100 bg-white p-3 shadow-xl sm:p-5 lg:p-6"><div className="text-center text-gray-500">Загрузка...</div></div></div>;
 
@@ -276,13 +316,58 @@ export default function ProductsPage() {
       {tab === 'list' && (
         <div>
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-lg font-semibold text-gray-700">Все товары</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-700">Все товары</h2>
+              {selectedIds.size > 0 && (
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+                  Выбрано: {selectedIds.size}
+                </span>
+              )}
+            </div>
             <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по названию или цене" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-72" />
           </div>
 
+          {filteredProducts.length > 0 && (
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === filteredProducts.length && filteredProducts.length > 0}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                />
+                Выбрать все
+              </label>
+
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? 'Удаление...' : `Удалить выбранные (${selectedIds.size})`}
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
             {filteredProducts.map((product: IProduct) => (
-              <div key={product._id} className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm transition-shadow hover:shadow-md sm:p-4">
+              <div key={product._id} className={`rounded-lg border bg-white p-2.5 shadow-sm transition-all hover:shadow-md sm:p-4 ${selectedIds.has(product._id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}>
+                <div className="mb-2 flex items-start justify-between">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(product._id)}
+                    onChange={() => toggleSelect(product._id)}
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  {product.pinnedInCategory && (
+                    <span className="rounded bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
+                      Закреплен
+                    </span>
+                  )}
+                </div>
                 <Image src={product.image || 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
                 <h3 className="truncate text-sm font-bold text-gray-900 sm:text-lg">{product.name}</h3>
                 <p className="text-xs font-semibold text-gray-900 sm:text-base">{product.price} ₽</p>

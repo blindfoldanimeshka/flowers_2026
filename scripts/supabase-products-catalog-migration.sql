@@ -1,0 +1,35 @@
+-- Adds missing catalog columns required by app/api/products routes.
+-- Safe to run multiple times.
+
+alter table public.products
+  add column if not exists images text[] not null default '{}'::text[],
+  add column if not exists category_ids text[] not null default '{}'::text[],
+  add column if not exists category_num_id integer not null default 0,
+  add column if not exists subcategory_num_id integer not null default 0,
+  add column if not exists preorder_only boolean not null default false,
+  add column if not exists assembly_time text not null default '',
+  add column if not exists stock_quantity integer not null default 0,
+  add column if not exists stock_unit text not null default 'шт.',
+  add column if not exists pinned_in_category text;
+
+-- Backfill arrays from legacy scalar fields.
+update public.products
+set images = case
+    when coalesce(image_url, '') <> '' then array[image_url]
+    else '{}'::text[]
+  end
+where images is null or cardinality(images) = 0;
+
+update public.products
+set category_ids = case
+    when coalesce(category_id, '') <> '' then array[category_id]
+    else '{}'::text[]
+  end
+where category_ids is null or cardinality(category_ids) = 0;
+
+-- Helpful indexes for category listing and pin sorting.
+create index if not exists products_category_id_idx on public.products (category_id);
+create index if not exists products_subcategory_id_idx on public.products (subcategory_id);
+create index if not exists products_pinned_in_category_idx on public.products (pinned_in_category);
+create index if not exists products_category_ids_gin_idx on public.products using gin (category_ids);
+
