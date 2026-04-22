@@ -167,3 +167,36 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   mediaCache = null;
   return NextResponse.json({ ok: true, entry });
 });
+
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
+  const auth = await requireAdmin(request);
+  if (!auth.success) {
+    return NextResponse.json({ error: 'Требуется авторизация администратора' }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => null)) as { url?: unknown } | null;
+  const url = typeof body?.url === 'string' ? body.url.trim() : '';
+  if (!url) {
+    return NextResponse.json({ error: 'URL не указан' }, { status: 400 });
+  }
+
+  await dbConnect();
+  const current = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
+  const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
+
+  const filtered = existingLib.filter((e: { url?: string }) => e?.url !== url);
+
+  if (filtered.length === existingLib.length) {
+    return NextResponse.json({ error: 'Изображение не найдено в библиотеке' }, { status: 404 });
+  }
+
+  await Settings.findOneAndUpdate(
+    { settingKey: SETTINGS_KEY },
+    { $set: { mediaLibrary: filtered } },
+    { upsert: true }
+  );
+
+  invalidateSettingsCache();
+  mediaCache = null;
+  return NextResponse.json({ ok: true, deleted: url });
+});
