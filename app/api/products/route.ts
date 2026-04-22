@@ -100,28 +100,44 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
     Object.assign(body, normalizeProductMeta(body as Record<string, unknown>));
 
-    // РџРѕР»СѓС‡Р°РµРј РєР°С‚РµРіРѕСЂРёСЋ РґР»СЏ С‡РёСЃР»РѕРІРѕРіРѕ ID
-    if (body.categoryId) {
+    // Обрабатываем массив категорий
+    if (body.categoryIds && Array.isArray(body.categoryIds) && body.categoryIds.length > 0) {
+      // Проверяем первую категорию для categoryNumId
+      const category = await Category.findById(body.categoryIds[0]);
+      if (!category) {
+        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      }
+      body.categoryId = body.categoryIds[0]; // Для обратной совместимости
+      body.categoryNumId = category.id;
+    } else if (body.categoryId) {
+      // Обратная совместимость: если передан только categoryId
       const category = await Category.findById(body.categoryId);
       if (!category) {
-        return NextResponse.json({ error: 'РљР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
+        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
       }
-      body.categoryNumId = category.id; // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‡РёСЃР»РѕРІРѕР№ ID РєР°С‚РµРіРѕСЂРёРё
+      body.categoryNumId = category.id;
+      body.categoryIds = [body.categoryId];
     } else {
-      return NextResponse.json({ error: 'ID РєР°С‚РµРіРѕСЂРёРё РѕР±СЏР·Р°С‚РµР»РµРЅ' }, { status: 400 });
+      return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
     }
 
-    // РћР±СЂР°Р±Р°С‚С‹РІР°РµРј РїРѕРґРєР°С‚РµРіРѕСЂРёСЋ, РµСЃР»Рё РѕРЅР° СѓРєР°Р·Р°РЅР°
+    // Обрабатываем подкатегорию, если она указана
     if (body.subcategoryId) {
       const subcategory = await Subcategory.findById(body.subcategoryId);
       if (!subcategory) {
-        return NextResponse.json({ error: 'РџРѕРґРєР°С‚РµРіРѕСЂРёСЏ РЅРµ РЅР°Р№РґРµРЅР°' }, { status: 404 });
+        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
       }
-      body.subcategoryNumId = subcategory.categoryNumId; // РЈСЃС‚Р°РЅР°РІР»РёРІР°РµРј С‡РёСЃР»РѕРІРѕР№ ID РїРѕРґРєР°С‚РµРіРѕСЂРёРё
+      body.subcategoryNumId = subcategory.categoryNumId;
     } else {
-      // РЈРґР°Р»СЏРµРј subcategoryId РµСЃР»Рё РѕРЅРѕ РїСѓСЃС‚РѕРµ РёР»Рё null
       delete body.subcategoryId;
       delete body.subcategoryNumId;
+    }
+
+    // Проверяем pinnedInCategory
+    if (body.pinnedInCategory) {
+      if (!body.categoryIds.includes(body.pinnedInCategory)) {
+        return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
+      }
     }
 
     const newProduct = await Product.create(body);
@@ -131,7 +147,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     revalidatePath('/category', 'layout');
 
     return NextResponse.json(newProduct, { status: 201 });
-  
+
 });
 
 export const DELETE = withErrorHandler(async (request: NextRequest) => {
@@ -187,10 +203,51 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
         updateData.stockQuantity = Math.floor(normalized);
       }
     }
-    if (typeof body.categoryId === 'string' && body.categoryId.trim()) updateData.categoryId = body.categoryId.trim();
-    if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) updateData.subcategoryId = body.subcategoryId.trim();
     if (typeof body.image === 'string' && body.image.trim()) updateData.image = body.image.trim();
     if (Array.isArray(body.images)) updateData.images = body.images.filter((item: unknown) => typeof item === 'string').slice(0, 3);
+
+    // Обрабатываем массив категорий
+    if (body.categoryIds && Array.isArray(body.categoryIds) && body.categoryIds.length > 0) {
+      const category = await Category.findById(body.categoryIds[0]);
+      if (!category) {
+        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      }
+      updateData.categoryId = body.categoryIds[0];
+      updateData.categoryIds = body.categoryIds;
+      updateData.categoryNumId = category.id;
+    } else if (typeof body.categoryId === 'string' && body.categoryId.trim()) {
+      // Обратная совместимость
+      const category = await Category.findById(body.categoryId.trim());
+      if (!category) {
+        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
+      }
+      updateData.categoryId = body.categoryId.trim();
+      updateData.categoryIds = [body.categoryId.trim()];
+      updateData.categoryNumId = category.id;
+    }
+
+    // Обрабатываем подкатегорию
+    if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) {
+      const subcategory = await Subcategory.findById(body.subcategoryId.trim());
+      if (!subcategory) {
+        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
+      }
+      updateData.subcategoryId = body.subcategoryId.trim();
+      updateData.subcategoryNumId = subcategory.categoryNumId;
+    }
+
+    // Проверяем pinnedInCategory
+    if (body.pinnedInCategory !== undefined) {
+      if (body.pinnedInCategory === '' || body.pinnedInCategory === null) {
+        updateData.pinnedInCategory = '';
+      } else if (typeof body.pinnedInCategory === 'string') {
+        const categoryIds = body.categoryIds || updateData.categoryIds;
+        if (!categoryIds || !Array.isArray(categoryIds) || !categoryIds.includes(body.pinnedInCategory)) {
+          return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
+        }
+        updateData.pinnedInCategory = body.pinnedInCategory;
+      }
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });

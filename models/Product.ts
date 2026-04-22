@@ -4,7 +4,8 @@ export interface IProduct {
   _id: string;
   name: string;
   price: number;
-  categoryId: string;
+  categoryId: string; // Оставляем для обратной совместимости
+  categoryIds: string[]; // Новое поле - массив категорий
   categoryNumId: number;
   subcategoryId?: string;
   subcategoryNumId?: number;
@@ -16,6 +17,7 @@ export interface IProduct {
   assemblyTime?: string;
   stockQuantity?: number;
   stockUnit?: string;
+  pinnedInCategory?: string; // ID категории, в которой товар закреплен
   createdAt: string;
   updatedAt: string;
 }
@@ -29,6 +31,7 @@ const Product = createSupabaseModel({
     assemblyTime: '',
     stockQuantity: 0,
     stockUnit: 'шт.',
+    categoryIds: [], // Массив категорий по умолчанию пустой
   },
   references: {
     categoryId: 'categories',
