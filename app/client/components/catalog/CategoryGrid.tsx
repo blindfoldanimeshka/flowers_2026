@@ -11,8 +11,15 @@ interface PublicSettings {
 }
 
 export default function CategoryGrid() {
-  const { categories } = useCategoriesViewModel();
+  const { categories: rawCategories } = useCategoriesViewModel();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+
+  // Сортируем категории по полю order (уже должны быть отсортированы с сервера, но на всякий случай)
+  const categories = [...rawCategories].sort((a, b) => {
+    const orderA = a.order ?? 999;
+    const orderB = b.order ?? 999;
+    return orderA - orderB;
+  });
 
   useEffect(() => {
     let isMounted = true;
