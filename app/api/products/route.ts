@@ -211,7 +211,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     const query: ProductQuery = {};
 
     // Р¤РёР»СЊС‚СЂР°С†РёСЏ РїРѕ ObjectId РєР°С‚РµРіРѕСЂРёРё
-    if (categoryId) query.$or = [{ categoryId }, { categoryIds: categoryId }];
+    if (categoryId) query.$or = [{ categoryId }, { categoryIds: { $in: [categoryId] } }];
 
     // Р¤РёР»СЊС‚СЂР°С†РёСЏ РїРѕ ObjectId РїРѕРґРєР°С‚РµРіРѕСЂРёРё
     if (subcategoryId) query.subcategoryId = subcategoryId;

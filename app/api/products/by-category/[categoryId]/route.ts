@@ -38,8 +38,13 @@ export const GET = withErrorHandler(async (request: NextRequest, { params }: Rou
       );
     }
     
-    // Получаем все товары в категории
-    const products = await Product.find({ categoryId })
+    // Получаем все товары в категории (включая товары с несколькими категориями)
+    const products = await Product.find({
+      $or: [
+        { categoryId },
+        { categoryIds: { $in: [categoryId] } }
+      ]
+    })
       .populate('categoryId', 'name slug')
       .populate('subcategoryId', 'name slug')
       .lean();
