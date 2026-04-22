@@ -21,7 +21,7 @@ interface ShopItemProps {
   stockUnit?: string;
 }
 
-const DEFAULT_IMAGE = '/image/items/11.png';
+const DEFAULT_IMAGE = 'https://placehold.co/600x600/ffe1e1/2f1b26?text=Нет+фото';
 const MAX_GALLERY_IMAGES = 3;
 const SWIPE_THRESHOLD_PX = 36;
 

@@ -47,7 +47,7 @@ export function sanitizePrice(price: number): number {
  * Sanitize image URL to prevent path traversal
  */
 export function sanitizeImageUrl(imageUrl: string, baseUrl: string): string {
-  if (!imageUrl) return `${baseUrl}/image/placeholder.jpg`;
+  if (!imageUrl) return 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото';
 
   // Remove any ../ path traversal attempts
   const cleanPath = imageUrl.replace(/\.\.\//g, '').replace(/\\/g, '/');
