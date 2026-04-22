@@ -18,11 +18,27 @@ interface ProductFormProps {
 
 const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSubmit, onCancel }: ProductFormProps) => {
   const [priceInput, setPriceInput] = useState(String(draft.price || ''));
+  const getCategoryKey = (category: ICategory): string => String((category as any)._id ?? (category as any).id ?? '');
+  const isFlowersCategory = (category: ICategory): boolean => {
+    const slug = String((category as any).slug ?? '').trim().toLowerCase();
+    const name = String((category as any).name ?? '').trim().toLowerCase();
+    return slug === 'cvety' || slug === 'flowers' || name === 'цветы';
+  };
+  const validCategoryIds = useMemo(() => new Set(categories.map((category) => getCategoryKey(category)).filter(Boolean)), [categories]);
+  const flowersCategoryId = useMemo(() => {
+    const flowersCategory = categories.find((category) => isFlowersCategory(category));
+    return flowersCategory ? getCategoryKey(flowersCategory) : '';
+  }, [categories]);
 
   // Инициализируем categoryIds из categoryId если массив пустой (для обратной совместимости)
-  const selectedCategoryIds = draft.categoryIds && draft.categoryIds.length > 0
-    ? draft.categoryIds
-    : (draft.categoryId ? [draft.categoryId] : []);
+  const selectedCategoryIds = useMemo(() => {
+    const source = draft.categoryIds && draft.categoryIds.length > 0
+      ? draft.categoryIds
+      : (draft.categoryId ? [draft.categoryId] : []);
+    return source
+      .map((id) => String(id))
+      .filter((id) => validCategoryIds.has(id));
+  }, [draft.categoryId, draft.categoryIds, validCategoryIds]);
 
   const updateImageAt = (index: number, value: string) => {
     const nextImages = [...(draft.images || [])];
@@ -73,14 +89,20 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
   };
 
   const handleCategoryToggle = (categoryId: string) => {
+    if (flowersCategoryId && categoryId === flowersCategoryId && selectedCategoryIds.includes(categoryId)) {
+      return;
+    }
+
     const currentIds = selectedCategoryIds;
     const newIds = currentIds.includes(categoryId)
       ? currentIds.filter(id => id !== categoryId)
       : [...currentIds, categoryId];
 
     onChange('categoryIds', newIds);
-    // Обновляем categoryId для обратной совместимости (первая выбранная категория)
-    onChange('categoryId', newIds[0] || '');
+    if (!newIds.includes(draft.categoryId)) {
+      const nextPrimary = newIds.find((id) => id !== flowersCategoryId) || newIds[0] || '';
+      onChange('categoryId', nextPrimary);
+    }
 
     // Если убрали категорию, в которой был закреплен товар, сбрасываем закрепление
     if (draft.pinnedInCategory && !newIds.includes(draft.pinnedInCategory)) {
@@ -112,28 +134,53 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
       <div>
         <label className="mb-2 block text-sm font-medium text-gray-700">Категории (можно выбрать несколько)</label>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {categories.map((category) => (
+          {categories.map((category) => {
+            const categoryKey = getCategoryKey(category);
+            const isFlowers = flowersCategoryId === categoryKey;
+            return (
             <label
-              key={category._id}
-              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors cursor-pointer ${
-                selectedCategoryIds.includes(category._id)
+              key={categoryKey}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                selectedCategoryIds.includes(categoryKey)
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
               }`}
             >
               <input
                 type="checkbox"
-                checked={selectedCategoryIds.includes(category._id)}
-                onChange={() => handleCategoryToggle(category._id)}
+                checked={selectedCategoryIds.includes(categoryKey)}
+                onChange={() => handleCategoryToggle(categoryKey)}
+                disabled={isFlowers}
                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
               />
-              <span className="truncate">{category.name}</span>
+              <span className="truncate">{category.name}{isFlowers ? ' (авто)' : ''}</span>
             </label>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {selectedCategoryIds.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Главная категория</label>
+            <select
+              name="categoryId"
+              value={draft.categoryId || ''}
+              onChange={handleChange}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              {categories
+                .filter((cat) => selectedCategoryIds.includes(getCategoryKey(cat)))
+                .map((category) => (
+                  <option key={getCategoryKey(category)} value={getCategoryKey(category)}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
         <select name="subcategoryId" value={draft.subcategoryId} onChange={handleChange} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
           <option value="">Подкатегория (необязательно)</option>
           {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
@@ -149,9 +196,9 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
             >
               <option value="">Не закреплять</option>
               {categories
-                .filter(cat => selectedCategoryIds.includes(cat._id))
+                .filter(cat => selectedCategoryIds.includes(getCategoryKey(cat)))
                 .map((category) => (
-                  <option key={category._id} value={category._id}>
+                  <option key={getCategoryKey(category)} value={getCategoryKey(category)}>
                     {category.name}
                   </option>
                 ))}

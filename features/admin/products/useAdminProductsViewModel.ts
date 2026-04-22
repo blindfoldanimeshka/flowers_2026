@@ -82,22 +82,60 @@ export function useAdminProductsViewModel() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const getCategoryKey = useCallback((category: ICategory): string => {
+    return String((category as any)._id ?? (category as any).id ?? '');
+  }, []);
+
+  const isFlowersCategory = useCallback((category: ICategory): boolean => {
+    const slug = String((category as any).slug ?? '').trim().toLowerCase();
+    const name = String((category as any).name ?? '').trim().toLowerCase();
+    return slug === 'cvety' || slug === 'flowers' || name === 'цветы';
+  }, []);
+
+  const flowersCategoryId = useMemo(() => {
+    const flowersCategory = categories.find((category) => isFlowersCategory(category));
+    return flowersCategory ? getCategoryKey(flowersCategory) : '';
+  }, [categories, getCategoryKey, isFlowersCategory]);
+
+  const ensureFlowersCategoryIds = useCallback((ids: string[]): string[] => {
+    const normalized = Array.from(new Set(ids.map((id) => String(id).trim()).filter(Boolean)));
+    if (flowersCategoryId && !normalized.includes(flowersCategoryId)) {
+      normalized.unshift(flowersCategoryId);
+    }
+    return normalized;
+  }, [flowersCategoryId]);
+
   const currentSubcategories = useMemo<ISubcategory[]>(() => {
     if (!draft.categoryId) return [];
-    return categories.find(category => String(category._id) === String(draft.categoryId))?.subcategories || [];
-  }, [categories, draft.categoryId]);
+    return categories.find(category => getCategoryKey(category) === String(draft.categoryId))?.subcategories || [];
+  }, [categories, draft.categoryId, getCategoryKey]);
 
   const openCreateForm = useCallback(() => {
-    setDraft(emptyDraft);
+    const initialCategoryIds = flowersCategoryId ? [flowersCategoryId] : [];
+    setDraft({
+      ...emptyDraft,
+      categoryIds: initialCategoryIds,
+      categoryId: initialCategoryIds[0] || '',
+    });
     setIsFormVisible(true);
     scrollToTop();
-  }, [scrollToTop]);
+  }, [flowersCategoryId, scrollToTop]);
 
   const openEditForm = useCallback((product: IProduct) => {
+    const validCategoryIds = new Set(categories.map((category) => getCategoryKey(category)).filter(Boolean));
+
     // Инициализируем categoryIds из product.categoryIds или из categoryId для обратной совместимости
-    const categoryIds = product.categoryIds && product.categoryIds.length > 0
+    const rawCategoryIds = product.categoryIds && product.categoryIds.length > 0
       ? product.categoryIds
       : (product.categoryId ? [product.categoryId] : []);
+    const categoryIds = ensureFlowersCategoryIds(rawCategoryIds
+      .map((id) => String(id))
+      .filter((id) => validCategoryIds.has(id)));
+
+    const productPrimaryCategoryId = product.categoryId ? String(product.categoryId) : '';
+    const primaryCategoryId = categoryIds.includes(productPrimaryCategoryId)
+      ? productPrimaryCategoryId
+      : (categoryIds.find((id) => id !== flowersCategoryId) || categoryIds[0] || '');
 
     setDraft({
       _id: product._id,
@@ -106,19 +144,21 @@ export function useAdminProductsViewModel() {
       price: product.price,
       image: product.image,
       images: Array.from(new Set([...(product.images || []), product.image].filter(Boolean))).slice(0, 3),
-      categoryId: product.categoryId ? String(product.categoryId) : (categoryIds[0] || ''),
-      categoryIds: categoryIds.map(id => String(id)),
+      categoryId: primaryCategoryId,
+      categoryIds,
       subcategoryId: product.subcategoryId ? String(product.subcategoryId) : '',
       inStock: product.inStock ?? true,
       preorderOnly: product.preorderOnly ?? false,
       assemblyTime: product.assemblyTime ?? '',
       stockQuantity: Math.max(0, Math.floor(product.stockQuantity ?? 0)),
       stockUnit: product.stockUnit?.trim() || 'шт.',
-      pinnedInCategory: product.pinnedInCategory ? String(product.pinnedInCategory) : '',
+      pinnedInCategory: product.pinnedInCategory && categoryIds.includes(String(product.pinnedInCategory))
+        ? String(product.pinnedInCategory)
+        : '',
     });
     setIsFormVisible(true);
     scrollToTop();
-  }, [scrollToTop]);
+  }, [categories, ensureFlowersCategoryIds, flowersCategoryId, getCategoryKey, scrollToTop]);
 
   const closeForm = useCallback(() => {
     setDraft(emptyDraft);
@@ -126,20 +166,51 @@ export function useAdminProductsViewModel() {
   }, []);
 
   const updateDraft = useCallback(<K extends keyof AdminProductDraft>(field: K, value: AdminProductDraft[K]) => {
-    setDraft(prev => field === 'categoryId'
-      ? { ...prev, categoryId: value as string, subcategoryId: '' }
-      : { ...prev, [field]: value });
-  }, []);
+    setDraft((prev) => {
+      if (field === 'categoryIds') {
+        const nextCategoryIds = ensureFlowersCategoryIds((value as string[]).map((id) => String(id)));
+        const hasCurrentPrimary = nextCategoryIds.includes(String(prev.categoryId || ''));
+        const nextPrimary = hasCurrentPrimary
+          ? String(prev.categoryId || '')
+          : (nextCategoryIds.find((id) => id !== flowersCategoryId) || nextCategoryIds[0] || '');
+        return {
+          ...prev,
+          categoryIds: nextCategoryIds,
+          categoryId: nextPrimary,
+          pinnedInCategory: nextCategoryIds.includes(prev.pinnedInCategory) ? prev.pinnedInCategory : '',
+        };
+      }
+
+      if (field === 'categoryId') {
+        const nextCategoryId = value as string;
+        const hasCategoryChanged = String(prev.categoryId || '') !== String(nextCategoryId || '');
+        return hasCategoryChanged
+          ? { ...prev, categoryId: nextCategoryId, subcategoryId: '' }
+          : { ...prev, categoryId: nextCategoryId };
+      }
+
+      return { ...prev, [field]: value };
+    });
+  }, [ensureFlowersCategoryIds, flowersCategoryId]);
 
   const saveDraft = useCallback(async () => {
+    const validCategoryIds = new Set(categories.map((category) => getCategoryKey(category)).filter(Boolean));
+    const normalizedCategoryIds = ensureFlowersCategoryIds(
+      Array.from(new Set((draft.categoryIds || []).map((id) => String(id)).filter((id) => validCategoryIds.has(id))))
+    );
+
     if (!draft.name.trim()) return showToast('Название товара обязательно', 'error');
-    if (!draft.categoryIds || draft.categoryIds.length === 0) return showToast('Выберите хотя бы одну категорию', 'error');
+    if (normalizedCategoryIds.length === 0) return showToast('Выберите хотя бы одну категорию', 'error');
     const images = Array.from(new Set((draft.images || []).map((src) => src?.trim()).filter(Boolean))).slice(0, 3);
     if (images.length === 0) return showToast('Добавьте хотя бы одно изображение товара', 'error');
     if (!Number.isFinite(draft.price) || draft.price <= 0) return showToast('Укажите корректную цену товара', 'error');
 
+    const primaryCategoryId = normalizedCategoryIds.includes(draft.categoryId)
+      ? draft.categoryId
+      : (normalizedCategoryIds.find((id) => id !== flowersCategoryId) || normalizedCategoryIds[0]);
+
     // Проверяем, что pinnedInCategory входит в список выбранных категорий
-    if (draft.pinnedInCategory && !draft.categoryIds.includes(draft.pinnedInCategory)) {
+    if (draft.pinnedInCategory && !normalizedCategoryIds.includes(draft.pinnedInCategory)) {
       return showToast('Категория для закрепления должна быть выбрана в списке категорий', 'error');
     }
 
@@ -152,15 +223,15 @@ export function useAdminProductsViewModel() {
         price: draft.price,
         image: images[0],
         images,
-        categoryId: draft.categoryIds[0], // Первая категория для обратной совместимости
-        categoryIds: draft.categoryIds,
-        subcategoryId: draft.subcategoryId || undefined,
+        categoryId: primaryCategoryId, // Главная категория
+        categoryIds: normalizedCategoryIds,
+        subcategoryId: draft.subcategoryId.trim(),
         inStock: draft.inStock,
         preorderOnly: draft.preorderOnly,
         assemblyTime: draft.assemblyTime.trim(),
         stockQuantity: Math.max(0, Math.floor(draft.stockQuantity)),
         stockUnit: draft.stockUnit.trim() || 'шт.',
-        pinnedInCategory: draft.pinnedInCategory || undefined,
+        pinnedInCategory: normalizedCategoryIds.includes(draft.pinnedInCategory.trim()) ? draft.pinnedInCategory.trim() : '',
       };
       if (draft._id) {
         await updateProduct(draft._id, payload);
@@ -178,12 +249,20 @@ export function useAdminProductsViewModel() {
     } finally {
       setSaving(false);
     }
-  }, [closeForm, draft, loadData, showToast]);
+  }, [categories, closeForm, draft, ensureFlowersCategoryIds, flowersCategoryId, getCategoryKey, loadData, showToast]);
 
   const removeProduct = useCallback(async (product: IProduct) => {
     if (!window.confirm(`Удалить товар "${product.name}"?`)) return;
+    if (!product._id) {
+      const message = 'Не удалось удалить товар: отсутствует ID';
+      setError(message);
+      showToast(message, 'error');
+      return;
+    }
+
     try {
       await deleteProduct(product._id);
+      setProducts((prev) => prev.filter((item) => item._id !== product._id));
       showToast(`Товар "${product.name}" удален`);
       await loadData();
     } catch (err) {

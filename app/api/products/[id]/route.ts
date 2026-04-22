@@ -2,6 +2,8 @@
 import { revalidatePath } from 'next/cache';
 import connect from '@/lib/db';
 import Product from '@/models/Product';
+import Category from '@/models/Category';
+import Subcategory from '@/models/Subcategory';
 import { isValidId } from '@/lib/id';
 import { sanitizeMongoObject } from '@/lib/security';
 import { productionLogger } from '@/lib/productionLogger';
@@ -218,10 +220,54 @@ export const PUT = withErrorHandler(async (request: NextRequest, { params }: Rou
       updateData.stockQuantity = Math.floor(normalized);
     }
   }
-  if (typeof body.categoryId === 'string' && body.categoryId.trim()) updateData.categoryId = body.categoryId.trim();
-  if (typeof body.subcategoryId === 'string' && body.subcategoryId.trim()) updateData.subcategoryId = body.subcategoryId.trim();
+  const categoryIds = normalizeStringArray(body.categoryIds);
+  const categoryId = typeof body.categoryId === 'string' ? body.categoryId.trim() : '';
+  const mergedCategoryIds = Array.from(new Set(categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : [])));
+
+  if (Array.isArray(body.categoryIds) || typeof body.categoryId === 'string') {
+    if (mergedCategoryIds.length === 0) {
+      return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
+    }
+
+    const existingCategories = await Category.find({ _id: { $in: mergedCategoryIds } }).select('_id id').lean();
+    if (existingCategories.length !== mergedCategoryIds.length) {
+      return NextResponse.json({ error: 'Одна или несколько категорий не найдены' }, { status: 404 });
+    }
+
+    updateData.categoryIds = mergedCategoryIds;
+    updateData.categoryId = mergedCategoryIds[0];
+
+    const primaryCategory = existingCategories.find((category) => String(category._id) === String(mergedCategoryIds[0]));
+    if (primaryCategory && typeof primaryCategory.id === 'number') {
+      updateData.categoryNumId = primaryCategory.id;
+    }
+  }
+
+  if (typeof body.subcategoryId === 'string') {
+    const nextSubcategoryId = body.subcategoryId.trim();
+    if (nextSubcategoryId) {
+      const subcategory = await Subcategory.findById(nextSubcategoryId).lean();
+      if (!subcategory) {
+        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
+      }
+      updateData.subcategoryId = nextSubcategoryId;
+      if (typeof subcategory.categoryNumId === 'number') {
+        updateData.subcategoryNumId = subcategory.categoryNumId;
+      }
+    } else {
+      updateData.subcategoryId = '';
+      updateData.subcategoryNumId = 0;
+    }
+  }
   if (typeof body.image === 'string' && body.image.trim()) updateData.image = body.image.trim();
   if (Array.isArray(body.images)) updateData.images = body.images.filter((item: unknown) => typeof item === 'string').slice(0, 3);
+  if (body.pinnedInCategory !== undefined) {
+    const pinnedInCategory = typeof body.pinnedInCategory === 'string' ? body.pinnedInCategory.trim() : '';
+    if (pinnedInCategory && mergedCategoryIds.length > 0 && !mergedCategoryIds.includes(pinnedInCategory)) {
+      return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
+    }
+    updateData.pinnedInCategory = pinnedInCategory || '';
+  }
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
