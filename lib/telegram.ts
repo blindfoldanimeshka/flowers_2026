@@ -67,18 +67,44 @@ ${itemsList}
 
     await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
 
-    // Отправляем фото первого товара, если есть
-    if (order.items.length > 0 && order.items[0].image) {
-      const imageUrl = order.items[0].image.startsWith('http')
-        ? order.items[0].image
-        : `${process.env.NEXT_PUBLIC_APP_URL || ''}${order.items[0].image}`;
+    // Отправляем фото всех товаров
+    const itemsWithImages = order.items.filter(item => item.image);
 
-      try {
-        await bot.sendPhoto(telegramId, imageUrl, {
-          caption: `Фото товара: ${order.items[0].name}`
-        });
-      } catch (photoError) {
-        productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
+    if (itemsWithImages.length > 0) {
+      // Если товаров с фото от 2 до 10, отправляем медиа-группой
+      if (itemsWithImages.length >= 2 && itemsWithImages.length <= 10) {
+        try {
+          const mediaGroup = itemsWithImages.map((item, index) => {
+            const imageUrl = item.image.startsWith('http')
+              ? item.image
+              : `${process.env.NEXT_PUBLIC_APP_URL || ''}${item.image}`;
+
+            return {
+              type: 'photo' as const,
+              media: imageUrl,
+              caption: index === 0 ? `${item.name} (${item.quantity} шт.)` : `${item.name} (${item.quantity} шт.)`
+            };
+          });
+
+          await bot.sendMediaGroup(telegramId, mediaGroup);
+        } catch (photoError) {
+          productionLogger.error('Ошибка отправки медиа-группы в Telegram:', photoError);
+        }
+      } else {
+        // Если товар один или больше 10, отправляем по одному
+        for (const item of itemsWithImages) {
+          const imageUrl = item.image.startsWith('http')
+            ? item.image
+            : `${process.env.NEXT_PUBLIC_APP_URL || ''}${item.image}`;
+
+          try {
+            await bot.sendPhoto(telegramId, imageUrl, {
+              caption: `${item.name} (${item.quantity} шт.)`
+            });
+          } catch (photoError) {
+            productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
+          }
+        }
       }
     }
 
