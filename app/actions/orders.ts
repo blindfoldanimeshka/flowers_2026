@@ -4,23 +4,23 @@ export const dynamic = 'force-dynamic';
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import Order from '@/models/Order';
 import { getCachedOrderStats, invalidateOrderStatsCache, invalidateOrdersCache } from '@/lib/cache';
 import { productionLogger } from '@/lib/productionLogger';
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Создание нового заказа
 export async function createOrder(formData: FormData) {
   try {
-    await dbConnect();
-    
-    // Получаем данные клиента
     const customerName = formData.get('customerName') as string;
     const customerEmail = formData.get('customerEmail') as string;
     const customerPhone = formData.get('customerPhone') as string;
     const customerAddress = formData.get('customerAddress') as string;
     
-    // Получаем данные заказа
     const itemsJson = formData.get('items') as string;
     const totalAmount = parseFloat(formData.get('totalAmount') as string);
     const paymentMethod = formData.get('paymentMethod') as string;
@@ -29,7 +29,6 @@ export async function createOrder(formData: FormData) {
     const deliveryTime = formData.get('deliveryTime') as string;
     const notes = formData.get('notes') as string;
     
-    // Валидация
     if (!customerName || !customerPhone || !customerAddress) {
       return {
         success: false,
@@ -61,7 +60,6 @@ export async function createOrder(formData: FormData) {
       };
     }
     
-    // Создание заказа
     const orderData: any = {
       customer: {
         name: customerName,
@@ -72,7 +70,8 @@ export async function createOrder(formData: FormData) {
       items,
       totalAmount,
       paymentMethod,
-      fulfillmentMethod
+      fulfillmentMethod,
+      status: 'pending'
     };
     
     if (deliveryDate) {
@@ -87,9 +86,22 @@ export async function createOrder(formData: FormData) {
       orderData.notes = notes;
     }
     
-    const order = await Order.create(orderData);
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({ collection: 5, doc: JSON.stringify(orderData) })
+      .select()
+      .single();
     
-    // Инвалидируем кэш и обновляем страницы
+    if (error) {
+      productionLogger.error('Ошибка при создании заказа (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка при создании заказа'
+      };
+    }
+    
+    const order = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateOrdersCache();
     invalidateOrderStatsCache();
     revalidatePath('/admin/orders');
@@ -101,17 +113,6 @@ export async function createOrder(formData: FormData) {
     
   } catch (error: any) {
     productionLogger.error('Ошибка при создании заказа:', error);
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
     return {
       success: false,
       error: 'Ошибка при создании заказа'
@@ -122,8 +123,6 @@ export async function createOrder(formData: FormData) {
 // Обновление статуса заказа
 export async function updateOrderStatus(orderId: string, status: string) {
   try {
-    await dbConnect();
-    
     if (!orderId || !status) {
       return {
         success: false,
@@ -139,20 +138,43 @@ export async function updateOrderStatus(orderId: string, status: string) {
       };
     }
     
-    const order = await Order.findByIdAndUpdate(
-      orderId,
-      { status },
-      { new: true, runValidators: true }
-    ).populate('items.productId', 'name price image');
+    // Получаем текущий документ
+    const { data: existing, error: existingError } = await supabase
+      .from('documents')
+      .select('doc')
+      .eq('id', orderId)
+      .eq('collection', 5)
+      .single();
     
-    if (!order) {
+    if (existingError || !existing) {
+      productionLogger.error('Ошибка при поиске заказа (Supabase):', existingError);
       return {
         success: false,
         error: 'Заказ не найден'
       };
     }
     
-    // Инвалидируем кэш и обновляем страницы
+    const existingDoc = JSON.parse(existing.doc);
+    const updatedDoc = { ...existingDoc, status };
+    
+    const { data, error } = await supabase
+      .from('documents')
+      .update({ doc: JSON.stringify(updatedDoc) })
+      .eq('id', orderId)
+      .eq('collection', 5)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      productionLogger.error('Ошибка при обновлении статуса заказа (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка обновления статуса'
+      };
+    }
+    
+    const order = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateOrdersCache();
     invalidateOrderStatsCache();
     revalidatePath('/admin/orders');
@@ -181,7 +203,6 @@ export async function getCustomerOrders(email: string) {
       };
     }
     
-    // Используем кэшированный метод с фильтром по email
     const { getCachedOrders } = await import('@/lib/cache');
     const result = await getCachedOrders({ email });
     
@@ -207,7 +228,6 @@ export async function getAllOrders(filters?: {
   limit?: number;
 }) {
   try {
-    // Используем кэшированный метод
     const { getCachedOrders } = await import('@/lib/cache');
     const result = await getCachedOrders(filters || {});
     
@@ -228,7 +248,6 @@ export async function getAllOrders(filters?: {
 // Получение статистики заказов (с кэшированием)
 export async function getOrderStats() {
   try {
-    // Получаем статистику из кэша
     const stats = await getCachedOrderStats();
     
     return {
@@ -243,4 +262,4 @@ export async function getOrderStats() {
       error: 'Ошибка при получении статистики'
     };
   }
-} 
+}
