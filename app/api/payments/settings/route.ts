@@ -1,10 +1,8 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import PaymentSettings from '@/models/PaymentSettings';
-import { sanitizeMongoObject } from '@/lib/security';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
 
 function buildPaymentSettingsUpdate(body: Record<string, any>) {
   const update: Record<string, any> = {};
@@ -48,31 +46,40 @@ function buildPaymentSettingsUpdate(body: Record<string, any>) {
 }
 
 export const GET = withErrorHandler(async (_request: NextRequest) => {
-    await dbConnect();
+    const { data: settings, error } = await supabase
+      .from('payment_settings')
+      .select('*')
+      .maybeSingle();
 
-    const settings = await PaymentSettings.getSettings();
+    if (error || !settings) {
+      productionLogger.error('Supabase payment settings fetch error:', error);
+      return NextResponse.json(
+        { settings: { isEnabled: false, currency: 'RUB' } },
+        { status: 200 }
+      );
+    }
+
     const publicSettings = {
-      isEnabled: settings.isEnabled,
+      isEnabled: settings.is_enabled,
       currency: settings.currency,
       stripe: {
-        enabled: settings.stripe.enabled,
-        publishableKey: settings.stripe.publishableKey,
+        enabled: settings.stripe?.enabled,
+        publishableKey: settings.stripe?.publishableKey,
       },
       yookassa: {
-        enabled: settings.yookassa.enabled,
+        enabled: settings.yookassa?.enabled,
       },
       sberbank: {
-        enabled: settings.sberbank.enabled,
+        enabled: settings.sberbank?.enabled,
       },
-      cashOnDelivery: settings.cashOnDelivery,
-      cardOnDelivery: settings.cardOnDelivery,
-      taxRate: settings.taxRate,
-      deliveryFee: settings.deliveryFee,
-      freeDeliveryThreshold: settings.freeDeliveryThreshold,
+      cashOnDelivery: settings.cash_on_delivery,
+      cardOnDelivery: settings.card_on_delivery,
+      taxRate: settings.tax_rate,
+      deliveryFee: settings.delivery_fee,
+      freeDeliveryThreshold: settings.free_delivery_threshold,
     };
 
     return NextResponse.json({ settings: publicSettings }, { status: 200 });
-  
 });
 
 export const PUT = withErrorHandler(async (request: NextRequest) => {
@@ -81,17 +88,22 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Доступ запрещен - требуется роль администратора' }, { status: 403 });
     }
 
-    await dbConnect();
-
-    const body = sanitizeMongoObject(await request.json());
+    const body = await request.json();
     const updateData = buildPaymentSettingsUpdate(body);
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
     }
 
-    const settings = await PaymentSettings.getSettings();
-    const updatedSettings = await PaymentSettings.findByIdAndUpdate(settings._id, { $set: updateData }, { new: true, runValidators: true });
+    const { data: updatedSettings, error } = await supabase
+      .from('payment_settings')
+      .update(updateData)
+      .select('*')
+      .single();
+
+    if (error || !updatedSettings) {
+      productionLogger.error('Supabase payment settings update error:', error);
+      return NextResponse.json({ error: error?.message || 'Ошибка обновления настроек' }, { status: 500 });
+    }
 
     return NextResponse.json({ settings: updatedSettings }, { status: 200 });
-  
 });
