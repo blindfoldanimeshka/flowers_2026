@@ -1,12 +1,11 @@
 export const dynamic = 'force-dynamic';
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import Settings from '@/models/Settings';
 import { getCachedSettings, invalidateSettingsCache } from '@/lib/cache';
 import { requireAdmin } from '@/lib/auth';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
 
 interface SettingsUpdatePayload {
   siteName?: string;
@@ -247,8 +246,6 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
 }
 
 async function updateOrCreateSettings(body: Record<string, unknown>): Promise<any> {
-  await dbConnect();
-
   const sanitizedBody = validateAndSanitizeSettings(body);
 
   const defaultSettings = {
@@ -271,32 +268,37 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
     mediaLibrary: [],
   };
 
-  const settings = await Settings.findOneAndUpdate(
-    { settingKey: SETTINGS_KEY },
-    {
-      $set: { ...sanitizedBody, settingKey: SETTINGS_KEY },
-      $setOnInsert: defaultSettings,
-    },
-    {
-      new: true,
-      upsert: true,
-      runValidators: true,
-      setDefaultsOnInsert: true,
-    }
-  );
+  const { data: settings, error } = await supabase
+    .from('settings')
+    .upsert(
+      { ...defaultSettings, ...sanitizedBody },
+      { onConflict: 'settingKey', ignoreDuplicates: false }
+    )
+    .select('*')
+    .single();
 
-  await Settings.deleteMany({ _id: { $ne: settings._id } });
+  if (error || !settings) {
+    productionLogger.error('Supabase settings upsert error:', error);
+    throw new Error(error?.message || 'Failed to update settings');
+  }
+
   invalidateSettingsCache();
-
   return settings;
 }
 
 export const GET = withErrorHandler(async () => {
-    const settings = await getCachedSettings();
-    const plainSettings = settings ? JSON.parse(JSON.stringify(settings)) : null;
+    const { data: settings, error } = await supabase
+      .from('settings')
+      .select('*')
+      .eq('settingKey', SETTINGS_KEY)
+      .maybeSingle();
 
-    return NextResponse.json({ settings: normalizePublicSettings(plainSettings) }, { status: 200 });
-  
+    if (error) {
+      productionLogger.error('Supabase settings fetch error:', error);
+      return NextResponse.json({ settings: normalizePublicSettings(null) }, { status: 200 });
+    }
+
+    return NextResponse.json({ settings: normalizePublicSettings(settings) }, { status: 200 });
 });
 
 export const PUT = withErrorHandler(async (request: NextRequest) => {
