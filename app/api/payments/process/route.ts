@@ -1,46 +1,59 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import PaymentSettings from '@/models/PaymentSettings';
-import Order from '@/models/Order';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
 
 // POST запрос для обработки платежа
 export const POST = withErrorHandler(async (request: NextRequest) => {
-    await dbConnect();
-    
     const body = await request.json();
     const { orderId, paymentMethod, paymentData } = body;
-    
+
     if (!orderId || !paymentMethod) {
       return NextResponse.json(
         { error: 'ID заказа и способ оплаты обязательны' },
         { status: 400 }
       );
     }
-    
+
     // Получаем заказ
-    const order = await Order.findById(orderId);
-    if (!order) {
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (orderError || !order) {
+      productionLogger.error('Supabase order fetch error:', orderError);
       return NextResponse.json(
         { error: 'Заказ не найден' },
         { status: 404 }
       );
     }
-    
+
     // Получаем настройки платежей
-    const settings = await PaymentSettings.getSettings();
-    
-    if (!settings.isEnabled) {
+    const { data: settings, error: settingsError } = await supabase
+      .from('payment_settings')
+      .select('*')
+      .maybeSingle();
+
+    if (settingsError || !settings) {
+      productionLogger.error('Supabase payment settings fetch error:', settingsError);
       return NextResponse.json(
         { error: 'Платежи временно недоступны' },
         { status: 503 }
       );
     }
-    
+
+    if (!settings.is_enabled) {
+      return NextResponse.json(
+        { error: 'Платежи временно недоступны' },
+        { status: 503 }
+      );
+    }
+
     let paymentResult;
-    
+
     // Обрабатываем платеж в зависимости от метода
     switch (paymentMethod) {
       case 'stripe':
@@ -69,17 +82,34 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
           { status: 400 }
         );
     }
-    
+
     if (!paymentResult.success) {
       return NextResponse.json(
         { error: paymentResult.error },
         { status: 400 }
       );
     } else {
-      await Order.findByIdAndUpdate(orderId, {
-        paymentStatus: paymentResult.paymentStatus,
-        status: paymentResult.orderStatus
-      });
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          payment_status: paymentResult.paymentStatus,
+          status: paymentResult.orderStatus
+        })
+        .eq('id', orderId);
+
+      if (updateError) {
+        productionLogger.error('Supabase order update error:', updateError);
+      }
+
+      return NextResponse.json({
+        success: true,
+        paymentId: paymentResult.paymentId,
+        status: paymentResult.paymentStatus,
+        message: paymentResult.message
+      }, { status: 200 });
+    }
+   
+});
 
       return NextResponse.json({
         success: true,
