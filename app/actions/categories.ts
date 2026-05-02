@@ -1,16 +1,18 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import Category from '@/models/Category';
 import { getCachedCategories, invalidateCategoriesCache } from '@/lib/cache';
 import { productionLogger } from '@/lib/productionLogger';
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Создание новой категории
 export async function createCategory(formData: FormData) {
   try {
-    await dbConnect();
-    
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
     const image = formData.get('image') as string;
@@ -23,14 +25,24 @@ export async function createCategory(formData: FormData) {
       };
     }
     
-    const category = await Category.create({
-      name,
-      description,
-      image,
-      isActive
-    });
+    const newDoc = { name, description, image, isActive };
     
-    // Инвалидируем кэш и обновляем страницы
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({ collection: 2, doc: JSON.stringify(newDoc) })
+      .select()
+      .single();
+    
+    if (error) {
+      productionLogger.error('Ошибка при создании категории (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка при создании категории'
+      };
+    }
+    
+    const category = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateCategoriesCache();
     revalidatePath('/admin/categories');
     revalidatePath('/');
@@ -42,24 +54,6 @@ export async function createCategory(formData: FormData) {
     
   } catch (error: any) {
     productionLogger.error('Ошибка при создании категории:', error);
-    
-    if (error.code === 11000) {
-      return {
-        success: false,
-        error: 'Категория с таким названием уже существует'
-      };
-    }
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
     return {
       success: false,
       error: 'Ошибка при создании категории'
@@ -70,8 +64,6 @@ export async function createCategory(formData: FormData) {
 // Обновление категории
 export async function updateCategory(id: string, formData: FormData) {
   try {
-    await dbConnect();
-    
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
     const image = formData.get('image') as string;
@@ -84,25 +76,26 @@ export async function updateCategory(id: string, formData: FormData) {
       };
     }
     
-    const category = await Category.findByIdAndUpdate(
-      id,
-      {
-        name,
-        description,
-        image,
-        isActive
-      },
-      { new: true, runValidators: true }
-    );
+    const updateDoc = { name, description, image, isActive };
     
-    if (!category) {
+    const { data, error } = await supabase
+      .from('documents')
+      .update({ doc: JSON.stringify(updateDoc) })
+      .eq('id', id)
+      .eq('collection', 2)
+      .select()
+      .single();
+    
+    if (error || !data) {
+      productionLogger.error('Ошибка при обновлении категории (Supabase):', error);
       return {
         success: false,
         error: 'Категория не найдена'
       };
     }
     
-    // Инвалидируем кэш и обновляем страницы
+    const category = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateCategoriesCache();
     revalidatePath('/admin/categories');
     revalidatePath('/');
@@ -114,24 +107,6 @@ export async function updateCategory(id: string, formData: FormData) {
     
   } catch (error: any) {
     productionLogger.error('Ошибка при обновлении категории:', error);
-    
-    if (error.code === 11000) {
-      return {
-        success: false,
-        error: 'Категория с таким названием уже существует'
-      };
-    }
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
     return {
       success: false,
       error: 'Ошибка при обновлении категории'
@@ -142,18 +117,22 @@ export async function updateCategory(id: string, formData: FormData) {
 // Удаление категории
 export async function deleteCategory(id: string) {
   try {
-    await dbConnect();
+    const { data, error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id)
+      .eq('collection', 2)
+      .select()
+      .single();
     
-    const category = await Category.findByIdAndDelete(id);
-    
-    if (!category) {
+    if (error || !data) {
+      productionLogger.error('Ошибка при удалении категории (Supabase):', error);
       return {
         success: false,
         error: 'Категория не найдена'
       };
     }
     
-    // Инвалидируем кэш и обновляем страницы
     invalidateCategoriesCache();
     revalidatePath('/admin/categories');
     revalidatePath('/');
@@ -175,7 +154,6 @@ export async function deleteCategory(id: string) {
 // Получение всех категорий (с кэшированием)
 export async function getCategories() {
   try {
-    // Получаем категории из кэша
     const categories = await getCachedCategories();
     
     return {
@@ -195,7 +173,6 @@ export async function getCategories() {
 // Получение активных категорий (с кэшированием)
 export async function getActiveCategories() {
   try {
-    // Получаем категории из кэша и фильтруем активные
     const categories = await getCachedCategories();
     const activeCategories = categories.filter(cat => cat.isActive);
     
@@ -211,4 +188,4 @@ export async function getActiveCategories() {
       error: 'Ошибка при получении категорий'
     };
   }
-} 
+}
