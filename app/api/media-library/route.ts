@@ -1,11 +1,9 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import Settings from '@/models/Settings';
-import Product from '@/models/Product';
 import { requireAdmin } from '@/lib/auth';
 import { invalidateSettingsCache } from '@/lib/cache';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
 
 const SETTINGS_KEY = 'global-settings';
 const MAX_LIBRARY_ITEMS = 400;
@@ -70,11 +68,17 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     );
 
     const dataPromise = (async () => {
-      await dbConnect();
-      const settingsDoc = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
+      const { data: settingsDoc } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('settingKey', SETTINGS_KEY)
+        .maybeSingle();
       const settings = (settingsDoc || {}) as Record<string, unknown>;
 
-      const products = await Product.find({}).select('image images').limit(200).lean();
+      const { data: products } = await supabase
+        .from('products')
+        .select('image, images')
+        .limit(200);
 
       const map = new Map<string, { url: string; inLibrary: boolean; createdAt?: string }>();
 
@@ -91,7 +95,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
         }
       }
 
-      for (const p of products) {
+      for (const p of products || []) {
         for (const u of collectProductImageUrls(p)) {
           if (!map.has(u)) {
             map.set(u, { url: u, inLibrary: false });
@@ -139,8 +143,12 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Некорректный URL' }, { status: 400 });
   }
 
-  await dbConnect();
-  const current = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
+  const { data: current } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('settingKey', SETTINGS_KEY)
+    .maybeSingle();
+
   const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
 
   if (existingLib.some((e: { url?: string }) => e?.url === url)) {
@@ -154,13 +162,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   };
   const nextLib = [entry, ...existingLib].slice(0, MAX_LIBRARY_ITEMS);
 
-  if (!current) {
-    await Settings.create({
-      settingKey: SETTINGS_KEY,
-      mediaLibrary: nextLib,
-    });
-  } else {
-    await Settings.findOneAndUpdate({ settingKey: SETTINGS_KEY }, { $set: { mediaLibrary: nextLib } });
+  const { error } = await supabase
+    .from('settings')
+    .update({ mediaLibrary: nextLib })
+    .eq('settingKey', SETTINGS_KEY);
+
+  if (error) {
+    return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
   }
 
   invalidateSettingsCache();
@@ -180,8 +188,12 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'URL не указан' }, { status: 400 });
   }
 
-  await dbConnect();
-  const current = await Settings.findOne({ settingKey: SETTINGS_KEY }).lean();
+  const { data: current } = await supabase
+    .from('settings')
+    .select('*')
+    .eq('settingKey', SETTINGS_KEY)
+    .maybeSingle();
+
   const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
 
   const filtered = existingLib.filter((e: { url?: string }) => e?.url !== url);
@@ -190,11 +202,14 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Изображение не найдено в библиотеке' }, { status: 404 });
   }
 
-  await Settings.findOneAndUpdate(
-    { settingKey: SETTINGS_KEY },
-    { $set: { mediaLibrary: filtered } },
-    { upsert: true }
-  );
+  const { error } = await supabase
+    .from('settings')
+    .update({ mediaLibrary: filtered })
+    .eq('settingKey', SETTINGS_KEY);
+
+  if (error) {
+    return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
+  }
 
   invalidateSettingsCache();
   mediaCache = null;
