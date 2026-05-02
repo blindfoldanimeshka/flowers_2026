@@ -1,4 +1,4 @@
-import { createSupabaseModel } from '@/lib/supabaseModel';
+import { supabase } from '@/lib/supabase';
 
 export interface IOrderCounter {
   _id: string;
@@ -6,9 +6,18 @@ export interface IOrderCounter {
   seq: number;
 }
 
-const OrderCounter = createSupabaseModel({
-  collection: 'order_counters',
-  defaults: { seq: 0 },
-});
+export async function getNextOrderNumber(): Promise<string> {
+  const date = new Date();
+  const dateKey = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
 
-export default OrderCounter;
+  const { data, error } = await supabase.rpc('increment_order_counter', { p_date_key: dateKey });
+
+  if (error) {
+    const fallbackSeq = Date.now() % 10000;
+    return `${dateKey}-${String(fallbackSeq).padStart(4, '0')}`;
+  }
+
+  return `${dateKey}-${String(data).padStart(4, '0')}`;
+}
+
+export default { getNextOrderNumber };

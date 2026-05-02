@@ -8,7 +8,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { generateOrganizationSchema, generateWebSiteSchema } from '@/lib/structuredData';
 
 const inter = Inter({
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic", "cyrillic-ext"],
   display: "swap",
   preload: true,
   variable: "--font-inter",

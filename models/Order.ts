@@ -42,14 +42,7 @@ const Order = createSupabaseModel({
   },
   preCreate: async (doc) => {
     if (!doc.orderNumber) {
-      const date = new Date();
-      const dateKey = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-      const counter = await OrderCounter.findOneAndUpdate(
-        { dateKey },
-        { $inc: { seq: 1 }, $setOnInsert: { dateKey, seq: 0 } },
-        { upsert: true, new: true }
-      );
-      doc.orderNumber = `${dateKey}-${String(counter.seq).padStart(4, '0')}`;
+      doc.orderNumber = await OrderCounter.getNextOrderNumber();
     }
   },
 });

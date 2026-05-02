@@ -105,7 +105,7 @@ function NavItem({ category, compact }: { category: ICategory; compact: boolean 
           <div className="absolute h-3 w-full top-[-12px]"></div>
           {category.subcategories.map((subcategory, index) => (
             <Link
-              key={subcategory._id}
+              key={`${String(category._id || category.id || category.slug)}-${String(subcategory._id || subcategory.slug || index)}`}
               href={`/category/${category.slug}/${subcategory.slug}`}
               className={`block px-4 py-2 text-[16px] hover:bg-[#FFE1E1] hover:font-medium transition-all duration-300 ${
                 index === 0 ? 'rounded-t-[16px]' : ''

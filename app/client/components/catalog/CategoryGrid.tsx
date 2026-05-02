@@ -92,7 +92,7 @@ export default function CategoryGrid() {
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
-                      '/image/items/11.png'
+                      '/image/items/no_photo.jpg'
                     }
                     alt={category.name}
                     fill
@@ -107,9 +107,9 @@ export default function CategoryGrid() {
                   <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight pr-4">{category.name}</h3>
 
                   <div className="hidden lg:flex flex-wrap gap-2 max-w-[90%]">
-                    {category.subcategories?.slice(0, 3).map((subcategory) => (
+                    {category.subcategories?.slice(0, 3).map((subcategory, idx) => (
                       <span
-                        key={subcategory._id}
+                        key={subcategory._id || `subcat-${idx}`}
                         className="px-2.5 py-1 bg-white/80 rounded-full text-xs text-[#2f1b26]"
                       >
                         {subcategory.name}

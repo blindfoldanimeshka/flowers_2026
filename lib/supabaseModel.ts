@@ -16,11 +16,6 @@ type ModelOptions = {
   references?: Record<string, string>;
 };
 
-const modelRegistry = new Map<string, ReturnType<typeof createSupabaseModel>>();
-
-const collectionCache = new Map<string, { data: AnyObject[]; timestamp: number }>();
-const COLLECTION_CACHE_TTL = 30000; // 30 секунд
-
 const COLLECTION_CODE_MAP: Record<string, number> = {
   users: 1,
   categories: 2,
@@ -84,195 +79,65 @@ function pickSelectedFields(current: AnyObject, select: string): AnyObject {
   return picked;
 }
 
-function matchCondition(value: any, condition: any): boolean {
-  const asArray = (input: any): any[] => (Array.isArray(input) ? input : [input]);
-  const includesByString = (source: any, target: any): boolean => {
-    const sourceItems = asArray(source);
-    const targetItems = asArray(target);
-    return sourceItems.some((sourceItem) =>
-      targetItems.some((targetItem) => String(sourceItem) === String(targetItem))
-    );
-  };
+function buildSupabaseQuery(baseQuery: any, query: AnyObject) {
+  if (!query || Object.keys(query).length === 0) return baseQuery;
 
-  if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
-    if ('$regex' in condition) {
-      const pattern = condition.$regex;
-      const flags = condition.$options || '';
-      const regex = pattern instanceof RegExp ? pattern : new RegExp(String(pattern), flags);
-      return regex.test(String(value ?? ''));
+  for (const [key, condition] of Object.entries(query)) {
+    if (key === '$or') continue;
+    
+    const isIdField = key === '_id';
+    const jsonbPath = isIdField ? 'id' : `doc->>${key}`;
+    
+    if (isIdField && typeof condition === 'object' && condition !== null) {
+      if ('$in' in condition) {
+        baseQuery = baseQuery.in('id', condition.$in);
+      } else if ('$eq' in condition) {
+        baseQuery = baseQuery.eq('id', condition.$eq);
+      } else if ('$ne' in condition) {
+        baseQuery = baseQuery.neq('id', condition.$ne);
+      }
+      continue;
     }
-    if ('$in' in condition) {
-      return includesByString(value, condition.$in as any[]);
+
+    if (typeof condition === 'object' && condition !== null) {
+      if ('$eq' in condition) {
+        baseQuery = baseQuery.eq(jsonbPath, condition.$eq);
+      }
+      if ('$ne' in condition) {
+        baseQuery = baseQuery.neq(jsonbPath, condition.$ne);
+      }
+      if ('$in' in condition) {
+        baseQuery = baseQuery.in(jsonbPath, condition.$in);
+      }
+      if ('$gte' in condition) {
+        baseQuery = baseQuery.gte(`doc->${key}`, condition.$gte);
+      }
+      if ('$gt' in condition) {
+        baseQuery = baseQuery.gt(`doc->${key}`, condition.$gt);
+      }
+      if ('$lte' in condition) {
+        baseQuery = baseQuery.lte(`doc->${key}`, condition.$lte);
+      }
+      if ('$lt' in condition) {
+        baseQuery = baseQuery.lt(`doc->${key}`, condition.$lt);
+      }
+      if ('$regex' in condition) {
+        const pattern = condition.$regex;
+        const flags = condition.$options || '';
+        const regex = new RegExp(pattern, flags);
+        baseQuery = baseQuery.ilike(`doc->${key}`, regex.source.replace(/^\^/, '').replace(/\$$/, ''));
+      }
+      continue;
     }
-    if ('$ne' in condition) {
-      return !includesByString(value, condition.$ne);
-    }
-    if ('$gte' in condition && !(value >= condition.$gte)) return false;
-    if ('$gt' in condition && !(value > condition.$gt)) return false;
-    if ('$lte' in condition && !(value <= condition.$lte)) return false;
-    if ('$lt' in condition && !(value < condition.$lt)) return false;
-    if ('$eq' in condition) return includesByString(value, condition.$eq);
-    return Object.entries(condition).every(([key, val]) => matchCondition((value || {})[key], val));
-  }
-  return includesByString(value, condition);
-}
 
-function matchesQuery(doc: AnyObject, query: AnyObject = {}): boolean {
-  if (!query || Object.keys(query).length === 0) return true;
-  if (Array.isArray(query.$or)) {
-    const orMatch = query.$or.some((q: AnyObject) => matchesQuery(doc, q));
-    if (!orMatch) return false;
+    baseQuery = baseQuery.eq(jsonbPath, condition);
   }
 
-  return Object.entries(query).every(([key, condition]) => {
-    if (key === '$or') return true;
-    const value = getByPath(doc, key);
-    return matchCondition(value, condition);
-  });
-}
-
-function applyUpdateOperators(doc: AnyObject, update: AnyObject): AnyObject {
-  const next = deepClone(doc);
-  const hasOps = Object.keys(update).some((k) => k.startsWith('$'));
-  if (!hasOps) {
-    return { ...next, ...update };
-  }
-
-  if (update.$set) {
-    for (const [key, value] of Object.entries(update.$set)) {
-      setByPath(next, key, value);
-    }
-  }
-  if (update.$inc) {
-    for (const [key, value] of Object.entries(update.$inc)) {
-      const current = Number(getByPath(next, key) || 0);
-      setByPath(next, key, current + Number(value));
-    }
-  }
-  if (update.$addToSet) {
-    for (const [key, value] of Object.entries(update.$addToSet)) {
-      const arr = Array.isArray(getByPath(next, key)) ? [...getByPath(next, key)] : [];
-      const exists = arr.some((item: any) => String(item) === String(value));
-      if (!exists) arr.push(value);
-      setByPath(next, key, arr);
-    }
-  }
-  if (update.$pull) {
-    for (const [key, value] of Object.entries(update.$pull)) {
-      const arr = Array.isArray(getByPath(next, key)) ? [...getByPath(next, key)] : [];
-      const filtered = arr.filter((item: any) => {
-        if (value && typeof value === 'object' && '$in' in (value as AnyObject)) {
-          return !(value as AnyObject).$in.some((v: any) => String(v) === String(item));
-        }
-        return String(item) !== String(value);
-      });
-      setByPath(next, key, filtered);
-    }
-  }
-  return next;
-}
-
-async function readCollection(collection: string): Promise<AnyObject[]> {
-  const now = Date.now();
-  const cached = collectionCache.get(collection);
-
-  if (cached && now - cached.timestamp < COLLECTION_CACHE_TTL) {
-    return cached.data;
-  }
-
-  const collectionValue = resolveCollectionValue(collection);
-  const { data, error } = await supabase
-    .from(SUPABASE_COLLECTION_TABLE)
-    .select('id, doc, created_at, updated_at')
-    .eq('collection', collectionValue);
-
-  if (error) throw error;
-
-  const result = (data || []).map((row: AnyObject) => ({
-    ...normalizeRowDoc(row.doc),
-    _id: row.id,
-    createdAt: normalizeRowDoc(row.doc)?.createdAt || row.created_at,
-    updatedAt: normalizeRowDoc(row.doc)?.updatedAt || row.updated_at,
-  }));
-
-  collectionCache.set(collection, { data: result, timestamp: now });
-  return result;
-}
-
-function invalidateCollectionCache(collection: string) {
-  collectionCache.delete(collection);
-}
-
-async function insertDoc(collection: string, doc: AnyObject): Promise<AnyObject> {
-  const collectionValue = resolveCollectionValue(collection);
-  const now = new Date().toISOString();
-  const payload = {
-    ...doc,
-    createdAt: doc.createdAt || now,
-    updatedAt: now,
-  };
-  const { data, error } = await supabase
-    .from(SUPABASE_COLLECTION_TABLE)
-    .insert({ collection: collectionValue, doc: payload })
-    .select('id, doc, created_at, updated_at')
-    .single();
-  if (error) throw error;
-  invalidateCollectionCache(collection);
-  return {
-    ...normalizeRowDoc(data?.doc),
-    _id: data?.id,
-    createdAt: normalizeRowDoc(data?.doc)?.createdAt || data?.created_at,
-    updatedAt: normalizeRowDoc(data?.doc)?.updatedAt || data?.updated_at,
-  };
-}
-
-async function updateDoc(collection: string, id: string, doc: AnyObject): Promise<AnyObject | null> {
-  const collectionValue = resolveCollectionValue(collection);
-  const now = new Date().toISOString();
-  const payload = {
-    ...doc,
-    updatedAt: now,
-  };
-  const { data, error } = await supabase
-    .from(SUPABASE_COLLECTION_TABLE)
-    .update({ doc: payload, updated_at: now })
-    .eq('collection', collectionValue)
-    .eq('id', id)
-    .select('id, doc, created_at, updated_at')
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  invalidateCollectionCache(collection);
-  return {
-    ...normalizeRowDoc(data.doc),
-    _id: data.id,
-    createdAt: normalizeRowDoc(data.doc)?.createdAt || data.created_at,
-    updatedAt: normalizeRowDoc(data.doc)?.updatedAt || data.updated_at,
-  };
-}
-
-async function deleteDoc(collection: string, id: string): Promise<AnyObject | null> {
-  const collectionValue = resolveCollectionValue(collection);
-  const { data, error } = await supabase
-    .from(SUPABASE_COLLECTION_TABLE)
-    .delete()
-    .eq('collection', collectionValue)
-    .eq('id', id)
-    .select('id, doc, created_at, updated_at')
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) return null;
-  invalidateCollectionCache(collection);
-  return {
-    ...normalizeRowDoc(data.doc),
-    _id: data.id,
-    createdAt: normalizeRowDoc(data.doc)?.createdAt || data.created_at,
-    updatedAt: normalizeRowDoc(data.doc)?.updatedAt || data.updated_at,
-  };
+  return baseQuery;
 }
 
 class QueryBuilder {
-  private readonly model: ReturnType<typeof createSupabaseModel>;
+  private readonly model: any;
   private readonly query: AnyObject;
   private readonly single: boolean;
   private sortSpec: AnyObject | null = null;
@@ -281,9 +146,9 @@ class QueryBuilder {
   private selectValue: string | null = null;
   private leanValue = false;
   private populates: PopulateSpec[] = [];
-  private fixedResult: AnyObject | AnyObject[] | Promise<any> | null = null;
+  private fixedResult: any = null;
 
-  constructor(model: ReturnType<typeof createSupabaseModel>, query: AnyObject = {}, single = false, fixedResult: any = null) {
+  constructor(model: any, query: AnyObject = {}, single = false, fixedResult: any = null) {
     this.model = model;
     this.query = query;
     this.single = single;
@@ -325,47 +190,61 @@ class QueryBuilder {
   }
 
   async exec() {
-    let docs: AnyObject[];
     if (this.fixedResult != null) {
       const resolved = await this.fixedResult;
       if (resolved == null) {
-        docs = [];
-      } else {
-        docs = Array.isArray(resolved) ? resolved : [resolved];
+        return this.single ? null : [];
       }
-    } else {
-      docs = await readCollection(this.model.collectionName);
-      docs = docs.filter((doc) => matchesQuery(doc, this.query));
+      if (this.single) {
+        return this.model.wrapRead(resolved, this.leanValue);
+      }
+      const arr = Array.isArray(resolved) ? resolved : [resolved];
+      return arr.map((doc) => this.model.wrapRead(doc, this.leanValue));
     }
+
+    const collectionValue = resolveCollectionValue(this.model.collectionName);
+
+    let query = supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .select('id, doc, created_at, updated_at')
+      .eq('collection', collectionValue);
+
+    query = buildSupabaseQuery(query, this.query);
 
     if (this.sortSpec) {
       const [[field, direction]] = Object.entries(this.sortSpec);
-      docs.sort((a, b) => {
-        const av = getByPath(a, field);
-        const bv = getByPath(b, field);
-        if (av === bv) return 0;
-        return av > bv ? (direction as number) : -(direction as number);
-      });
+      query = query.order(field, { ascending: direction > 0 });
     }
 
-    if (this.skipValue) {
-      docs = docs.slice(this.skipValue);
+    if (this.skipValue > 0) {
+      query = query.range(this.skipValue, this.skipValue + (this.limitValue || 10) - 1);
+    } else if (this.limitValue != null) {
+      query = query.limit(this.limitValue);
     }
-    if (this.limitValue != null) {
-      docs = docs.slice(0, this.limitValue);
-    }
+
+    const { data, error } = await query;
+
+    if (error) throw error;
+
+    let docs: any = (data || []).map((row: AnyObject) => ({
+      ...normalizeRowDoc(row.doc),
+      _id: row.id,
+      createdAt: normalizeRowDoc(row.doc)?.createdAt || row.created_at,
+      updatedAt: normalizeRowDoc(row.doc)?.updatedAt || row.updated_at,
+    }));
 
     if (this.populates.length > 0) {
-      docs = await this.model.applyPopulate(docs, this.populates);
+      docs = await this.model.applyPopulate(docs as any[], this.populates);
     }
 
     if (this.selectValue) {
       const fields = this.selectValue.split(/\s+/).filter(Boolean);
-      docs = docs.map((doc) => {
+      docs = docs.map((doc: any) => {
         const out: AnyObject = {};
         for (const f of fields) {
           out[f] = getByPath(doc, f);
         }
+        out._id = doc._id;
         return out;
       });
     }
@@ -396,7 +275,7 @@ class QueryBuilder {
 }
 
 export class SupabaseDocument {
-  static model: ReturnType<typeof createSupabaseModel>;
+  static model: any;
   _id?: string;
 
   constructor(data: AnyObject = {}) {
@@ -425,6 +304,71 @@ export class SupabaseDocument {
   validateSync() {
     return null;
   }
+}
+
+async function insertDoc(collection: string, doc: AnyObject): Promise<AnyObject> {
+  const collectionValue = resolveCollectionValue(collection);
+  const now = new Date().toISOString();
+  const payload = {
+    ...doc,
+    createdAt: doc.createdAt || now,
+    updatedAt: now,
+  };
+  const { data, error } = await supabase
+    .from(SUPABASE_COLLECTION_TABLE)
+    .insert({ collection: collectionValue, doc: payload })
+    .select('id, doc, created_at, updated_at')
+    .single();
+  if (error) throw error;
+  return {
+    ...normalizeRowDoc(data?.doc),
+    _id: data?.id,
+    createdAt: normalizeRowDoc(data?.doc)?.createdAt || data?.created_at,
+    updatedAt: normalizeRowDoc(data?.doc)?.updatedAt || data?.updated_at,
+  };
+}
+
+async function updateDoc(collection: string, id: string, doc: AnyObject): Promise<AnyObject | null> {
+  const collectionValue = resolveCollectionValue(collection);
+  const now = new Date().toISOString();
+  const payload = {
+    ...doc,
+    updatedAt: now,
+  };
+  const { data, error } = await supabase
+    .from(SUPABASE_COLLECTION_TABLE)
+    .update({ doc: payload, updated_at: now })
+    .eq('collection', collectionValue)
+    .eq('id', id)
+    .select('id, doc, created_at, updated_at')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    ...normalizeRowDoc(data.doc),
+    _id: data.id,
+    createdAt: normalizeRowDoc(data.doc)?.createdAt || data.created_at,
+    updatedAt: normalizeRowDoc(data.doc)?.updatedAt || data.updated_at,
+  };
+}
+
+async function deleteDoc(collection: string, id: string): Promise<AnyObject | null> {
+  const collectionValue = resolveCollectionValue(collection);
+  const { data, error } = await supabase
+    .from(SUPABASE_COLLECTION_TABLE)
+    .delete()
+    .eq('collection', collectionValue)
+    .eq('id', id)
+    .select('id, doc, created_at, updated_at')
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  return {
+    ...normalizeRowDoc(data.doc),
+    _id: data.id,
+    createdAt: normalizeRowDoc(data.doc)?.createdAt || data.created_at,
+    updatedAt: normalizeRowDoc(data.doc)?.updatedAt || data.updated_at,
+  };
 }
 
 export function createSupabaseModel(options: ModelOptions) {
@@ -528,8 +472,17 @@ export function createSupabaseModel(options: ModelOptions) {
     }
 
     static async countDocuments(query: AnyObject = {}) {
-      const docs = await readCollection(options.collection);
-      return docs.filter((doc) => matchesQuery(doc, query)).length;
+      const collectionValue = resolveCollectionValue(options.collection);
+      let dbQuery = supabase
+        .from(SUPABASE_COLLECTION_TABLE)
+        .select('id', { count: 'exact', head: true })
+        .eq('collection', collectionValue);
+
+      dbQuery = buildSupabaseQuery(dbQuery, query);
+
+      const { count, error } = await dbQuery;
+      if (error) throw error;
+      return count || 0;
     }
 
     static async exists(query: AnyObject = {}) {
@@ -546,7 +499,7 @@ export function createSupabaseModel(options: ModelOptions) {
         if (!saved) return null;
         return this.wrapRead(saved, false);
       };
-      return new QueryBuilder(Model as any, {}, true, run());
+      return new QueryBuilder(Model as any, {}, true, Promise.resolve(run()));
     }
 
     static async findByIdAndDelete(id: string) {
@@ -608,15 +561,58 @@ export function createSupabaseModel(options: ModelOptions) {
     }
 
     static async aggregate(pipeline: AnyObject[]) {
-      let docs = await this.find({}).lean();
+      const collectionValue = resolveCollectionValue(options.collection);
+      let docs: AnyObject[] = [];
+
+      const hasOnlyGroup = pipeline.length === 1 && pipeline[0].$group;
+      const hasMatchGroup = pipeline.length === 2 && pipeline[0].$match && pipeline[1].$group;
+
+      if (collectionValue === 5) {
+        if (hasOnlyGroup && pipeline[0].$group._id === null) {
+          const expr = pipeline[0].$group.total;
+          if (expr && typeof expr === 'object' && '.$sum' in expr) {
+            const sumExpr = (expr as AnyObject).$sum;
+            if (sumExpr === '$totalAmount') {
+              const { data } = await supabase.rpc('get_total_revenue');
+              return [{ _id: null, total: data || 0 }];
+            }
+          }
+        }
+        if (hasMatchGroup && pipeline[1].$group._id === '$status') {
+          const statusCounts = new Map<string, number>();
+          const { data } = await supabase
+            .from(SUPABASE_COLLECTION_TABLE)
+            .select('id, doc, created_at, updated_at')
+            .eq('collection', collectionValue);
+          
+          (data || []).forEach((row) => {
+            const status = row.doc?.status || 'unknown';
+            statusCounts.set(status, (statusCounts.get(status) || 0) + 1);
+          });
+          
+          return Array.from(statusCounts.entries()).map(([status, count]) => ({
+            _id: status,
+            count
+          }));
+        }
+      }
+
       for (const stage of pipeline) {
         if (stage.$match) {
-          docs = docs.filter((doc: AnyObject) => matchesQuery(doc, stage.$match));
+          const { data } = await supabase
+            .from(SUPABASE_COLLECTION_TABLE)
+            .select('id, doc, created_at, updated_at')
+            .eq('collection', collectionValue);
+
+          docs = (data || []).map((row) => ({
+            ...normalizeRowDoc(row.doc),
+            _id: row.id,
+          })).filter((doc) => matchesQuery(doc, stage.$match));
         }
         if (stage.$group) {
           const idExpr = stage.$group._id;
           const groups = new Map<string, AnyObject>();
-          docs.forEach((doc: AnyObject) => {
+          docs.forEach((doc) => {
             const groupId = typeof idExpr === 'string' && idExpr.startsWith('$')
               ? getByPath(doc, idExpr.slice(1))
               : idExpr;
@@ -644,6 +640,96 @@ export function createSupabaseModel(options: ModelOptions) {
   modelRegistry.set(options.collection, Model as any);
   return Model as any;
 }
+
+function applyUpdateOperators(doc: AnyObject, update: AnyObject): AnyObject {
+  const next = deepClone(doc);
+  const hasOps = Object.keys(update).some((k) => k.startsWith('$'));
+  if (!hasOps) {
+    return { ...next, ...update };
+  }
+
+  if (update.$set) {
+    for (const [key, value] of Object.entries(update.$set)) {
+      setByPath(next, key, value);
+    }
+  }
+  if (update.$inc) {
+    for (const [key, value] of Object.entries(update.$inc)) {
+      const current = Number(getByPath(next, key) || 0);
+      setByPath(next, key, current + Number(value));
+    }
+  }
+  if (update.$addToSet) {
+    for (const [key, value] of Object.entries(update.$addToSet)) {
+      const arr = Array.isArray(getByPath(next, key)) ? [...getByPath(next, key)] : [];
+      const exists = arr.some((item: any) => String(item) === String(value));
+      if (!exists) arr.push(value);
+      setByPath(next, key, arr);
+    }
+  }
+  if (update.$pull) {
+    for (const [key, value] of Object.entries(update.$pull)) {
+      const arr = Array.isArray(getByPath(next, key)) ? [...getByPath(next, key)] : [];
+      const filtered = arr.filter((item: any) => {
+        if (value && typeof value === 'object' && '$in' in (value as AnyObject)) {
+          return !(value as AnyObject).$in.some((v: any) => String(v) === String(item));
+        }
+        return String(item) !== String(value);
+      });
+      setByPath(next, key, filtered);
+    }
+  }
+  return next;
+}
+
+function matchesQuery(doc: AnyObject, query: AnyObject = {}): boolean {
+  if (!query || Object.keys(query).length === 0) return true;
+  if (Array.isArray(query.$or)) {
+    const orMatch = query.$or.some((q: AnyObject) => matchesQuery(doc, q));
+    if (!orMatch) return false;
+  }
+
+  return Object.entries(query).every(([key, condition]) => {
+    if (key === '$or') return true;
+    const value = getByPath(doc, key);
+    return matchCondition(value, condition);
+  });
+}
+
+function matchCondition(value: any, condition: any): boolean {
+  const asArray = (input: any): any[] => (Array.isArray(input) ? input : [input]);
+  const includesByString = (source: any, target: any): boolean => {
+    const sourceItems = asArray(source);
+    const targetItems = asArray(target);
+    return sourceItems.some((sourceItem) =>
+      targetItems.some((targetItem) => String(sourceItem) === String(targetItem))
+    );
+  };
+
+  if (condition && typeof condition === 'object' && !Array.isArray(condition)) {
+    if ('$regex' in condition) {
+      const pattern = condition.$regex;
+      const flags = condition.$options || '';
+      const regex = pattern instanceof RegExp ? pattern : new RegExp(String(pattern), flags);
+      return regex.test(String(value ?? ''));
+    }
+    if ('$in' in condition) {
+      return includesByString(value, condition.$in as any[]);
+    }
+    if ('$ne' in condition) {
+      return !includesByString(value, condition.$ne);
+    }
+    if ('$gte' in condition && !(value >= condition.$gte)) return false;
+    if ('$gt' in condition && !(value > condition.$gt)) return false;
+    if ('$lte' in condition && !(value <= condition.$lte)) return false;
+    if ('$lt' in condition && !(value < condition.$lt)) return false;
+    if ('$eq' in condition) return includesByString(value, condition.$eq);
+    return Object.entries(condition).every(([key, val]) => matchCondition((value || {})[key], val));
+  }
+  return includesByString(value, condition);
+}
+
+const modelRegistry = new Map<string, any>();
 
 export const SessionStub = {
   async withTransaction<T>(fn: () => Promise<T>) {

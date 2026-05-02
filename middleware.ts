@@ -8,6 +8,12 @@ const ADMIN_DASHBOARD_PATH = '/admin/orders';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const mirrorMode = process.env.MIRROR_MODE === 'true';
+  const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
+  const mirrorMutationAllowlist = (process.env.MIRROR_MUTATION_ALLOWLIST || '/api/auth')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
 
   let token = request.cookies.get('auth_token')?.value;
 
@@ -27,6 +33,17 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/favicon.ico')
   ) {
     return NextResponse.next();
+  }
+
+  const isMirrorAllowedMutation = mirrorMutationAllowlist.some((prefix) => pathname.startsWith(prefix));
+
+  if (mirrorMode && pathname.startsWith('/api/') && isMutatingRequest && !isMirrorAllowedMutation) {
+    return NextResponse.json(
+      {
+        error: 'Mirror mode is enabled. This mutating endpoint is blocked in local environment.',
+      },
+      { status: 403 }
+    );
   }
 
   if (pathname === AUTH_LOGIN_PATH) {
@@ -69,7 +86,6 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json(errorResponse, { status });
     }
 
-    const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
     const hasAuthCookie = Boolean(request.cookies.get('auth_token')?.value);
     const hasBearerToken = Boolean(request.headers.get('authorization')?.startsWith('Bearer '));
 

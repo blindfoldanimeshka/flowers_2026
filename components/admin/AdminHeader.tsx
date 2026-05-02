@@ -9,7 +9,7 @@ export default function AdminHeader() {
   return (
     <header className="bg-white dark:bg-gray-800 shadow-md p-4 flex justify-between items-center">
       <div>
-        <h1 className="text-xl font-semibold text-gray-800 dark:text-white">РђРґРјРёРЅ-РїР°РЅРµР»СЊ</h1>
+        <h1 className="text-xl font-semibold text-gray-800 dark:text-white">Админ-панель</h1>
       </div>
       <div>
         <button
@@ -17,7 +17,7 @@ export default function AdminHeader() {
           disabled={isLoggingOut}
           className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded transition duration-300 disabled:opacity-50"
         >
-          {isLoggingOut ? 'Р’С‹С…РѕРґ...' : 'Р’С‹Р№С‚Рё'}
+          {isLoggingOut ? 'Выход...' : 'Выйти'}
         </button>
       </div>
     </header>

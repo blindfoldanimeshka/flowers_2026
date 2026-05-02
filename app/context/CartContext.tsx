@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import React, { createContext, useContext, useEffect, useCallback, useRef, useMemo, useReducer } from 'react';
 import { productionLogger } from '@/lib/productionLogger';
