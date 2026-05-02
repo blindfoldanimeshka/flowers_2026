@@ -26,6 +26,7 @@ export function generateProductSchema(product: {
   image: string;
   images?: string[];
   inStock: boolean;
+  categorySlug?: string;
 }) {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://floramix24.ru';
 
@@ -40,6 +41,11 @@ export function generateProductSchema(product: {
     ? product.images.map(img => sanitizeImageUrl(img, baseUrl))
     : [sanitizeImageUrl(product.image, baseUrl)];
 
+  // Продукт показывается на странице категории, а не на отдельной странице товара
+  const productUrl = product.categorySlug
+    ? `${baseUrl}/category/${product.categorySlug}`
+    : baseUrl;
+
   return {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -53,7 +59,7 @@ export function generateProductSchema(product: {
       availability: product.inStock
         ? 'https://schema.org/InStock'
         : 'https://schema.org/OutOfStock',
-      url: `${baseUrl}/product/${safeId}`,
+      url: productUrl,
     },
   };
 }
@@ -76,18 +82,11 @@ export function generateBreadcrumbSchema(items: Array<{ name: string; url: strin
 export function generateWebSiteSchema() {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://floramix24.ru';
 
+  // Страница поиска не существует - поиск реализован через категории
   return {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: 'Floramix',
     url: baseUrl,
-    potentialAction: {
-      '@type': 'SearchAction',
-      target: {
-        '@type': 'EntryPoint',
-        urlTemplate: `${baseUrl}/search?q={search_term_string}`,
-      },
-      'query-input': 'required name=search_term_string',
-    },
   };
 }

@@ -67,7 +67,7 @@ export const products: Product[] = [
     price: 1200,
     oldPrice: 1500,
     description: "Маленький букет красных роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 1,
     subcategoryId: 101
@@ -77,7 +77,7 @@ export const products: Product[] = [
     title: "Роза белая",
     price: 1100,
     description: "Маленький букет белых роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 1,
     subcategoryId: 101
@@ -90,7 +90,7 @@ export const products: Product[] = [
     price: 1800,
     oldPrice: 2000,
     description: "Средний букет розовых роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 1,
     subcategoryId: 102
@@ -100,7 +100,7 @@ export const products: Product[] = [
     title: "Роза жёлтая",
     price: 1750,
     description: "Средний букет жёлтых роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 1,
     subcategoryId: 102
@@ -113,7 +113,7 @@ export const products: Product[] = [
     price: 2500,
     oldPrice: 2800,
     description: "Большой букет красных роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 1,
     subcategoryId: 103
@@ -123,7 +123,7 @@ export const products: Product[] = [
     title: "Роза микс",
     price: 2700,
     description: "Большой букет разноцветных роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: false,
     categoryId: 1,
     subcategoryId: 103
@@ -136,7 +136,7 @@ export const products: Product[] = [
     price: 2200,
     oldPrice: 2500,
     description: "Красивый букет хризантем для праздника",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 201
@@ -146,7 +146,7 @@ export const products: Product[] = [
     title: "Хризантема счастья",
     price: 2000,
     description: "Яркий букет хризантем для радости",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 201
@@ -159,7 +159,7 @@ export const products: Product[] = [
     price: 3500,
     oldPrice: 4000,
     description: "Роскошный букет хризантем для юбилея",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 202
@@ -169,7 +169,7 @@ export const products: Product[] = [
     title: "Хризантема торжественная",
     price: 3200,
     description: "Элегантный букет хризантем для важной даты",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 202
@@ -181,7 +181,7 @@ export const products: Product[] = [
     title: "Хризантема невесты",
     price: 4500,
     description: "Нежный букет хризантем для особенного дня",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 203
@@ -192,7 +192,7 @@ export const products: Product[] = [
     price: 5000,
     oldPrice: 5500,
     description: "Роскошная цветочная композиция из хризантем для свадьбы",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 2,
     subcategoryId: 203
@@ -204,7 +204,7 @@ export const products: Product[] = [
     title: "Букет классический",
     price: 1800,
     description: "Классический букет из свежих цветов",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 3,
     subcategoryId: 301
@@ -214,7 +214,7 @@ export const products: Product[] = [
     title: "Букет с пионами",
     price: 2800,
     description: "Букет из нежно-розовых пионов",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: false,
     categoryId: 3,
     subcategoryId: 301
@@ -226,7 +226,7 @@ export const products: Product[] = [
     title: "Букет декоративный",
     price: 2100,
     description: "Декоративный букет для интерьера",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 3,
     subcategoryId: 302
@@ -237,7 +237,7 @@ export const products: Product[] = [
     price: 3500,
     oldPrice: 3800,
     description: "Букет из редких видов пионов",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 3,
     subcategoryId: 302
@@ -249,7 +249,7 @@ export const products: Product[] = [
     title: "Букет праздничный",
     price: 2300,
     description: "Праздничный букет для особого случая",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 3,
     subcategoryId: 303
@@ -259,7 +259,7 @@ export const products: Product[] = [
     title: "Букет с розами",
     price: 4000,
     description: "Комбинированный букет из пионов и роз",
-    imageSrc: "/image/items/11.png",
+    imageSrc: "/image/items/no_photo.jpg",
     inStock: true,
     categoryId: 3,
     subcategoryId: 303

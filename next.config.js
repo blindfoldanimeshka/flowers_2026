@@ -27,7 +27,7 @@ const nextConfig = {
   
   // ESLint конфигурация
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
     dirs: ['app', 'components', 'lib', 'hooks', 'models'],
   },
   
@@ -40,7 +40,6 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['framer-motion', 'react-icons'],
     serverMinification: true,
-    proxyClientMaxBodySize: '100mb',
   },
   
   // Компилятор

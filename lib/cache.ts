@@ -1,12 +1,11 @@
-﻿import { unstable_cache } from 'next/cache';
-import { revalidateTag } from 'next/cache';
+import { escapeRegExp } from '@/lib/security';
+import { unstable_cache, revalidateTag } from 'next/cache';
 import Settings from '@/models/Settings';
 import dbConnect from './db';
 
-// Р СћР С‘Р С—РЎвЂ№ Р Т‘Р В»РЎРЏ Р С”РЎРЊРЎв‚¬Р С‘РЎР‚Р С•Р Р†Р В°Р Р…Р С‘РЎРЏ
 export interface CacheOptions {
   tags?: string[];
-  revalidate?: number; // Р Р†РЎР‚Р ВµР СРЎРЏ Р Р† РЎРѓР ВµР С”РЎС“Р Р…Р Т‘Р В°РЎвЂ¦
+  revalidate?: number;
 }
 
 interface CacheMetric {
@@ -43,7 +42,6 @@ export function getCacheStats() {
   return Array.from(cacheMetrics.entries()).map(([key, value]) => ({ key, ...value }));
 }
 
-// Р Р€РЎвЂљР С‘Р В»Р С‘РЎвЂљР В° Р Т‘Р В»РЎРЏ РЎРѓР С•Р В·Р Т‘Р В°Р Р…Р С‘РЎРЏ Р С”Р В»РЎР‹РЎвЂЎР ВµР в„– Р С”РЎРЊРЎв‚¬Р В°
 function createCacheKey(prefix: string, params: Record<string, any> = {}): string {
   const sortedParams = Object.keys(params)
     .sort()
@@ -53,7 +51,6 @@ function createCacheKey(prefix: string, params: Record<string, any> = {}): strin
   return sortedParams ? `${prefix}:${sortedParams}` : prefix;
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ РЎвЂљР С•Р Р†Р В°РЎР‚Р С•Р Р†
 export async function getCachedProducts(filters: {
   categoryId?: string;
   subcategoryId?: string;
@@ -88,9 +85,10 @@ export async function getCachedProducts(filters: {
       }
       
       if (filters.search) {
+        const escaped = escapeRegExp(filters.search);
         query.$or = [
-          { name: { $regex: filters.search, $options: 'i' } },
-          { description: { $regex: filters.search, $options: 'i' } }
+          { name: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } }
         ];
       }
       
@@ -118,13 +116,12 @@ export async function getCachedProducts(filters: {
     },
     [cacheKey],
     {
-      revalidate: 3 * 60, // 5 Р СР С‘Р Р…РЎС“РЎвЂљ
+      revalidate: 180,
       tags: ['products']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р в„–
 export async function getCachedCategories() {
   recordCacheAccess('categories', 5 * 60);
 
@@ -137,18 +134,15 @@ export async function getCachedCategories() {
       
       await dbConnect();
       
-      // Р СџР С•Р В»РЎС“РЎвЂЎР В°Р ВµР С Р Р†РЎРѓР Вµ Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘ Р С‘ Р С—Р С•Р Т‘Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘ Р С—Р В°РЎР‚Р В°Р В»Р В»Р ВµР В»РЎРЉР Р…Р С•
       const [categories, allSubcategories] = await Promise.all([
         Category.find().sort({ name: 1 }).lean(),
         Subcategory.find().lean(),
       ]);
       
-      // Р РЋР С•Р В·Р Т‘Р В°Р ВµР С Р С”Р В°РЎР‚РЎвЂљРЎС“ Р С—Р С•Р Т‘Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р в„– Р Т‘Р В»РЎРЏ Р В±РЎвЂ№РЎРѓРЎвЂљРЎР‚Р С•Р С–Р С• Р Т‘Р С•РЎРѓРЎвЂљРЎС“Р С—Р В°
       const subcategoryMap = new Map(
         allSubcategories.map(sub => [String(sub._id), sub])
       );
       
-      // Р вЂ™РЎР‚РЎС“РЎвЂЎР Р…РЎС“РЎР‹ Р Р…Р В°Р С—Р С•Р В»Р Р…РЎРЏР ВµР С Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р С‘ Р С—Р С•Р Т‘Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘РЎРЏР СР С‘
       const populatedCategories = categories.map(category => {
         const categorySubcategories = Array.isArray(category.subcategories)
           ? category.subcategories
@@ -157,7 +151,7 @@ export async function getCachedCategories() {
                 const sub = subcategoryMap.get(subIdStr);
                 return sub;
               })
-              .filter(Boolean) // Р Р€Р В±Р С‘РЎР‚Р В°Р ВµР С null, Р ВµРЎРѓР В»Р С‘ Р С—Р С•Р Т‘Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘РЎРЏ Р Р…Р Вµ Р Р…Р В°Р в„–Р Т‘Р ВµР Р…Р В°
+              .filter(Boolean)
           : [];
 
         return {
@@ -170,13 +164,12 @@ export async function getCachedCategories() {
     },
     ['categories'],
     {
-      revalidate: 5 * 60, // 10 Р СР С‘Р Р…РЎС“РЎвЂљ
+      revalidate: 300,
       tags: ['categories']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р ВµР С” Р С—Р В»Р В°РЎвЂљР ВµР В¶Р ВµР в„–
 export async function getCachedPaymentSettings() {
   recordCacheAccess('payment-settings', 60 * 60);
 
@@ -191,7 +184,6 @@ export async function getCachedPaymentSettings() {
       let settings = await PaymentSettings.findOne();
       
       if (!settings) {
-        // Р РЋР С•Р В·Р Т‘Р В°Р ВµР С Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р в„–Р С”Р С‘ Р С—Р С• РЎС“Р СР С•Р В»РЎвЂЎР В°Р Р…Р С‘РЎР‹
         settings = await PaymentSettings.create({
           stripe: { enabled: false, publishableKey: '', secretKey: '' },
           yookassa: { enabled: false, shopId: '', secretKey: '' },
@@ -207,32 +199,29 @@ export async function getCachedPaymentSettings() {
     },
     ['payment-settings'],
     {
-      revalidate: 60 * 60, // 1 РЎвЂЎР В°РЎРѓ
+      revalidate: 3600,
       tags: ['payment-settings']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р ВµР С”
 export async function getCachedSettings() {
   recordCacheAccess('settings', 60 * 60);
 
   return unstable_cache(
     async () => {
       await dbConnect();
-      // Р ВРЎРѓР С—Р С•Р В»РЎРЉР В·РЎС“Р ВµР С findOne, РЎвЂљР В°Р С” Р С”Р В°Р С” Р Р…Р В°РЎРѓРЎвЂљРЎР‚Р С•Р в„–Р С”Р С‘ - РЎРЊРЎвЂљР С• Р С•Р Т‘Р С‘Р Р… Р Т‘Р С•Р С”РЎС“Р СР ВµР Р…РЎвЂљ
       const settings = await Settings.findOne({ settingKey: 'global-settings' }) || await Settings.findOne();
       return settings ? settings.toObject() : null;
     },
-    ['settings'], // Р С™Р В»РЎР‹РЎвЂЎ Р С”РЎРЊРЎв‚¬Р В°
+    ['settings'],
     {
-      revalidate: 60 * 60, // 1 РЎвЂЎР В°РЎРѓ
-      tags: ['settings'], // Р СћР ВµР С– Р Т‘Р В»РЎРЏ РЎР‚Р ВµР Р†Р В°Р В»Р С‘Р Т‘Р В°РЎвЂ Р С‘Р С‘
+      revalidate: 3600,
+      tags: ['settings']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ РЎРѓРЎвЂљР В°РЎвЂљР С‘РЎРѓРЎвЂљР С‘Р С”Р С‘ Р В·Р В°Р С”Р В°Р В·Р С•Р Р†
 export async function getCachedOrderStats() {
   recordCacheAccess('order-stats', 3 * 60);
 
@@ -249,12 +238,10 @@ export async function getCachedOrderStats() {
       const confirmedOrders = await Order.countDocuments({ status: 'confirmed' });
       const deliveredOrders = await Order.countDocuments({ status: 'delivered' });
       
-      // Р С›Р В±РЎвЂ°Р В°РЎРЏ РЎРѓРЎС“Р СР СР В° Р Р†РЎРѓР ВµРЎвЂ¦ Р В·Р В°Р С”Р В°Р В·Р С•Р Р†
       const totalRevenue = await Order.aggregate([
         { $group: { _id: null, total: { $sum: '$totalAmount' } } }
       ]);
       
-      // Р вЂ”Р В°Р С”Р В°Р В·РЎвЂ№ Р В·Р В° Р С—Р С•РЎРѓР В»Р ВµР Т‘Р Р…Р С‘Р Вµ 7 Р Т‘Р Р…Р ВµР в„–
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
       const recentOrders = await Order.countDocuments({
@@ -272,17 +259,16 @@ export async function getCachedOrderStats() {
     },
     ['order-stats'],
     {
-      revalidate: 3 * 60, // 5 Р СР С‘Р Р…РЎС“РЎвЂљ
+      revalidate: 180,
       tags: ['order-stats']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ Р В·Р В°Р С”Р В°Р В·Р С•Р Р† РЎРѓ Р С—Р В°Р С–Р С‘Р Р…Р В°РЎвЂ Р С‘Р ВµР в„–
 export async function getCachedOrders(filters: {
   email?: string;
   status?: string;
-  deliveryType?: string; // Р СњР С•Р Р†РЎвЂ№Р в„– РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚ Р С—Р С• РЎвЂљР С‘Р С—РЎС“ Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р С”Р С‘
+  deliveryType?: string;
   page?: number;
   limit?: number;
 } = {}) {
@@ -307,7 +293,6 @@ export async function getCachedOrders(filters: {
         query['customer.email'] = filters.email;
       }
       
-      // Р вЂќР С•Р В±Р В°Р Р†Р В»РЎРЏР ВµР С РЎвЂћР С‘Р В»РЎРЉРЎвЂљРЎР‚ Р С—Р С• РЎвЂљР С‘Р С—РЎС“ Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р С”Р С‘
       if (filters.deliveryType) {
         query.fulfillmentMethod = filters.deliveryType;
       }
@@ -335,13 +320,12 @@ export async function getCachedOrders(filters: {
     },
     [cacheKey],
     {
-      revalidate: 30, // 1 Р СР С‘Р Р…РЎС“РЎвЂљР В°
+      revalidate: 30,
       tags: ['orders']
     }
   )();
 }
 
-// Р С™РЎРЊРЎв‚¬ Р Т‘Р В»РЎРЏ Р С—Р С•Р Т‘Р С”Р В°РЎвЂљР ВµР С–Р С•РЎР‚Р С‘Р в„–
 export async function getCachedSubcategories(filters: {
   categoryId?: string;
   categoryNumId?: number;
@@ -382,13 +366,12 @@ export async function getCachedSubcategories(filters: {
     },
     [cacheKey],
     {
-      revalidate: 5 * 60, // 10 Р СР С‘Р Р…РЎС“РЎвЂљ
+      revalidate: 300,
       tags: ['subcategories']
     }
   )();
 }
 
-// Р В¤РЎС“Р Р…Р С”РЎвЂ Р С‘Р С‘ Р Т‘Р В»РЎРЏ Р С‘Р Р…Р Р†Р В°Р В»Р С‘Р Т‘Р В°РЎвЂ Р С‘Р С‘ Р С”РЎРЊРЎв‚¬Р В°
 export function invalidateSettingsCache() {
   revalidateTag('settings', 'max');
 }
@@ -417,7 +400,6 @@ export function invalidateSubcategoriesCache() {
   revalidateTag('subcategories', 'max');
 }
 
-// Р СџР С•Р В»Р Р…Р В°РЎРЏ Р С‘Р Р…Р Р†Р В°Р В»Р С‘Р Т‘Р В°РЎвЂ Р С‘РЎРЏ Р Р†РЎРѓР ВµР С–Р С• Р С”РЎРЊРЎв‚¬Р В°
 export function invalidateAllCache() {
   invalidateSettingsCache();
   invalidateProductsCache();
@@ -428,7 +410,6 @@ export function invalidateAllCache() {
   invalidateSubcategoriesCache();
 }
 
-// Р С™РЎРЊРЎв‚¬ РЎРѓ Р С—Р С•Р В»РЎРЉР В·Р С•Р Р†Р В°РЎвЂљР ВµР В»РЎРЉРЎРѓР С”Р С‘Р СР С‘ Р С—Р В°РЎР‚Р В°Р СР ВµРЎвЂљРЎР‚Р В°Р СР С‘
 export function createCustomCache<T>(
   fn: (...args: any[]) => Promise<T>,
   prefix: string,
@@ -442,5 +423,4 @@ export function createCustomCache<T>(
       revalidate: options.revalidate || 300
     }
   );
-} 
-
+}

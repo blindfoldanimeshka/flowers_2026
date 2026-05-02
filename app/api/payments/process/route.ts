@@ -75,20 +75,19 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         { error: paymentResult.error },
         { status: 400 }
       );
+    } else {
+      await Order.findByIdAndUpdate(orderId, {
+        paymentStatus: paymentResult.paymentStatus,
+        status: paymentResult.orderStatus
+      });
+
+      return NextResponse.json({
+        success: true,
+        paymentId: paymentResult.paymentId,
+        status: paymentResult.paymentStatus,
+        message: paymentResult.message
+      }, { status: 200 });
     }
-    
-    // Обновляем статус заказа
-    await Order.findByIdAndUpdate(orderId, {
-      paymentStatus: paymentResult.paymentStatus,
-      status: paymentResult.orderStatus
-    });
-    
-    return NextResponse.json({
-      success: true,
-      paymentId: paymentResult.paymentId,
-      status: paymentResult.paymentStatus,
-      message: paymentResult.message
-    }, { status: 200 });
     
   
 });
@@ -101,15 +100,10 @@ async function processStripePayment(order: any, paymentData: any, settings: any)
       error: 'Stripe не настроен'
     };
   }
-  
-  // Здесь будет реальная интеграция со Stripe
-  // Пока возвращаем заглушку
+
   return {
-    success: true,
-    paymentId: `stripe_${Date.now()}`,
-    paymentStatus: 'paid',
-    orderStatus: 'confirmed',
-    message: 'Платеж успешно обработан (тестовый режим)'
+    success: false,
+    error: 'Stripe: интеграция в разработке'
   };
 }
 
@@ -121,14 +115,10 @@ async function processYookassaPayment(order: any, paymentData: any, settings: an
       error: 'ЮKassa не настроен'
     };
   }
-  
-  // Здесь будет реальная интеграция с ЮKassa
+
   return {
-    success: true,
-    paymentId: `yookassa_${Date.now()}`,
-    paymentStatus: 'paid',
-    orderStatus: 'confirmed',
-    message: 'Платеж успешно обработан (тестовый режим)'
+    success: false,
+    error: 'ЮKassa: интеграция в разработке'
   };
 }
 
@@ -140,14 +130,10 @@ async function processSberbankPayment(order: any, paymentData: any, settings: an
       error: 'Сбербанк не настроен'
     };
   }
-  
-  // Здесь будет реальная интеграция со Сбербанком
+
   return {
-    success: true,
-    paymentId: `sberbank_${Date.now()}`,
-    paymentStatus: 'paid',
-    orderStatus: 'confirmed',
-    message: 'Платеж успешно обработан (тестовый режим)'
+    success: false,
+    error: 'Сбербанк: интеграция в разработке'
   };
 }
 

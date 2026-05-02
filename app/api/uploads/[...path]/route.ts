@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFile } from 'fs/promises';
-import { join, normalize } from 'path';
+import { basename, join, normalize } from 'path';
 import { existsSync } from 'fs';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
+
+const STORAGE_BUCKET_CANDIDATES = Array.from(new Set([
+  process.env.SUPABASE_STORAGE_BUCKET_PRODUCTS,
+  process.env.SUPABASE_STORAGE_BUCKET,
+  'product-images',
+].filter((value): value is string => Boolean(value && value.trim()))));
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 // Функция для определения директории загрузки
 function resolveUploadDir(): string {
@@ -39,10 +54,38 @@ export const GET = withErrorHandler(async (
     if (existingPath) {
       fileBuffer = await readFile(existingPath);
     } else {
+      const storageCandidates = Array.from(new Set([
+        normalizedPath,
+        safeDecode(normalizedPath),
+        basename(normalizedPath),
+        safeDecode(basename(normalizedPath)),
+      ]));
+
+      let downloaded: Uint8Array | null = null;
+      for (const bucket of STORAGE_BUCKET_CANDIDATES) {
+        for (const storagePath of storageCandidates) {
+          const { data, error } = await supabase.storage.from(bucket).download(storagePath);
+          if (!error && data) {
+            downloaded = new Uint8Array(await data.arrayBuffer());
+            extension = storagePath.split('.').pop()?.toLowerCase();
+            break;
+          }
+        }
+        if (downloaded) break;
+      }
+
+      if (downloaded) {
+        fileBuffer = Buffer.from(downloaded);
+      } else {
       // Фолбэк, чтобы Next/Image не падал на битых старых ссылках
-      const fallbackPath = join(process.cwd(), 'public/image/items/11.png');
-      fileBuffer = await readFile(fallbackPath);
-      extension = 'png';
+        const fallbackPath = join(process.cwd(), 'public/image/items/no_photo.jpg');
+        if (existsSync(fallbackPath)) {
+          fileBuffer = await readFile(fallbackPath);
+          extension = 'jpg';
+        } else {
+          return new NextResponse('Image not found', { status: 404 });
+        }
+      }
     }
 
     // Определяем MIME-тип

@@ -3,12 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import connect from '@/lib/db';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
+import { createClient } from '@supabase/supabase-js';
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
     await connect();
     const { default: Category } = await import('@/models/Category');
     const { default: Subcategory } = await import('@/models/Subcategory');
     const { default: Product } = await import('@/models/Product');
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://jnbopvwnwyummzvsqjcj.supabase.co';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const categoryStats = await Product.aggregate([
       {

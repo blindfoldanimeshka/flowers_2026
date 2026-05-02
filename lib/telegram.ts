@@ -1,4 +1,3 @@
-// @ts-ignore
 import TelegramBot from 'node-telegram-bot-api';
 import { productionLogger } from '@/lib/productionLogger';
 
@@ -7,8 +6,11 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 
 let bot: TelegramBot | null = null;
 
-if (TELEGRAM_BOT_TOKEN) {
+function getBot(): TelegramBot | null {
+  if (!TELEGRAM_BOT_TOKEN) return null;
+  if (bot) return bot;
   bot = new TelegramBot(TELEGRAM_BOT_TOKEN, { polling: false });
+  return bot;
 }
 
 interface OrderItem {
@@ -34,7 +36,8 @@ export async function sendOrderNotification(
   telegramId: string,
   order: OrderNotification
 ): Promise<void> {
-  if (!bot || !TELEGRAM_BOT_TOKEN) {
+  const tgBot = getBot();
+  if (!tgBot) {
     productionLogger.warn('Telegram bot не настроен. Пропускаем отправку уведомления.');
     return;
   }
@@ -65,46 +68,19 @@ ${itemsList}
 💰 *Итого: ${order.totalAmount} ₽*
     `.trim();
 
-    await bot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
+    await tgBot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
 
-    // Отправляем фото всех товаров
-    const itemsWithImages = order.items.filter(item => item.image);
+    if (order.items.length > 0 && order.items[0].image) {
+      const imageUrl = order.items[0].image.startsWith('http')
+        ? order.items[0].image
+        : `${process.env.NEXT_PUBLIC_APP_URL || ''}${order.items[0].image}`;
 
-    if (itemsWithImages.length > 0) {
-      // Если товаров с фото от 2 до 10, отправляем медиа-группой
-      if (itemsWithImages.length >= 2 && itemsWithImages.length <= 10) {
-        try {
-          const mediaGroup = itemsWithImages.map((item, index) => {
-            const imageUrl = item.image.startsWith('http')
-              ? item.image
-              : `${process.env.NEXT_PUBLIC_APP_URL || ''}${item.image}`;
-
-            return {
-              type: 'photo' as const,
-              media: imageUrl,
-              caption: index === 0 ? `${item.name} (${item.quantity} шт.)` : `${item.name} (${item.quantity} шт.)`
-            };
-          });
-
-          await bot.sendMediaGroup(telegramId, mediaGroup);
-        } catch (photoError) {
-          productionLogger.error('Ошибка отправки медиа-группы в Telegram:', photoError);
-        }
-      } else {
-        // Если товар один или больше 10, отправляем по одному
-        for (const item of itemsWithImages) {
-          const imageUrl = item.image.startsWith('http')
-            ? item.image
-            : `${process.env.NEXT_PUBLIC_APP_URL || ''}${item.image}`;
-
-          try {
-            await bot.sendPhoto(telegramId, imageUrl, {
-              caption: `${item.name} (${item.quantity} шт.)`
-            });
-          } catch (photoError) {
-            productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
-          }
-        }
+      try {
+        await tgBot.sendPhoto(telegramId, imageUrl, {
+          caption: `Фото товара: ${order.items[0].name}`
+        });
+      } catch (photoError) {
+        productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
       }
     }
 
@@ -116,7 +92,8 @@ ${itemsList}
 }
 
 export async function verifyTelegramAccess(telegramId: string): Promise<boolean> {
-  if (!bot || !TELEGRAM_BOT_TOKEN) {
+  const tgBot = getBot();
+  if (!tgBot) {
     return false;
   }
 
@@ -125,7 +102,7 @@ export async function verifyTelegramAccess(telegramId: string): Promise<boolean>
   }
 
   try {
-    await bot.sendMessage(telegramId, 'Доступ к боту подтвержден ✅');
+    await tgBot.sendMessage(telegramId, 'Доступ к боту подтвержден ✅');
     return true;
   } catch (error) {
     productionLogger.error('Ошибка проверки доступа к Telegram:', error);

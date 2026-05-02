@@ -1,42 +1,44 @@
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
 interface TelegramRateLimiterConfig {
   maxNotifications: number;
   windowMs: number;
 }
 
-interface NotificationRecord {
-  timestamp: number;
-}
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL || '',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+});
 
 class TelegramRateLimiter {
-  private notifications: NotificationRecord[] = [];
+  private readonly limiter: Ratelimit;
   private readonly config: TelegramRateLimiterConfig;
 
   constructor(config: TelegramRateLimiterConfig) {
+    const windowSeconds = Math.floor(config.windowMs / 1000);
+    this.limiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(config.maxNotifications, `${windowSeconds} s`),
+      prefix: 'telegram-notify',
+    });
     this.config = config;
   }
 
-  canSend(): boolean {
-    this.cleanup();
-    return this.notifications.length < this.config.maxNotifications;
+  async canSend(): Promise<boolean> {
+    const { success } = await this.limiter.limit('telegram-notifications');
+    return success;
   }
 
-  recordSent(): void {
-    this.notifications.push({ timestamp: Date.now() });
-  }
-
-  getStats() {
-    this.cleanup();
+  async getStats() {
+    const { remaining, reset } = await this.limiter.limit('telegram-notifications');
     return {
-      sent: this.notifications.length,
-      remaining: this.config.maxNotifications - this.notifications.length,
+      sent: this.config.maxNotifications - remaining,
+      remaining,
       limit: this.config.maxNotifications,
       windowMs: this.config.windowMs,
+      resetTime: reset * 1000,
     };
-  }
-
-  private cleanup(): void {
-    const cutoff = Date.now() - this.config.windowMs;
-    this.notifications = this.notifications.filter((record) => record.timestamp > cutoff);
   }
 }
 
@@ -44,4 +46,3 @@ export const telegramRateLimiter = new TelegramRateLimiter({
   maxNotifications: 20,
   windowMs: 60 * 1000,
 });
-

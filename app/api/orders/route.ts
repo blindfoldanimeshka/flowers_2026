@@ -1,4 +1,4 @@
-﻿export const dynamic = 'force-dynamic';
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Order from '@/models/Order';
@@ -66,6 +66,21 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     let totalAmount = 0;
     const orderItems: Array<{ productId: string; quantity: number; name: string; price: number; image: string }> = [];
 
+    const productIds = items.map((item) =>
+      typeof item.productId === 'string'
+        ? item.productId.trim()
+        : typeof item.productId === 'number' && Number.isFinite(item.productId)
+          ? String(item.productId)
+          : ''
+    ).filter(Boolean);
+
+    if (productIds.length === 0) {
+      return NextResponse.json({ error: 'Некорректные позиции заказа' }, { status: 400 });
+    }
+
+    const products = await Product.find({ _id: { $in: productIds } }).lean() as any[];
+    const productMap = new Map(products.map((p) => [p._id, p]));
+
     for (const rawItem of items as Array<{ productId?: string | number; quantity?: number }>) {
       const normalizedProductId =
         typeof rawItem.productId === 'string'
@@ -84,7 +99,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         return NextResponse.json({ error: 'Некорректные позиции заказа' }, { status: 400 });
       }
 
-      const product = await Product.findById(normalizedProductId);
+      const product = productMap.get(normalizedProductId);
       if (!product) {
         return NextResponse.json({ error: `Товар с ID ${normalizedProductId} не найден` }, { status: 404 });
       }
@@ -134,7 +149,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
         for (const telegramId of telegramIds) {
           try {
-            if (telegramRateLimiter.canSend()) {
+            if (await telegramRateLimiter.canSend()) {
               await sendOrderNotification(telegramId, {
                 orderNumber: newOrder._id.toString(),
                 customer: {
@@ -145,12 +160,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
                 items: orderItems,
                 totalAmount: totalAmount,
               });
-              telegramRateLimiter.recordSent();
             } else {
               productionLogger.warn('Telegram rate limit exceeded, notification skipped', {
                 orderId: newOrder._id.toString(),
                 telegramId,
-                stats: telegramRateLimiter.getStats(),
+                stats: await telegramRateLimiter.getStats(),
               });
             }
           } catch (err) {

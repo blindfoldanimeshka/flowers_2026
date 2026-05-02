@@ -33,23 +33,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
 
-    // Получаем товары
-    const products = await Product.find({ inStock: true }).lean();
-    const productPages: MetadataRoute.Sitemap = products.map((product: any) => ({
-      url: `${baseUrl}/product/${encodeURIComponent(product._id)}`,
-      lastModified: new Date(product.updatedAt || product.createdAt),
-      changeFrequency: 'weekly' as const,
-      priority: 0.7,
-      images: product.images && product.images.length > 0
-        ? product.images
-            .filter((img: string) => img && !img.includes('..'))
-            .map((img: string) => `${baseUrl}${img}`)
-        : product.image && !product.image.includes('..')
-          ? [`${baseUrl}${product.image}`]
-          : undefined,
-    }));
+    // Товары не включены в sitemap, т.к. отдельные страницы товаров (/product/[id]) не существуют
+    // Товары отображаются на страницах категорий
 
-    return [...staticPages, ...categoryPages, ...productPages];
+    return [...staticPages, ...categoryPages];
   } catch (error) {
     console.error('Sitemap generation error:', error);
     return staticPages;

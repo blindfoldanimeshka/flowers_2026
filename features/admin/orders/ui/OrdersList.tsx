@@ -115,7 +115,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               const isNewHighlight = highlightNewOrderIds.has(String(order._id));
               const previewImage =
                 order.items.find((item) => typeof item.image === 'string' && item.image.trim().length > 0)?.image ||
-                '/image/items/11.png';
+                '/image/items/no_photo.jpg';
               const statusLabel = orderStatuses[order.status];
 
               return (
@@ -365,7 +365,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                   <li key={index} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3 md:flex-row md:items-start">
                     <div className="aspect-square w-full max-w-[320px] overflow-hidden rounded-xl border border-gray-200 bg-white sm:max-w-[380px] md:w-[min(40vw,420px)] md:max-w-none">
                       <Image
-                        src={item.image || '/image/items/11.png'}
+                        src={item.image || '/image/items/no_photo.jpg'}
                         alt={item.name}
                         width={640}
                         height={640}
@@ -375,7 +375,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                         sizes="(max-width: 768px) 92vw, 640px"
                         onError={(event) => {
                           const target = event.currentTarget as HTMLImageElement;
-                          target.src = '/image/items/11.png';
+                          target.src = '/image/items/no_photo.jpg';
                         }}
                       />
                     </div>
