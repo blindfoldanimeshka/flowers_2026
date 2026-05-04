@@ -68,9 +68,9 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       );
     }
 
-    const productsRows = (products || []) as Array<{ category_id?: string | null; subcategory_id?: string | null }>;
-    const categoryRows = (categories || []) as Array<{ id: string; legacy_id?: number | null; name?: string; slug?: string; is_active?: boolean }>;
-    const subcategoryRows = (allSubcategories || []) as Array<{ id: string; category_id?: string | null; name?: string; slug?: string; is_active?: boolean }>;
+    const productsRows = ((products || []) as unknown) as Array<{ category_id?: string | null; subcategory_id?: string | null }>;
+    const categoryRows = ((categories || []) as unknown) as Array<{ id: string; legacy_id?: number | null; name?: string; slug?: string; is_active?: boolean }>;
+    const subcategoryRows = ((allSubcategories || []) as unknown) as Array<{ id: string; category_id?: string | null; name?: string; slug?: string; is_active?: boolean }>;
 
     // Подсчитываем статистику продуктов по категориям
     const categoryStatsMap = new Map<string, number>();
