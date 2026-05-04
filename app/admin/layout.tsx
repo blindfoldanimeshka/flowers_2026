@@ -26,7 +26,10 @@ export default function AdminLayout({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (window.innerWidth < 1024) {
-      setIsSidebarOpen(false);
+      const rafId = window.requestAnimationFrame(() => {
+        setIsSidebarOpen(false);
+      });
+      return () => window.cancelAnimationFrame(rafId);
     }
   }, [pathname]);
 

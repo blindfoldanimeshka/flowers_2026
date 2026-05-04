@@ -25,12 +25,6 @@ const nextConfig = {
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   
-  // ESLint конфигурация
-  eslint: {
-    ignoreDuringBuilds: true,
-    dirs: ['app', 'components', 'lib', 'hooks', 'models'],
-  },
-  
   // TypeScript конфигурация
   typescript: {
     ignoreBuildErrors: false,

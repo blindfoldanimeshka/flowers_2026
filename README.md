@@ -38,7 +38,7 @@ cd flower_shop
 
 npm install
 
-cp env.example .env.local
+cp .env.example .env
 # Заполните переменные (минимум Supabase + JWT_SECRET + NEXT_PUBLIC_API_URL для локали)
 
 npm run generate-secrets   # скопируйте вывод JWT_SECRET в .env.local при необходимости
@@ -56,7 +56,7 @@ npm run dev
 
 ### Переменные окружения
 
-Ориентир — файл [`env.example`](env.example):
+Ориентир — файл [`.env.example`](.env.example):
 
 | Переменная | Назначение |
 |------------|------------|
@@ -144,6 +144,31 @@ npm run db:seed
 - **401/403 в админке** — сессия JWT, cookie, `JWT_SECRET` одинаковый везде после смены.
 - **Сборка падает** — `npm run lint` и `npm run type-check`; исправьте ошибки, не отключая проверки без необходимости.
 - **Картинки** — проверьте `next.config` и маршрут `/api/upload` / хранение в настройках проекта.
+
+## Статус Отладки (2026-05-04)
+
+- Исправлены падения `next build` из-за ранней инициализации Supabase в API/кэше.
+- Синхронизированы версии ESLint (`eslint@9` + flat config).
+- `npm run type-check` проходит.
+- `npm test -- --runInBand` проходит (63/63).
+- `npm run build` проходит.
+- В `npm run lint` остаётся legacy-техдолг (много `any` и `require` в старых модулях), это отдельный поэтапный рефакторинг.
+
+### Проверки Перед Деплоем
+
+```bash
+npm run type-check
+npm test -- --runInBand
+npm run build
+```
+
+Для Windows PowerShell при запрете `npm.ps1`:
+
+```bash
+npm.cmd run type-check
+npm.cmd test -- --runInBand
+npm.cmd run build
+```
 
 ## Разработчики
 

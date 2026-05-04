@@ -89,7 +89,10 @@ export function useApi<T = any>(
 
   useEffect(() => {
     if (immediate) {
-      execute();
+      const timer = setTimeout(() => {
+        void execute();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [immediate, execute]);
 

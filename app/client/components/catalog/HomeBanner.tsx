@@ -60,12 +60,8 @@ export default function HomeBanner() {
 
     return () => clearInterval(timerId);
   }, [slides]);
-
-  useEffect(() => {
-    if (slideIndex >= slides.length) {
-      setSlideIndex(0);
-    }
-  }, [slideIndex, slides.length]);
+  
+  const safeSlideIndex = slideIndex % slides.length;
 
   const backgroundStyle = settings?.homeBannerBackground
     ? ({
@@ -87,7 +83,7 @@ export default function HomeBanner() {
         <div className="absolute inset-0 pointer-events-none">
           <AnimatePresence mode="wait">
             <motion.div
-              key={slides[slideIndex]}
+              key={slides[safeSlideIndex]}
               className="absolute inset-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -95,7 +91,7 @@ export default function HomeBanner() {
               transition={{ duration: 0.55, ease: 'easeInOut' }}
             >
               <Image
-                src={slides[slideIndex] || FALLBACK_SLIDE}
+                src={slides[safeSlideIndex] || FALLBACK_SLIDE}
                 alt="Баннер"
                 fill
                 priority
