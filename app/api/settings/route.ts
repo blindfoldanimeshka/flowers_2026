@@ -42,6 +42,14 @@ interface SettingsUpdatePayload {
 
 const SETTINGS_KEY = 'global-settings';
 
+async function getSettingsRow() {
+  const byId = await supabase.from('settings').select('*').eq('id', SETTINGS_KEY).maybeSingle();
+  if (!byId.error && byId.data) return byId;
+
+  const legacy = await supabase.from('settings').select('*').eq('settingKey', SETTINGS_KEY).maybeSingle();
+  return legacy.error ? byId : legacy;
+}
+
 const ALLOWED_FIELDS: (keyof SettingsUpdatePayload)[] = [
   'siteName',
   'siteDescription',
@@ -268,14 +276,31 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
     mediaLibrary: [],
   };
 
-  const { data: settings, error } = await supabase
+  const payload = { ...defaultSettings, ...sanitizedBody };
+  const byIdUpsert = await supabase
     .from('settings')
     .upsert(
-      { ...defaultSettings, ...sanitizedBody },
-      { onConflict: 'settingKey', ignoreDuplicates: false }
+      { ...payload, id: SETTINGS_KEY },
+      { onConflict: 'id', ignoreDuplicates: false }
     )
     .select('*')
     .single();
+
+  let settings = byIdUpsert.data;
+  let error = byIdUpsert.error;
+
+  if (error) {
+    const legacyUpsert = await supabase
+      .from('settings')
+      .upsert(
+        { ...payload, settingKey: SETTINGS_KEY },
+        { onConflict: 'settingKey', ignoreDuplicates: false }
+      )
+      .select('*')
+      .single();
+    settings = legacyUpsert.data;
+    error = legacyUpsert.error;
+  }
 
   if (error || !settings) {
     productionLogger.error('Supabase settings upsert error:', error);
@@ -287,11 +312,7 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
 }
 
 export const GET = withErrorHandler(async () => {
-    const { data: settings, error } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('settingKey', SETTINGS_KEY)
-      .maybeSingle();
+    const { data: settings, error } = await getSettingsRow();
 
     if (error) {
       productionLogger.error('Supabase settings fetch error:', error);

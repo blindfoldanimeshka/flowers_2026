@@ -11,6 +11,13 @@ const MEDIA_CACHE_TTL = 60000; // 1 минута
 
 let mediaCache: { items: any[]; timestamp: number } | null = null;
 
+async function getSettingsRow() {
+  const byId = await supabase.from('settings').select('*').eq('id', SETTINGS_KEY).maybeSingle();
+  if (!byId.error && byId.data) return byId;
+  const legacy = await supabase.from('settings').select('*').eq('settingKey', SETTINGS_KEY).maybeSingle();
+  return legacy.error ? byId : legacy;
+}
+
 function collectProductImageUrls(p: { image?: string; images?: string[] }): string[] {
   const urls: string[] = [];
   if (typeof p?.image === 'string' && p.image.trim()) urls.push(p.image.trim());
@@ -68,11 +75,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     );
 
     const dataPromise = (async () => {
-      const { data: settingsDoc } = await supabase
-        .from('settings')
-        .select('*')
-        .eq('settingKey', SETTINGS_KEY)
-        .maybeSingle();
+      const { data: settingsDoc } = await getSettingsRow();
       const settings = (settingsDoc || {}) as Record<string, unknown>;
 
       const { data: products } = await supabase
@@ -143,11 +146,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Некорректный URL' }, { status: 400 });
   }
 
-  const { data: current } = await supabase
-    .from('settings')
-    .select('*')
-    .eq('settingKey', SETTINGS_KEY)
-    .maybeSingle();
+  const { data: current } = await getSettingsRow();
 
   const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
 
@@ -162,10 +161,18 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   };
   const nextLib = [entry, ...existingLib].slice(0, MAX_LIBRARY_ITEMS);
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('settings')
     .update({ mediaLibrary: nextLib })
-    .eq('settingKey', SETTINGS_KEY);
+    .eq('id', SETTINGS_KEY);
+
+  if (error) {
+    const legacyUpdate = await supabase
+      .from('settings')
+      .update({ mediaLibrary: nextLib })
+      .eq('settingKey', SETTINGS_KEY);
+    error = legacyUpdate.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
@@ -188,11 +195,7 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'URL не указан' }, { status: 400 });
   }
 
-  const { data: current } = await supabase
-    .from('settings')
-    .select('*')
-    .eq('settingKey', SETTINGS_KEY)
-    .maybeSingle();
+  const { data: current } = await getSettingsRow();
 
   const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
 
@@ -202,10 +205,18 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Изображение не найдено в библиотеке' }, { status: 404 });
   }
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('settings')
     .update({ mediaLibrary: filtered })
-    .eq('settingKey', SETTINGS_KEY);
+    .eq('id', SETTINGS_KEY);
+
+  if (error) {
+    const legacyUpdate = await supabase
+      .from('settings')
+      .update({ mediaLibrary: filtered })
+      .eq('settingKey', SETTINGS_KEY);
+    error = legacyUpdate.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
