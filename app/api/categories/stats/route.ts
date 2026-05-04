@@ -4,33 +4,11 @@ import { supabase } from '@/lib/supabase';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
 
-function isMissingColumnError(error: unknown): boolean {
-  const message = String((error as { message?: string })?.message || '').toLowerCase();
-  const code = String((error as { code?: string })?.code || '');
-  return code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
-}
-
-async function selectWithOptionalActiveFilter(table: 'products' | 'categories' | 'subcategories', columns: string) {
-  let primary = await supabase.from(table).select(columns).eq('is_active', true);
-  if (primary.error) {
-    const fallback = await supabase.from(table).select(columns);
-    if (!fallback.error) {
-      return fallback;
-    }
-    if (isMissingColumnError(primary.error)) {
-      return fallback;
-    }
-    return primary;
-  }
-  return primary;
-}
-
 export const GET = withErrorHandler(async (request: NextRequest) => {
     // Получаем все продукты для подсчета статистики
-    const { data: products, error: productsError } = await selectWithOptionalActiveFilter(
-      'products',
-      'id, category_id, subcategory_id'
-    );
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, category_id, subcategory_id');
 
     if (productsError) {
       productionLogger.error('[CATEGORIES STATS] Products fetch error:', productsError);
@@ -41,10 +19,9 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все категории
-    const { data: categories, error: categoriesError } = await selectWithOptionalActiveFilter(
-      'categories',
-      '*'
-    );
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*');
 
     if (categoriesError) {
       productionLogger.error('[CATEGORIES STATS] Categories fetch error:', categoriesError);
@@ -55,10 +32,9 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все подкатегории
-    const { data: allSubcategories, error: subcategoriesError } = await selectWithOptionalActiveFilter(
-      'subcategories',
-      '*'
-    );
+    const { data: allSubcategories, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
 
     if (subcategoriesError) {
       productionLogger.error('[CATEGORIES STATS] Subcategories fetch error:', subcategoriesError);
