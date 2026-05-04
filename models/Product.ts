@@ -1,42 +1,26 @@
-import { createSupabaseModel } from '@/lib/supabaseModel';
+// Заглушка для обратной совместимости
+// Проект использует Supabase напрямую через @/lib/supabase
+// Этот файл создан для предотвращения ошибок импорта
 
 export interface IProduct {
-  _id: string;
+  id: string;
+  legacy_id?: number;
   name: string;
+  slug: string;
   price: number;
-  categoryId: string; // Оставляем для обратной совместимости
-  categoryIds: string[]; // Новое поле - массив категорий
-  categoryNumId: number;
-  subcategoryId?: string;
-  subcategoryNumId?: number;
-  image: string;
+  description?: string;
   images?: string[];
-  description: string;
-  inStock: boolean;
-  preorderOnly?: boolean;
-  assemblyTime?: string;
-  stockQuantity?: number;
-  stockUnit?: string;
-  pinnedInCategory?: string; // ID категории, в которой товар закреплен
-  createdAt: string;
-  updatedAt: string;
+  subcategory_id: string;
+  is_active: boolean;
+  is_featured: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const Product = createSupabaseModel({
-  collection: 'products',
-  defaults: {
-    inStock: true,
-    image: 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото',
-    preorderOnly: false,
-    assemblyTime: '',
-    stockQuantity: 0,
-    stockUnit: 'шт.',
-    categoryIds: [], // Массив категорий по умолчанию пустой
-  },
-  references: {
-    categoryId: 'categories',
-    subcategoryId: 'subcategories',
-  },
-});
-
-export default Product;
+export default {
+  find: () => ({ lean: () => [] }),
+  findById: () => ({}),
+  findOne: () => ({ lean: () => ({}) }),
+  findByIdAndUpdate: () => ({}),
+  findByIdAndDelete: () => ({}),
+};

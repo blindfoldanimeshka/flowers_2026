@@ -101,26 +101,14 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         productionLogger.error('Supabase order update error:', updateError);
       }
 
-      return NextResponse.json({
+return NextResponse.json({
         success: true,
         paymentId: paymentResult.paymentId,
         status: paymentResult.paymentStatus,
         message: paymentResult.message
-      }, { status: 200 });
+}, { status: 200 });
     }
-   
-});
-
-      return NextResponse.json({
-        success: true,
-        paymentId: paymentResult.paymentId,
-        status: paymentResult.paymentStatus,
-        message: paymentResult.message
-      }, { status: 200 });
-    }
-    
-  
-});
+  });
 
 // Заглушка для Stripe
 async function processStripePayment(order: any, paymentData: any, settings: any) {

@@ -1,6 +1,5 @@
 import { MetadataRoute } from 'next';
-import Category from '@/models/Category';
-import Product from '@/models/Product';
+import { supabase } from '@/lib/supabase';
 
 export const revalidate = 3600; // Cache for 1 hour
 
@@ -25,10 +24,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     // Получаем категории
-    const categories = await Category.find({ isActive: true }).lean();
+    const { data: categories, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true);
+
+    if (error || !categories) {
+      console.error('Sitemap generation error:', error);
+      return staticPages;
+    }
+
     const categoryPages: MetadataRoute.Sitemap = categories.map((category: any) => ({
       url: `${baseUrl}/category/${encodeURIComponent(category.slug)}`,
-      lastModified: new Date(category.updatedAt || category.createdAt),
+      lastModified: new Date(category.updated_at || category.created_at),
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     }));

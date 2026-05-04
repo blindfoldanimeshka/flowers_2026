@@ -122,10 +122,8 @@ export const DELETE = withErrorHandler(async (request: NextRequest, { params }: 
       message: responseMessage,
       data: {
         deletedSubcategoryId: id,
-        categoryId: categoryId,
+      categoryId: categoryId,
         productsMarkedOutOfStock: productCount ||0
       }
     });
-});
-  
-});
+  });

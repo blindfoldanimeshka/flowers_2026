@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import Order from '@/models/Order';
+import { supabase, SUPABASE_COLLECTION_TABLE } from '@/lib/supabase';
 import { invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 import { sanitizeMongoObject } from '@/lib/security';
 import { productionLogger } from '@/lib/productionLogger';
@@ -9,33 +8,50 @@ import { withErrorHandler } from '@/lib/errorHandler';
 
 const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivering', 'delivered', 'cancelled'] as const;
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed'] as const;
+const ORDERS_COLLECTION = 5;
 type RouteContext = { params: Promise<{ id: string }> };
 
+function mapOrderRow(row: any) {
+  const doc = typeof row.doc === 'string' ? JSON.parse(row.doc) : row.doc;
+  return {
+    _id: row.id,
+    ...doc,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export const GET = withErrorHandler(async (request: NextRequest, context: RouteContext) => {
-    await dbConnect();
     const { id } = await context.params;
 
     if (!id) {
       return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
 
-    const order = await Order.findById(id).populate('items.productId', 'name price image description');
-    if (!order) {
+    const { data: order, error } = await supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .select('id, doc, created_at, updated_at')
+      .eq('collection', ORDERS_COLLECTION)
+      .eq('id', id)
+      .single();
+
+    if (error || !order) {
       return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
 
+    const orderData = mapOrderRow(order);
+
     const userRole = request.headers.get('x-user-role');
     const userEmail = request.headers.get('x-username');
-    if (userRole !== 'admin' && order.customer.email !== userEmail) {
+    if (userRole !== 'admin' && orderData.customer?.email !== userEmail) {
       return NextResponse.json({ error: 'Доступ запрещен' }, { status: 403 });
     }
 
-    return NextResponse.json({ order }, { status: 200 });
+    return NextResponse.json({ order: orderData }, { status: 200 });
   
 });
 
 export const PATCH = withErrorHandler(async (request: NextRequest, context: RouteContext) => {
-    await dbConnect();
     const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
 
@@ -47,6 +63,19 @@ export const PATCH = withErrorHandler(async (request: NextRequest, context: Rout
       return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
 
+    // First, get the current order
+    const { data: currentOrder, error: fetchError } = await supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .select('id, doc, created_at, updated_at')
+      .eq('collection', ORDERS_COLLECTION)
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !currentOrder) {
+      return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
+    }
+
+    const currentDoc = typeof currentOrder.doc === 'string' ? JSON.parse(currentOrder.doc) : currentOrder.doc;
     const body = sanitizeMongoObject(await request.json());
     const updateData: Record<string, unknown> = {};
 
@@ -59,24 +88,31 @@ export const PATCH = withErrorHandler(async (request: NextRequest, context: Rout
       return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
     }
 
-    const updatedOrder = await Order.findByIdAndUpdate(id, { $set: updateData }, { new: true, runValidators: true }).populate(
-      'items.productId',
-      'name price image'
-    );
+    // Merge updates into doc
+    const updatedDoc = { ...currentDoc, ...updateData };
 
-    if (!updatedOrder) {
-      return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
+    const { data: updatedOrder, error: updateError } = await supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .update({ doc: updatedDoc })
+      .eq('collection', ORDERS_COLLECTION)
+      .eq('id', id)
+      .select('id, doc, created_at, updated_at')
+      .single();
+
+    if (updateError) {
+      console.error('[ORDERS/[ID]] Supabase update error:', { message: updateError.message, code: updateError.code });
+      return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
     }
 
     invalidateOrdersCache();
     invalidateOrderStatsCache();
 
-    return NextResponse.json({ order: updatedOrder }, { status: 200 });
+    const orderResponse = mapOrderRow(updatedOrder);
+    return NextResponse.json({ order: orderResponse }, { status: 200 });
   
 });
 
 export const DELETE = withErrorHandler(async (request: NextRequest, context: RouteContext) => {
-    await dbConnect();
     const { id } = await context.params;
     const userRole = request.headers.get('x-user-role');
 
@@ -88,14 +124,35 @@ export const DELETE = withErrorHandler(async (request: NextRequest, context: Rou
       return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
 
-    const deletedOrder = await Order.findByIdAndDelete(id);
-    if (!deletedOrder) {
+    // First get the order to return orderNumber
+    const { data: orderToDelete, error: fetchError } = await supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .select('id, doc')
+      .eq('collection', ORDERS_COLLECTION)
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !orderToDelete) {
       return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
+    }
+
+    const doc = typeof orderToDelete.doc === 'string' ? JSON.parse(orderToDelete.doc) : orderToDelete.doc;
+
+    // Delete the order
+    const { error: deleteError } = await supabase
+      .from(SUPABASE_COLLECTION_TABLE)
+      .delete()
+      .eq('collection', ORDERS_COLLECTION)
+      .eq('id', id);
+
+    if (deleteError) {
+      console.error('[ORDERS/[ID]] Supabase delete error:', { message: deleteError.message, code: deleteError.code });
+      return NextResponse.json({ error: 'Failed to delete order' }, { status: 500 });
     }
 
     invalidateOrdersCache();
     invalidateOrderStatsCache();
 
-    return NextResponse.json({ message: 'Заказ успешно удален', orderNumber: deletedOrder.orderNumber }, { status: 200 });
+    return NextResponse.json({ message: 'Заказ успешно удален', orderNumber: doc.orderNumber }, { status: 200 });
   
 });

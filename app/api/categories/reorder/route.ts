@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Category from '@/models/Category';
+import { supabase } from '@/lib/supabase';
 import { invalidateCategoriesCache } from '@/lib/cache';
 import { requireAdmin } from '@/lib/auth';
 import { productionLogger } from '@/lib/productionLogger';
@@ -13,7 +12,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Требуется авторизация администратора' }, { status: 401 });
     }
 
-    await connect();
     const body = await request.json();
     const { categoryIds } = body;
 
@@ -22,13 +20,23 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Обновляем порядок для каждой категории
-    const updatePromises = categoryIds.map((id, index) =>
-      Category.findByIdAndUpdate(id, { $set: { order: index } }, { new: true })
+    const updatePromises = categoryIds.map((id: string, index: number) =>
+      supabase
+        .from('categories')
+        .update({ legacy_id: index })
+        .eq('id', id)
     );
 
-    await Promise.all(updatePromises);
+    const results = await Promise.all(updatePromises);
+    
+    // Проверяем на ошибки
+    const hasError = results.some(result => result.error);
+    if (hasError) {
+      productionLogger.error('[CATEGORIES REORDER] Error updating order');
+      return NextResponse.json({ error: 'Ошибка обновления порядка' }, { status: 500 });
+    }
+
     invalidateCategoriesCache();
 
     return NextResponse.json({ success: true });
-  
 });
