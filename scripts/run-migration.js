@@ -53,7 +53,53 @@ async function runMigration() {
     },
     {
       name: 'Backfill category_ids from category_id',
-      sql: `UPDATE public.products SET category_ids = CASE WHEN coalesce(category_id, '') <> '' THEN array[category_id] ELSE '{}'::text[] END WHERE category_ids IS NULL OR cardinality(category_ids) = 0`
+      sql: `UPDATE public.products SET category_ids = CASE WHEN category_id IS NOT NULL THEN array[category_id::text] ELSE '{}'::text[] END WHERE category_ids IS NULL OR cardinality(category_ids) = 0`
+    },
+    {
+      name: 'Drop invalid product subcategory links',
+      sql: `UPDATE public.products p
+SET subcategory_id = NULL
+WHERE p.subcategory_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1
+    FROM public.subcategories s
+    WHERE s.id = p.subcategory_id
+      AND s.category_id = p.category_id
+  )`
+    },
+    {
+      name: 'Create products subcategory/category validator function',
+      sql: `CREATE OR REPLACE FUNCTION public.validate_products_subcategory_category_match()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.subcategory_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.subcategories s
+    WHERE s.id = NEW.subcategory_id
+      AND s.category_id = NEW.category_id
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  RAISE EXCEPTION 'products.subcategory_id (%) does not belong to products.category_id (%)',
+    NEW.subcategory_id, NEW.category_id;
+END;
+$$`
+    },
+    {
+      name: 'Recreate products category-subcategory validation trigger',
+      sql: `DROP TRIGGER IF EXISTS trg_validate_products_subcategory_category_match ON public.products;
+CREATE TRIGGER trg_validate_products_subcategory_category_match
+BEFORE INSERT OR UPDATE OF category_id, subcategory_id
+ON public.products
+FOR EACH ROW
+EXECUTE FUNCTION public.validate_products_subcategory_category_match()`
     },
     {
       name: 'Create index on category_id',
