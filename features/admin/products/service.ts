@@ -41,7 +41,8 @@ export async function createProduct(payload: Omit<IProduct, '_id'>): Promise<IPr
 }
 
 export async function updateProduct(id: string, payload: Omit<IProduct, '_id'>): Promise<IProduct> {
-  const response = await fetch(`/api/products/${id}`, {
+  const encodedId = encodeURIComponent(id);
+  const response = await fetch(`/api/products?id=${encodedId}`, {
     method: 'PUT',
     headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
