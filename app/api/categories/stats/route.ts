@@ -68,11 +68,15 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       );
     }
 
+    const productsRows = (products || []) as Array<{ category_id?: string | null; subcategory_id?: string | null }>;
+    const categoryRows = (categories || []) as Array<{ id: string; legacy_id?: number | null; name?: string; slug?: string; is_active?: boolean }>;
+    const subcategoryRows = (allSubcategories || []) as Array<{ id: string; category_id?: string | null; name?: string; slug?: string; is_active?: boolean }>;
+
     // Подсчитываем статистику продуктов по категориям
     const categoryStatsMap = new Map<string, number>();
     const subcategoryStatsMap = new Map<string, number>();
 
-    (products || []).forEach(product => {
+    productsRows.forEach((product) => {
       const categoryId = product.category_id;
       const subcategoryId = product.subcategory_id;
 
@@ -86,8 +90,9 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     });
 
     // Группируем подкатегории по категориям
-    const subcategoriesByCategory = (allSubcategories || []).reduce((acc: Record<string, typeof allSubcategories>, sub: any) => {
+    const subcategoriesByCategory = subcategoryRows.reduce((acc: Record<string, Array<typeof subcategoryRows[number] & { productCount: number }>>, sub) => {
       const categoryId = sub.category_id;
+      if (!categoryId) return acc;
       if (!acc[categoryId]) {
         acc[categoryId] = [];
       }
@@ -99,7 +104,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }, {} as Record<string, any[]>);
 
     // Обогащаем категории статистикой
-    const enrichedCategories = (categories || []).map((category: any) => {
+    const enrichedCategories = categoryRows.map((category) => {
       const categoryProductCount = categoryStatsMap.get(category.id) || 0;
       const enrichedSubcategories = subcategoriesByCategory[category.id] || [];
 
@@ -127,9 +132,9 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       success: true,
       categories: enrichedCategories,
       summary: {
-        totalCategories: (categories || []).length,
-        totalSubcategories: (allSubcategories || []).length,
-        totalProducts: (products || []).length
+        totalCategories: categoryRows.length,
+        totalSubcategories: subcategoryRows.length,
+        totalProducts: productsRows.length
       }
     });
 });
