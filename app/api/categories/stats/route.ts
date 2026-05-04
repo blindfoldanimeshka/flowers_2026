@@ -10,18 +10,27 @@ function isMissingColumnError(error: unknown): boolean {
   return code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
 }
 
+async function selectWithOptionalActiveFilter(table: 'products' | 'categories' | 'subcategories', columns: string) {
+  let primary = await supabase.from(table).select(columns).eq('is_active', true);
+  if (primary.error) {
+    const fallback = await supabase.from(table).select(columns);
+    if (!fallback.error) {
+      return fallback;
+    }
+    if (isMissingColumnError(primary.error)) {
+      return fallback;
+    }
+    return primary;
+  }
+  return primary;
+}
+
 export const GET = withErrorHandler(async (request: NextRequest) => {
     // Получаем все продукты для подсчета статистики
-    let { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, category_id, subcategory_id')
-      .eq('is_active', true);
-
-    if (productsError && isMissingColumnError(productsError)) {
-      const retry = await supabase.from('products').select('id, category_id, subcategory_id');
-      products = retry.data;
-      productsError = retry.error;
-    }
+    const { data: products, error: productsError } = await selectWithOptionalActiveFilter(
+      'products',
+      'id, category_id, subcategory_id'
+    );
 
     if (productsError) {
       productionLogger.error('[CATEGORIES STATS] Products fetch error:', productsError);
@@ -32,16 +41,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все категории
-    let { data: categories, error: categoriesError } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('is_active', true);
-
-    if (categoriesError && isMissingColumnError(categoriesError)) {
-      const retry = await supabase.from('categories').select('*');
-      categories = retry.data;
-      categoriesError = retry.error;
-    }
+    const { data: categories, error: categoriesError } = await selectWithOptionalActiveFilter(
+      'categories',
+      '*'
+    );
 
     if (categoriesError) {
       productionLogger.error('[CATEGORIES STATS] Categories fetch error:', categoriesError);
@@ -52,16 +55,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все подкатегории
-    let { data: allSubcategories, error: subcategoriesError } = await supabase
-      .from('subcategories')
-      .select('*')
-      .eq('is_active', true);
-
-    if (subcategoriesError && isMissingColumnError(subcategoriesError)) {
-      const retry = await supabase.from('subcategories').select('*');
-      allSubcategories = retry.data;
-      subcategoriesError = retry.error;
-    }
+    const { data: allSubcategories, error: subcategoriesError } = await selectWithOptionalActiveFilter(
+      'subcategories',
+      '*'
+    );
 
     if (subcategoriesError) {
       productionLogger.error('[CATEGORIES STATS] Subcategories fetch error:', subcategoriesError);
