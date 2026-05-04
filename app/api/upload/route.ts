@@ -8,7 +8,8 @@ const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || 'product-images';
 // POST запрос для загрузки изображений в Supabase Storage
 export const POST = withErrorHandler(async (request: NextRequest) => {
     const data = await request.formData();
-    const file: File | null = data.get('file') as unknown as File;
+    const fileEntry = data.get('file') ?? data.get('image');
+    const file: File | null = (fileEntry as unknown as File) || null;
 
     if (!file) {
       return NextResponse.json({ error: 'Файл не найден' }, { status: 400 });

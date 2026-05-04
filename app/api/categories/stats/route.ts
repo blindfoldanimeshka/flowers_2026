@@ -4,12 +4,24 @@ import { supabase } from '@/lib/supabase';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
 
+function isMissingColumnError(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
+  const code = String((error as { code?: string })?.code || '');
+  return code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
+}
+
 export const GET = withErrorHandler(async (request: NextRequest) => {
     // Получаем все продукты для подсчета статистики
-    const { data: products, error: productsError } = await supabase
+    let { data: products, error: productsError } = await supabase
       .from('products')
       .select('id, category_id, subcategory_id')
       .eq('is_active', true);
+
+    if (productsError && isMissingColumnError(productsError)) {
+      const retry = await supabase.from('products').select('id, category_id, subcategory_id');
+      products = retry.data;
+      productsError = retry.error;
+    }
 
     if (productsError) {
       productionLogger.error('[CATEGORIES STATS] Products fetch error:', productsError);

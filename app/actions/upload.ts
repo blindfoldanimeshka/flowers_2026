@@ -58,7 +58,7 @@ export async function uploadImage(formData: FormData) {
     return {
       success: true,
       url: result.url,
-      fileName: result.fileName
+      fileName: result.fileName || result.filename
     };
 
   } catch (error: any) {
