@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -23,20 +23,10 @@ const Modal: React.FC<ModalProps> = ({
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [mounted, setMounted] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
   const overflowBackupRef = useRef<{
     bodyOverflow: string;
     htmlOverflow: string;
   } | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isOpen) setIsVisible(true);
-  }, [isOpen]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -47,7 +37,7 @@ const Modal: React.FC<ModalProps> = ({
 
     let preventTouchMove: EventListener | null = null;
 
-    if (isVisible) {
+    if (isOpen) {
       document.addEventListener('keydown', handleEscape);
 
       // На iOS/некоторых mobile-браузерах блокировка скролла только через body может не сработать.
@@ -84,7 +74,7 @@ const Modal: React.FC<ModalProps> = ({
       html.style.overflow = backup?.htmlOverflow ?? '';
       overflowBackupRef.current = null;
     };
-  }, [isVisible, onClose]);
+  }, [isOpen, onClose]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -92,15 +82,10 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  if (!mounted) return null;
+  if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <AnimatePresence
-      // Exit-анимация длится ~0.22-0.26s, после неё можно снять блокировку скролла.
-      onExitComplete={() => {
-        if (!isOpen) setIsVisible(false);
-      }}
-    >
+    <AnimatePresence>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
