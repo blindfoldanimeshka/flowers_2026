@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import Category from '@/models/Category';
+import { supabase } from '@/lib/supabase';
 import { sanitizeForJsonLd } from '@/lib/seoSecurity';
 
 type Props = {
@@ -17,9 +17,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     };
   }
 
-  const category = await Category.findOne({ slug, isActive: true }).lean();
+  const { data: category, error } = await supabase
+    .from('categories')
+    .select('*')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
 
-  if (!category) {
+  if (error || !category) {
     return {
       title: 'Категория не найдена',
     };

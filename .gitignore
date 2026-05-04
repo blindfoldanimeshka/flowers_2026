@@ -44,3 +44,4 @@ mongodb-data
 
 # Local run logs
 *.log
+.vscode

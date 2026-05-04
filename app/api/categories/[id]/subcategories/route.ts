@@ -1,29 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Category from '@/models/Category';
-import Subcategory from '@/models/Subcategory';
+import { createClient } from '@supabase/supabase-js';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);
+
 type CategorySubcategoriesRouteContext = { params: Promise<{ id: string }> };
 
-export const GET = withErrorHandler(async (request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
-    await connect();
-
+export const GET = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
     const { id } = await params;
-    const category = await Category.findById(id);
-
-    if (!category) {
+    
+    const { data: category, error: catError } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 2) // categories = 2
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (catError || !category) {
+      productionLogger.error('Supabase category fetch error:', catError);
       return NextResponse.json(
         { error: 'Категория не найдена' },
         { status: 404 }
       );
     }
-
-    const subcategories = await Subcategory.find({ categoryId: id }).lean();
-    return NextResponse.json({ subcategories }, { status: 200 });
-  
-});
+    
+    const { data: subcategories, error: subError } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3) // subcategories = 3
+      .eq('doc->>categoryId', id);
+    
+    if (subError) {
+      productionLogger.error('Supabase subcategories fetch error:', subError);
+      return NextResponse.json(
+        { error: 'Ошибка получения подкатегорий' },
+        { status: 500 }
+      );
+    }
+    
+    const subcategoryList = (subcategories || []).map(row => ({
+      _id: row.id,
+      ...JSON.parse(row.doc),
+    }));
+    
+    return NextResponse.json({ subcategories: subcategoryList }, { status: 200 });
+    
+  });
 
 export const POST = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
   const { id } = await params;

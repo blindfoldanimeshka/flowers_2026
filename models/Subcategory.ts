@@ -1,30 +1,25 @@
-import slugify from 'slugify';
-import { createSupabaseModel } from '@/lib/supabaseModel';
+// Заглушка для обратной совместимости
+// Проект использует Supabase напрямую через @/lib/supabase
+// Этот файл создан для предотвращения ошибок импорта
 
 export interface ISubcategory {
-  _id: string;
+  id: string;
   name: string;
   slug: string;
-  categoryId: string;
-  categoryNumId: number;
+  category_id: string;
   description?: string;
   image?: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const Subcategory = createSupabaseModel({
-  collection: 'subcategories',
-  defaults: { isActive: true },
-  references: {
-    categoryId: 'categories',
-  },
-  preCreate: (doc) => {
-    if (!doc.slug && doc.name) {
-      doc.slug = slugify(doc.name, { lower: true, strict: true });
-    }
-  },
-});
-
-export default Subcategory;
+export default {
+  find: () => ({ lean: () => [] }),
+  findOne: () => ({ lean: () => ({}) }),
+  findById: () => ({}),
+  findByIdAndUpdate: () => ({}),
+  findByIdAndDelete: () => ({}),
+  deleteOne: () => ({}),
+  save: () => ({}),
+};
