@@ -32,10 +32,16 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все категории
-    const { data: categories, error: categoriesError } = await supabase
+    let { data: categories, error: categoriesError } = await supabase
       .from('categories')
       .select('*')
       .eq('is_active', true);
+
+    if (categoriesError && isMissingColumnError(categoriesError)) {
+      const retry = await supabase.from('categories').select('*');
+      categories = retry.data;
+      categoriesError = retry.error;
+    }
 
     if (categoriesError) {
       productionLogger.error('[CATEGORIES STATS] Categories fetch error:', categoriesError);
@@ -46,10 +52,16 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     // Получаем все подкатегории
-    const { data: allSubcategories, error: subcategoriesError } = await supabase
+    let { data: allSubcategories, error: subcategoriesError } = await supabase
       .from('subcategories')
       .select('*')
       .eq('is_active', true);
+
+    if (subcategoriesError && isMissingColumnError(subcategoriesError)) {
+      const retry = await supabase.from('subcategories').select('*');
+      allSubcategories = retry.data;
+      subcategoriesError = retry.error;
+    }
 
     if (subcategoriesError) {
       productionLogger.error('[CATEGORIES STATS] Subcategories fetch error:', subcategoriesError);
