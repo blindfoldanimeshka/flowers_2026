@@ -4,6 +4,8 @@ import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
 
+const PAYMENT_SETTINGS_ID = 'default';
+
 function buildPaymentSettingsUpdate(body: Record<string, any>) {
   const update: Record<string, any> = {};
 
@@ -46,10 +48,21 @@ function buildPaymentSettingsUpdate(body: Record<string, any>) {
 }
 
 export const GET = withErrorHandler(async (_request: NextRequest) => {
-    const { data: settings, error } = await supabase
+    let { data: settings, error } = await supabase
       .from('payment_settings')
       .select('*')
+      .eq('id', PAYMENT_SETTINGS_ID)
       .maybeSingle();
+
+    if (error || !settings) {
+      const fallback = await supabase
+        .from('payment_settings')
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      settings = fallback.data;
+      error = fallback.error;
+    }
 
     if (error || !settings) {
       productionLogger.error('Supabase payment settings fetch error:', error);
@@ -94,11 +107,23 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
     }
 
-    const { data: updatedSettings, error } = await supabase
+    let { data: updatedSettings, error } = await supabase
       .from('payment_settings')
       .update(updateData)
+      .eq('id', PAYMENT_SETTINGS_ID)
       .select('*')
-      .single();
+      .maybeSingle();
+
+    if (error || !updatedSettings) {
+      const fallbackUpdate = await supabase
+        .from('payment_settings')
+        .update(updateData)
+        .select('*')
+        .limit(1)
+        .maybeSingle();
+      updatedSettings = fallbackUpdate.data;
+      error = fallbackUpdate.error;
+    }
 
     if (error || !updatedSettings) {
       productionLogger.error('Supabase payment settings update error:', error);
