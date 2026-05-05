@@ -392,16 +392,18 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
                       type="text"
                       value={form.tgId[index] || ''}
                       onChange={(e) => {
-                        const value = e.target.value.trim();
-                        const numValue = value ? parseInt(value, 10) : null;
+                        const value = e.target.value;
                         setForm((f) => {
                           const newTgId = [...f.tgId];
-                          if (numValue && numValue > 0 && numValue <= 32767) {
-                            newTgId[index] = numValue;
-                          } else if (!value) {
-                            newTgId[index] = null as any;
+                          if (value) {
+                            const numValue = parseInt(value, 10);
+                            if (!isNaN(numValue)) {
+                              newTgId[index] = numValue;
+                            }
+                          } else {
+                            newTgId.splice(index, 1);
                           }
-                          return { ...f, tgId: newTgId.filter((id) => id !== null && id !== undefined) };
+                          return { ...f, tgId: newTgId };
                         });
                       }}
                       className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
