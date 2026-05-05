@@ -10,6 +10,24 @@ interface MediaLibraryItem {
   inLibrary: boolean;
 }
 
+function normalizeMediaUrl(raw: string): string {
+  const url = String(raw || '').trim();
+  if (!url) return '';
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return url;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' && parsed.hostname.endsWith('.supabase.co')) {
+      parsed.protocol = 'https:';
+      return parsed.toString();
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
@@ -245,9 +263,10 @@ export default function ImageUpload({
   }, [onChange]);
 
   const pickFromLibrary = (url: string) => {
+    const normalized = normalizeMediaUrl(url);
     setError(null);
-    onChange(url);
-    setPreview(url);
+    onChange(normalized);
+    setPreview(normalized);
     setLibraryOpen(false);
   };
 
@@ -290,7 +309,18 @@ export default function ImageUpload({
                         title={item.inLibrary ? 'В медиатеке' : 'Из товара или оформления'}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element -- превью из медиатеки, произвольные URL */}
-                        <img src={item.url} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                        <img
+                          src={normalizeMediaUrl(item.url)}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (img.dataset.fallbackApplied === '1') return;
+                            img.dataset.fallbackApplied = '1';
+                            img.src = '/image/items/no_photo.jpg';
+                          }}
+                        />
                       </button>
                     ))}
                   </div>
