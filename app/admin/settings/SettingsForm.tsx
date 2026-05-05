@@ -396,9 +396,8 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
                         setForm((f) => {
                           const newTgId = [...f.tgId];
                           if (value.trim()) {
-                            const numValue = parseInt(value.trim(), 10);
-                            if (!isNaN(numValue) && numValue > 0) {
-                              newTgId[index] = numValue;
+                            if (/^\d+$/.test(value.trim())) {
+                              newTgId[index] = value.trim();
                             } else {
                               return f;
                             }
@@ -411,11 +410,10 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
                       onPaste={(e) => {
                         e.preventDefault();
                         const pastedText = e.clipboardData.getData('text');
-                        const numValue = parseInt(pastedText.trim(), 10);
-                        if (!isNaN(numValue) && numValue > 0) {
+                        if (/^\d+$/.test(pastedText.trim())) {
                           setForm((f) => {
                             const newTgId = [...f.tgId];
-                            newTgId[index] = numValue;
+                            newTgId[index] = pastedText.trim();
                             return { ...f, tgId: newTgId };
                           });
                         }
