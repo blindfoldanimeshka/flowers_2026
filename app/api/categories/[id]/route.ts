@@ -6,8 +6,8 @@ import { withErrorHandler } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
 
 // PUT to update a category by ID
-export const PUT = withErrorHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
-  const { id } = params;
+export const PUT = withErrorHandler(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
   const body = await request.json();
 
   if (!id) {
@@ -41,8 +41,8 @@ export const PUT = withErrorHandler(async (request: NextRequest, { params }: { p
 });
 
 // DELETE a category by ID
-export const DELETE = withErrorHandler(async (request: NextRequest, { params }: { params: { id: string } }) => {
-  const { id } = params;
+export const DELETE = withErrorHandler(async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+  const { id } = await params;
 
   if (!id) {
     return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
