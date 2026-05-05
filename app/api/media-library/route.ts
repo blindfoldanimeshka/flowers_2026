@@ -24,6 +24,25 @@ function toPublicBucketUrl(path: string): string {
   return `${base}/storage/v1/object/public/${STORAGE_BUCKET}/${encoded}`;
 }
 
+function extractBucketPathFromUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    const marker = `/storage/v1/object/public/${STORAGE_BUCKET}/`;
+    const idx = parsed.pathname.indexOf(marker);
+    if (idx === -1) return null;
+    const encodedPath = parsed.pathname.slice(idx + marker.length);
+    if (!encodedPath) return null;
+    return encodedPath
+      .split('/')
+      .map((part) => decodeURIComponent(part))
+      .join('/');
+  } catch {
+    return null;
+  }
+}
+
 async function listBucketImageUrls(): Promise<string[]> {
   const urls: string[] = [];
   let offset = 0;
@@ -301,21 +320,41 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
 
   const targetSet = new Set(targets);
   const filtered = existingLib.filter((e: { url?: string }) => !targetSet.has(String(e?.url || '')));
+  const removedFromLibrary = existingLib.length - filtered.length;
 
-  if (filtered.length === existingLib.length) {
-    return NextResponse.json({ error: 'Изображение не найдено в библиотеке' }, { status: 404 });
+  const bucketPaths = targets
+    .map((u) => extractBucketPathFromUrl(u))
+    .filter((p): p is string => Boolean(p));
+
+  let removedFromBucket = 0;
+  if (bucketPaths.length > 0) {
+    const { error } = await supabase.storage.from(STORAGE_BUCKET).remove(bucketPaths);
+    if (!error) {
+      removedFromBucket = bucketPaths.length;
+    }
   }
 
-  const { error } = await supabase
-    .from('settings')
-    .update({ media_library: filtered })
-    .eq('id', SETTINGS_KEY);
+  if (removedFromLibrary === 0 && removedFromBucket === 0) {
+    return NextResponse.json({ error: 'Изображение не найдено ни в библиотеке, ни в bucket' }, { status: 404 });
+  }
 
-  if (error) {
-    return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
+  if (removedFromLibrary > 0) {
+    const { error } = await supabase
+      .from('settings')
+      .update({ media_library: filtered })
+      .eq('id', SETTINGS_KEY);
+
+    if (error) {
+      return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
+    }
   }
 
   invalidateSettingsCache();
   mediaCache = null;
-  return NextResponse.json({ ok: true, deleted: targets.length });
+  return NextResponse.json({
+    ok: true,
+    deleted: targets.length,
+    removedFromLibrary,
+    removedFromBucket,
+  });
 });
