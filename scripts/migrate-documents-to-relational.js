@@ -231,15 +231,25 @@ async function migrateOrders(productByLegacy) {
     await supabase.from('order_items').delete().eq('order_id', orderId);
 
     const itemsPayload = doc.items
-      .map((item) => {
+      .map((item, index) => {
         const productLegacy = String(item.productId || '').trim();
         const productId = productByLegacy.get(productLegacy) || null;
+        const normalizedItemPrice = toBoundedNumber(item.price, { min: 0, max: 999999999.99, fallback: 0 });
+        const normalizedItemQuantity = Math.floor(toBoundedNumber(item.quantity, { min: 1, max: 100, fallback: 1 }));
+        if (Number(item.price) !== normalizedItemPrice || Number(item.quantity) !== normalizedItemQuantity) {
+          console.warn('Order item normalized:', row.id, index, {
+            priceFrom: item.price,
+            priceTo: normalizedItemPrice,
+            quantityFrom: item.quantity,
+            quantityTo: normalizedItemQuantity,
+          });
+        }
         return {
           order_id: orderId,
           product_id: productId,
           product_name: String(item.name || 'Товар'),
-          price: toNumber(item.price, 0),
-          quantity: Math.max(1, toNumber(item.quantity, 1)),
+          price: normalizedItemPrice,
+          quantity: normalizedItemQuantity,
           image_url: typeof item.image === 'string' ? item.image : null,
         };
       })
