@@ -243,6 +243,7 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
       homeCategoryCardBackgrounds: {},
       homeBannerBackground: '',
       homeBannerSlides: [],
+      tgId: [],
     };
   }
 
@@ -282,6 +283,7 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
       !Array.isArray(settings.socialLinks ?? settings.social_links)
         ? (settings.socialLinks ?? settings.social_links)
         : {},
+    tgId: Array.isArray(settings.tgId ?? settings.tg_id) ? (settings.tgId ?? settings.tg_id) : [],
   };
 }
 

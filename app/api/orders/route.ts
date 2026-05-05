@@ -318,40 +318,42 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     const orderResponse = mapOrderRow(fullOrder);
 
-    // Отправка уведомления в Telegram
-    try {
-      const { data: settingsData } = await supabase
-        .from('settings')
-        .select('tg_id')
-        .eq('id', 'global-settings')
-        .maybeSingle();
+    // Отправка уведомления в Telegram в фоновом режиме (не блокирует ответ клиенту)
+    setImmediate(async () => {
+      try {
+        const { data: settingsData } = await supabase
+          .from('settings')
+          .select('tg_id')
+          .eq('id', 'global-settings')
+          .maybeSingle();
 
-      const tgIds = settingsData?.tg_id || [];
+        const tgIds = settingsData?.tg_id || [];
 
-      for (const telegramId of tgIds) {
-        try {
-          if (await telegramRateLimiter.canSend()) {
-            await sendOrderNotification(String(telegramId), {
-              orderNumber,
-              customer: {
-                name: customer.name.trim(),
-                phone: customer.phone.trim(),
-                email: typeof customer.email === 'string' ? customer.email.trim() : undefined,
-              },
-              items: orderItems,
-              totalAmount,
+        for (const telegramId of tgIds) {
+          try {
+            if (await telegramRateLimiter.canSend()) {
+              await sendOrderNotification(String(telegramId), {
+                orderNumber,
+                customer: {
+                  name: customer.name.trim(),
+                  phone: customer.phone.trim(),
+                  email: typeof customer.email === 'string' ? customer.email.trim() : undefined,
+                },
+                items: orderItems,
+                totalAmount,
+              });
+            }
+          } catch (err) {
+            productionLogger.error('Failed to send Telegram notification', err, {
+              orderId: newOrder.id,
+              telegramId,
             });
           }
-        } catch (err) {
-          productionLogger.error('Failed to send Telegram notification', err, {
-            orderId: newOrder.id,
-            telegramId,
-          });
         }
+      } catch (telegramError) {
+        productionLogger.error('Ошибка отправки уведомления в Telegram:', telegramError);
       }
-    } catch (telegramError) {
-      productionLogger.error('Ошибка отправки уведомления в Telegram:', telegramError);
-    }
+    });
 
     return NextResponse.json({ message: 'Заказ успешно создан', order: orderResponse }, { status: 201 });
   
