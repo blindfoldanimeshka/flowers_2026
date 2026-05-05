@@ -38,7 +38,7 @@ interface SettingsUpdatePayload {
   homeBannerBackground?: string;
   homeBannerSlides?: string[];
   mediaLibrary?: Array<{ id: string; url: string; createdAt?: string }>;
-  tgId?: number[];
+  tgId?: string[];
 }
 
 const SETTINGS_KEY = 'global-settings';
@@ -208,14 +208,15 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
     }
 
     if (field === 'tgId' && Array.isArray(value)) {
-      const tgIds: number[] = [];
+      const tgIds: string[] = [];
       for (const item of value) {
-        if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
-          tgIds.push(item);
+        const strValue = typeof item === 'number' ? String(item) : typeof item === 'string' ? item.trim() : '';
+        if (strValue && /^\d+$/.test(strValue)) {
+          tgIds.push(strValue);
         }
       }
       if (tgIds.length > 0) {
-        sanitizedBody.tgId = tgIds;
+        sanitizedBody.tgId = tgIds as any;
       }
       continue;
     }
