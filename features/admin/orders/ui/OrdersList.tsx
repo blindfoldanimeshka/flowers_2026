@@ -114,8 +114,7 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
             filteredOrders.map((order) => {
               const isNewHighlight = highlightNewOrderIds.has(String(order._id));
               const previewImage =
-                order.items.find((item) => typeof item.image === 'string' && item.image.trim().length > 0)?.image ||
-                '/image/items/no_photo.jpg';
+                order.items.find((item) => typeof item.image === 'string' && item.image.trim().length > 0)?.image;
               const statusLabel = orderStatuses[order.status];
 
               return (
@@ -134,7 +133,9 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
                     isNewHighlight ? 'border-emerald-300' : 'border-gray-200'
                   } [touch-action:manipulation]`}
                   style={{
-                    backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.72) 74%), url('${previewImage}')`,
+                    backgroundImage: previewImage
+                      ? `linear-gradient(180deg, rgba(0,0,0,0.12) 0%, rgba(0,0,0,0.72) 74%), url('${previewImage}')`
+                      : 'linear-gradient(180deg, rgba(17,24,39,0.16) 0%, rgba(75,85,99,0.82) 100%)',
                     backgroundPosition: 'center',
                     backgroundSize: 'cover',
                   }}
@@ -363,22 +364,24 @@ export default function OrdersList({ initialOrders }: OrdersListProps) {
               <ul className="space-y-3">
                 {selectedOrder.items.map((item, index) => (
                   <li key={index} className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3 md:flex-row md:items-start">
-                    <div className="aspect-square w-full max-w-[320px] overflow-hidden rounded-xl border border-gray-200 bg-white sm:max-w-[380px] md:w-[min(40vw,420px)] md:max-w-none">
-                      <Image
-                        src={item.image || '/image/items/no_photo.jpg'}
-                        alt={item.name}
-                        width={640}
-                        height={640}
-                        unoptimized
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                        sizes="(max-width: 768px) 92vw, 640px"
-                        onError={(event) => {
-                          const target = event.currentTarget as HTMLImageElement;
-                          target.src = '/image/items/no_photo.jpg';
-                        }}
-                      />
-                    </div>
+                    {typeof item.image === 'string' && item.image.trim().length > 0 ? (
+                      <div className="aspect-square w-full max-w-[320px] overflow-hidden rounded-xl border border-gray-200 bg-white sm:max-w-[380px] md:w-[min(40vw,420px)] md:max-w-none">
+                        <Image
+                          src={item.image}
+                          alt={item.name}
+                          width={640}
+                          height={640}
+                          unoptimized
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          sizes="(max-width: 768px) 92vw, 640px"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex aspect-square w-full max-w-[320px] items-center justify-center rounded-xl border border-gray-200 bg-gradient-to-br from-slate-100 via-gray-100 to-slate-200 text-sm font-medium text-gray-500 sm:max-w-[380px] md:w-[min(40vw,420px)] md:max-w-none">
+                        Нет изображения
+                      </div>
+                    )}
                     <div className="min-w-0">
                       <div className="break-words text-base font-semibold text-gray-900">{item.name}</div>
                       <div className="mt-1 text-sm text-gray-600">

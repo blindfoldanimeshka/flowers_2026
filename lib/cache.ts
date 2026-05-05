@@ -91,6 +91,7 @@ function mapCategoryRow(row: any, subs: any[]) {
     id: asNumber(row.legacy_id, 0),
     name: row.name,
     slug: row.slug,
+    image: row.image_url || row.image || undefined,
     isActive: row.is_active ?? true,
     subcategories: subs,
     createdAt: row.created_at,
@@ -286,6 +287,7 @@ export async function getCachedSettings() {
         homeBannerBackground: data.home_banner_background || '',
         homeBannerSlides: Array.isArray(data.home_banner_slides) ? data.home_banner_slides : [],
         mediaLibrary: Array.isArray(data.media_library) ? data.media_library : [],
+        tgId: Array.isArray(data.tg_id) ? data.tg_id : Array.isArray(data.tgId) ? data.tgId : [],
       };
     },
     ['settings'],

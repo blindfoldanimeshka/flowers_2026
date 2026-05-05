@@ -6,7 +6,7 @@ import { productionLogger } from '@/lib/productionLogger';
 const AUTH_LOGIN_PATH = '/auth/login';
 const ADMIN_DASHBOARD_PATH = '/admin/orders';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const mirrorMode = process.env.MIRROR_MODE === 'true';
   const isMutatingRequest = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method);
@@ -142,3 +142,4 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: ['/admin/:path*', '/api/:path*', '/auth/login'],
 };
+

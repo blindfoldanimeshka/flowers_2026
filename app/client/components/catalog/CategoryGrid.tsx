@@ -87,19 +87,28 @@ export default function CategoryGrid() {
             <Link href={`/category/${category.slug}`} className="group block h-full">
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
                 <div className="absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity duration-300">
-                  <Image
-                    src={
+                  {(() => {
+                    const imageSrc =
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
-                      '/image/items/no_photo.jpg'
+                      '';
+
+                    if (!imageSrc) {
+                      return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
                     }
-                    alt={category.name}
-                    fill
-                    sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, (max-width: 1279px) 25vw, 33vw"
-                    priority={index < 4}
-                    className="object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
+
+                    return (
+                      <Image
+                        src={imageSrc}
+                        alt={category.name}
+                        fill
+                        sizes="(max-width: 767px) 100vw, (max-width: 1023px) 50vw, (max-width: 1279px) 25vw, 33vw"
+                        priority={index < 4}
+                        className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    );
+                  })()}
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/15 to-transparent" />
 
