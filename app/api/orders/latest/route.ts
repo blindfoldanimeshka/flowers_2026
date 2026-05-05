@@ -1,16 +1,34 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, SUPABASE_COLLECTION_TABLE } from '@/lib/supabase';
-import { productionLogger } from '@/lib/productionLogger';
+import { supabase } from '@/lib/supabase';
 import { withErrorHandler } from '@/lib/errorHandler';
 
-const ORDERS_COLLECTION = 5;
-
 function mapOrderRow(row: any) {
-  const doc = typeof row.doc === 'string' ? JSON.parse(row.doc) : row.doc;
+  const items = Array.isArray(row.order_items) ? row.order_items : [];
   return {
     _id: row.id,
-    ...doc,
+    orderNumber: row.order_number,
+    customer: {
+      name: row.customer_name,
+      email: row.customer_email || undefined,
+      phone: row.customer_phone,
+      address: row.customer_address,
+    },
+    items: items.map((item: any) => ({
+      productId: item.product_id || '',
+      quantity: item.quantity,
+      name: item.product_name,
+      price: Number(item.price) || 0,
+      image: item.image_url || '',
+    })),
+    paymentMethod: row.payment_method,
+    fulfillmentMethod: row.fulfillment_method,
+    deliveryDate: row.delivery_date || undefined,
+    deliveryTime: row.delivery_time || undefined,
+    notes: row.notes || undefined,
+    totalAmount: Number(row.total_amount) || 0,
+    status: row.status,
+    paymentStatus: row.payment_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -31,10 +49,33 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       );
     }
 
-    let query = supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .select('id, doc, created_at, updated_at')
-      .eq('collection', ORDERS_COLLECTION);
+    let query = supabase.from('orders').select(
+      `
+        id,
+        order_number,
+        customer_name,
+        customer_email,
+        customer_phone,
+        customer_address,
+        status,
+        payment_method,
+        fulfillment_method,
+        delivery_date,
+        delivery_time,
+        notes,
+        total_amount,
+        payment_status,
+        created_at,
+        updated_at,
+        order_items (
+          product_id,
+          product_name,
+          price,
+          quantity,
+          image_url
+        )
+      `
+    );
 
     // Если указан timestamp, получаем заказы после этой даты
     if (since) {
@@ -50,7 +91,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       if (deliveryType !== 'delivery' && deliveryType !== 'pickup') {
         return NextResponse.json({ error: 'Некорректный параметр deliveryType' }, { status: 400 });
       }
-      query = query.eq('doc->>fulfillmentMethod', deliveryType);
+      query = query.eq('fulfillment_method', deliveryType);
     }
 
     const { data, error } = await query

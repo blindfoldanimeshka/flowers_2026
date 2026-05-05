@@ -14,8 +14,7 @@ let mediaCache: { items: any[]; timestamp: number } | null = null;
 async function getSettingsRow() {
   const byId = await supabase.from('settings').select('*').eq('id', SETTINGS_KEY).maybeSingle();
   if (!byId.error && byId.data) return byId;
-  const legacy = await supabase.from('settings').select('*').eq('settingKey', SETTINGS_KEY).maybeSingle();
-  return legacy.error ? byId : legacy;
+  return byId;
 }
 
 function collectProductImageUrls(p: { image?: string; images?: string[] }): string[] {
@@ -32,15 +31,25 @@ function collectProductImageUrls(p: { image?: string; images?: string[] }): stri
 function collectSettingsImageUrls(s: Record<string, unknown> | null | undefined): string[] {
   const urls: string[] = [];
   if (!s) return urls;
-  if (typeof s.homeBannerBackground === 'string' && s.homeBannerBackground.trim()) {
-    urls.push(s.homeBannerBackground.trim());
+  const homeBannerBackground = typeof s.homeBannerBackground === 'string'
+    ? s.homeBannerBackground
+    : typeof s.home_banner_background === 'string'
+      ? s.home_banner_background
+      : '';
+  if (homeBannerBackground.trim()) {
+    urls.push(homeBannerBackground.trim());
   }
-  if (Array.isArray(s.homeBannerSlides)) {
-    for (const u of s.homeBannerSlides) {
+  const homeBannerSlides = Array.isArray(s.homeBannerSlides)
+    ? s.homeBannerSlides
+    : Array.isArray(s.home_banner_slides)
+      ? s.home_banner_slides
+      : [];
+  if (Array.isArray(homeBannerSlides)) {
+    for (const u of homeBannerSlides) {
       if (typeof u === 'string' && u.trim()) urls.push(u.trim());
     }
   }
-  const bg = s.homeCategoryCardBackgrounds;
+  const bg = s.homeCategoryCardBackgrounds || s.home_category_card_backgrounds;
   if (bg && typeof bg === 'object' && !Array.isArray(bg)) {
     for (const v of Object.values(bg)) {
       if (typeof v === 'string' && v.trim()) urls.push(v.trim());
@@ -85,8 +94,13 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
 
       const map = new Map<string, { url: string; inLibrary: boolean; createdAt?: string }>();
 
-      if (Array.isArray(settings.mediaLibrary)) {
-        for (const item of settings.mediaLibrary) {
+      const mediaLibrary = Array.isArray(settings.mediaLibrary)
+        ? settings.mediaLibrary
+        : Array.isArray(settings.media_library)
+          ? settings.media_library
+          : [];
+      if (Array.isArray(mediaLibrary)) {
+        for (const item of mediaLibrary) {
           if (!item || typeof item !== 'object' || !('url' in item)) continue;
           const url = typeof (item as { url: unknown }).url === 'string' ? (item as { url: string }).url.trim() : '';
           if (!url) continue;
@@ -148,7 +162,11 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
   const { data: current } = await getSettingsRow();
 
-  const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
+  const existingLib = Array.isArray(current?.media_library)
+    ? [...current.media_library]
+    : Array.isArray(current?.mediaLibrary)
+      ? [...current.mediaLibrary]
+      : [];
 
   if (existingLib.some((e: { url?: string }) => e?.url === url)) {
     return NextResponse.json({ ok: true, duplicate: true });
@@ -161,18 +179,10 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
   };
   const nextLib = [entry, ...existingLib].slice(0, MAX_LIBRARY_ITEMS);
 
-  let { error } = await supabase
+  const { error } = await supabase
     .from('settings')
-    .update({ mediaLibrary: nextLib })
+    .update({ media_library: nextLib })
     .eq('id', SETTINGS_KEY);
-
-  if (error) {
-    const legacyUpdate = await supabase
-      .from('settings')
-      .update({ mediaLibrary: nextLib })
-      .eq('settingKey', SETTINGS_KEY);
-    error = legacyUpdate.error;
-  }
 
   if (error) {
     return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });
@@ -197,7 +207,11 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
 
   const { data: current } = await getSettingsRow();
 
-  const existingLib = Array.isArray(current?.mediaLibrary) ? [...current.mediaLibrary] : [];
+  const existingLib = Array.isArray(current?.media_library)
+    ? [...current.media_library]
+    : Array.isArray(current?.mediaLibrary)
+      ? [...current.mediaLibrary]
+      : [];
 
   const filtered = existingLib.filter((e: { url?: string }) => e?.url !== url);
 
@@ -205,18 +219,10 @@ export const DELETE = withErrorHandler(async (request: NextRequest) => {
     return NextResponse.json({ error: 'Изображение не найдено в библиотеке' }, { status: 404 });
   }
 
-  let { error } = await supabase
+  const { error } = await supabase
     .from('settings')
-    .update({ mediaLibrary: filtered })
+    .update({ media_library: filtered })
     .eq('id', SETTINGS_KEY);
-
-  if (error) {
-    const legacyUpdate = await supabase
-      .from('settings')
-      .update({ mediaLibrary: filtered })
-      .eq('settingKey', SETTINGS_KEY);
-    error = legacyUpdate.error;
-  }
 
   if (error) {
     return NextResponse.json({ error: 'Ошибка обновления медиатеки' }, { status: 500 });

@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedSettings, invalidateSettingsCache } from '@/lib/cache';
+import { invalidateSettingsCache } from '@/lib/cache';
 import { requireAdmin } from '@/lib/auth';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
@@ -46,8 +46,7 @@ async function getSettingsRow() {
   const byId = await supabase.from('settings').select('*').eq('id', SETTINGS_KEY).maybeSingle();
   if (!byId.error && byId.data) return byId;
 
-  const legacy = await supabase.from('settings').select('*').eq('settingKey', SETTINGS_KEY).maybeSingle();
-  return legacy.error ? byId : legacy;
+  return byId;
 }
 
 const ALLOWED_FIELDS: (keyof SettingsUpdatePayload)[] = [
@@ -235,21 +234,37 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
 
   return {
     ...rest,
-    contactPhone2: settings.contactPhone2 || '',
-    contactPhone3: settings.contactPhone3 || '',
-    pickupHours: settings.pickupHours || '',
-    deliveryHours: settings.deliveryHours || '',
-    deliveryInfo: settings.deliveryInfo || '',
+    siteName: String(settings.siteName ?? settings.site_name ?? ''),
+    siteDescription: String(settings.siteDescription ?? settings.site_description ?? ''),
+    contactPhone: String(settings.contactPhone ?? settings.contact_phone ?? ''),
+    contactPhone2: String(settings.contactPhone2 ?? settings.contact_phone2 ?? ''),
+    contactPhone3: String(settings.contactPhone3 ?? settings.contact_phone3 ?? ''),
+    address: String(settings.address ?? ''),
+    workingHours: String(settings.workingHours ?? settings.working_hours ?? ''),
+    pickupHours: String(settings.pickupHours ?? settings.pickup_hours ?? ''),
+    deliveryHours: String(settings.deliveryHours ?? settings.delivery_hours ?? ''),
+    deliveryInfo: String(settings.deliveryInfo ?? settings.delivery_info ?? ''),
     homeCategoryCardBackgrounds:
-      typeof settings.homeCategoryCardBackgrounds === 'object' &&
-      settings.homeCategoryCardBackgrounds !== null &&
-      !Array.isArray(settings.homeCategoryCardBackgrounds)
-        ? settings.homeCategoryCardBackgrounds
+      typeof (settings.homeCategoryCardBackgrounds ?? settings.home_category_card_backgrounds) === 'object' &&
+      (settings.homeCategoryCardBackgrounds ?? settings.home_category_card_backgrounds) !== null &&
+      !Array.isArray(settings.homeCategoryCardBackgrounds ?? settings.home_category_card_backgrounds)
+        ? (settings.homeCategoryCardBackgrounds ?? settings.home_category_card_backgrounds)
         : {},
-    homeBannerBackground: typeof settings.homeBannerBackground === 'string' ? settings.homeBannerBackground : '',
-    homeBannerSlides: Array.isArray(settings.homeBannerSlides)
-      ? settings.homeBannerSlides.filter((item): item is string => typeof item === 'string').slice(0, 6)
+    homeBannerBackground:
+      typeof (settings.homeBannerBackground ?? settings.home_banner_background) === 'string'
+        ? String(settings.homeBannerBackground ?? settings.home_banner_background)
+        : '',
+    homeBannerSlides: Array.isArray(settings.homeBannerSlides ?? settings.home_banner_slides)
+      ? (settings.homeBannerSlides ?? settings.home_banner_slides)
+          .filter((item): item is string => typeof item === 'string')
+          .slice(0, 6)
       : [],
+    socialLinks:
+      typeof (settings.socialLinks ?? settings.social_links) === 'object' &&
+      (settings.socialLinks ?? settings.social_links) !== null &&
+      !Array.isArray(settings.socialLinks ?? settings.social_links)
+        ? (settings.socialLinks ?? settings.social_links)
+        : {},
   };
 }
 
@@ -277,30 +292,42 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
   };
 
   const payload = { ...defaultSettings, ...sanitizedBody };
+  const dbPayload = {
+    id: SETTINGS_KEY,
+    site_name: payload.siteName,
+    site_description: payload.siteDescription,
+    contact_phone: payload.contactPhone,
+    contact_phone2: payload.contactPhone2 ?? null,
+    contact_phone3: payload.contactPhone3 ?? null,
+    address: payload.address,
+    working_hours: payload.workingHours,
+    pickup_hours: payload.pickupHours ?? null,
+    delivery_hours: payload.deliveryHours ?? null,
+    delivery_info: payload.deliveryInfo ?? null,
+    delivery_radius: payload.deliveryRadius,
+    min_order_amount: payload.minOrderAmount,
+    free_delivery_threshold: payload.freeDeliveryThreshold,
+    delivery_fee: payload.deliveryFee,
+    currency: payload.currency,
+    timezone: payload.timezone,
+    maintenance_mode: payload.maintenanceMode,
+    seo_title: payload.seoTitle ?? null,
+    seo_description: payload.seoDescription ?? null,
+    seo_keywords: payload.seoKeywords ?? null,
+    social_links: payload.socialLinks ?? {},
+    home_category_card_backgrounds: payload.homeCategoryCardBackgrounds ?? {},
+    home_banner_background: payload.homeBannerBackground ?? '',
+    home_banner_slides: payload.homeBannerSlides ?? [],
+    media_library: payload.mediaLibrary ?? [],
+  };
   const byIdUpsert = await supabase
     .from('settings')
-    .upsert(
-      { ...payload, id: SETTINGS_KEY },
-      { onConflict: 'id', ignoreDuplicates: false }
-    )
+    .upsert(dbPayload, { onConflict: 'id', ignoreDuplicates: false })
     .select('*')
     .single();
 
-  let settings = byIdUpsert.data;
-  let error = byIdUpsert.error;
-
-  if (error) {
-    const legacyUpsert = await supabase
-      .from('settings')
-      .upsert(
-        { ...payload, settingKey: SETTINGS_KEY },
-        { onConflict: 'settingKey', ignoreDuplicates: false }
-      )
-      .select('*')
-      .single();
-    settings = legacyUpsert.data;
-    error = legacyUpsert.error;
-  }
+  const settings = byIdUpsert.data;
+  const error = byIdUpsert.error;
 
   if (error || !settings) {
     productionLogger.error('Supabase settings upsert error:', error);

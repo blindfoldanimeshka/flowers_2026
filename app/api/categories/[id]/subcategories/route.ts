@@ -1,32 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/lib/supabase';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
-
-function createSupabaseClient() {
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Supabase environment variables are not configured');
-  }
-
-  return createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
-}
 
 type CategorySubcategoriesRouteContext = { params: Promise<{ id: string }> };
 
 export const GET = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
-    const supabase = createSupabaseClient();
     const { id } = await params;
-    
+
     const { data: category, error: catError } = await supabase
-      .from('documents')
-      .select('id, doc')
-      .eq('collection', 2) // categories = 2
+      .from('categories')
+      .select('id')
       .eq('id', id)
       .maybeSingle();
-    
+
     if (catError || !category) {
       productionLogger.error('Supabase category fetch error:', catError);
       return NextResponse.json(
@@ -36,11 +23,11 @@ export const GET = withErrorHandler(async (_request: NextRequest, { params }: Ca
     }
     
     const { data: subcategories, error: subError } = await supabase
-      .from('documents')
-      .select('id, doc')
-      .eq('collection', 3) // subcategories = 3
-      .eq('doc->>categoryId', id);
-    
+      .from('subcategories')
+      .select('id, legacy_id, category_id, name, slug, created_at, updated_at')
+      .eq('category_id', id)
+      .order('name', { ascending: true });
+
     if (subError) {
       productionLogger.error('Supabase subcategories fetch error:', subError);
       return NextResponse.json(
@@ -49,13 +36,19 @@ export const GET = withErrorHandler(async (_request: NextRequest, { params }: Ca
       );
     }
     
-    const subcategoryList = (subcategories || []).map(row => ({
+    const subcategoryList = (subcategories || []).map((row) => ({
       _id: row.id,
-      ...JSON.parse(row.doc),
+      id: row.id,
+      legacyId: row.legacy_id,
+      categoryId: row.category_id,
+      name: row.name,
+      slug: row.slug,
+      isActive: true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     }));
-    
+
     return NextResponse.json({ subcategories: subcategoryList }, { status: 200 });
-    
   });
 
 export const POST = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
