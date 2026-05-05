@@ -395,16 +395,30 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
                         const value = e.target.value;
                         setForm((f) => {
                           const newTgId = [...f.tgId];
-                          if (value) {
-                            const numValue = parseInt(value, 10);
-                            if (!isNaN(numValue)) {
+                          if (value.trim()) {
+                            const numValue = parseInt(value.trim(), 10);
+                            if (!isNaN(numValue) && numValue > 0) {
                               newTgId[index] = numValue;
+                            } else {
+                              return f;
                             }
                           } else {
                             newTgId.splice(index, 1);
                           }
                           return { ...f, tgId: newTgId };
                         });
+                      }}
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const pastedText = e.clipboardData.getData('text');
+                        const numValue = parseInt(pastedText.trim(), 10);
+                        if (!isNaN(numValue) && numValue > 0) {
+                          setForm((f) => {
+                            const newTgId = [...f.tgId];
+                            newTgId[index] = numValue;
+                            return { ...f, tgId: newTgId };
+                          });
+                        }
                       }}
                       className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
                       placeholder="Например: 123456789"
