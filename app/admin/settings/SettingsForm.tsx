@@ -99,6 +99,7 @@ const getInitialFormState = (settings: any) => ({
   homeCategoryCardBackgrounds: settings?.homeCategoryCardBackgrounds ?? {},
   homeBannerBackground: settings?.homeBannerBackground ?? '',
   homeBannerSlides: Array.isArray(settings?.homeBannerSlides) ? settings.homeBannerSlides.slice(0, 6) : [],
+  tgId: Array.isArray(settings?.tgId) ? settings.tgId : [],
 });
 
 interface CategoryItem {
@@ -118,6 +119,7 @@ const sectionItems = [
   { key: 'hours', label: 'График' },
   { key: 'visuals', label: 'Витрина' },
   { key: 'socials', label: 'Соцсети' },
+  { key: 'notifications', label: 'Уведомления' },
 ] as const;
 
 type SectionKey = typeof sectionItems[number]['key'];
@@ -194,6 +196,7 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
       homeCategoryCardBackgrounds: form.homeCategoryCardBackgrounds,
       homeBannerBackground: form.homeBannerBackground,
       homeBannerSlides: normalizeSlides(form.homeBannerSlides),
+      tgId: form.tgId,
     };
 
     try {
@@ -224,7 +227,7 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
       <h2 className="mb-2 text-2xl font-extrabold tracking-tight text-gray-800 sm:text-3xl">Настройки магазина</h2>
       <p className="mb-5 text-sm text-gray-500">Переключай разделы, чтобы редактировать нужный блок без длинного скролла.</p>
 
-      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-5">
         {sectionItems.map((section) => (
           <button
             key={section.key}
@@ -369,6 +372,46 @@ export default function SettingsForm({ initialSettings }: { initialSettings: any
             <div>
               <label className="mb-1 block font-medium text-gray-700">Telegram</label>
               <input type="url" name="telegram" value={form.telegram} onChange={handleChange} className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200" placeholder="https://t.me/username" />
+            </div>
+          </div>
+        )}
+
+        {activeSection === 'notifications' && (
+          <div className="space-y-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div>
+              <label className="mb-2 block font-medium text-gray-700">Telegram ID для уведомлений о заказах</label>
+              <p className="mb-3 text-sm text-gray-500">
+                Добавьте до 3 Telegram ID пользователей, которые будут получать уведомления о новых заказах.
+                Чтобы узнать свой ID, напишите боту команду /start
+              </p>
+              <div className="space-y-3">
+                {[0, 1, 2].map((index) => (
+                  <div key={index}>
+                    <label className="mb-1 block text-sm text-gray-600">Telegram ID {index + 1}</label>
+                    <input
+                      type="number"
+                      value={form.tgId[index] || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const numValue = value ? parseInt(value, 10) : null;
+                        setForm((f) => {
+                          const newTgId = [...f.tgId];
+                          if (numValue && numValue > 0 && numValue <= 32767) {
+                            newTgId[index] = numValue;
+                          } else if (!value) {
+                            newTgId[index] = null as any;
+                          }
+                          return { ...f, tgId: newTgId.filter((id) => id !== null && id !== undefined) };
+                        });
+                      }}
+                      className="w-full rounded-lg border bg-white px-3 py-2 outline-none focus:ring-2 focus:ring-blue-200"
+                      placeholder="Например: 123456789"
+                      min="1"
+                      max="32767"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
