@@ -210,7 +210,7 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
     if (field === 'tgId' && Array.isArray(value)) {
       const tgIds: number[] = [];
       for (const item of value) {
-        if (typeof item === 'number' && Number.isInteger(item) && item > 0 && item <= 32767) {
+        if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
           tgIds.push(item);
         }
       }
