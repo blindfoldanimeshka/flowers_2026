@@ -320,15 +320,18 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
 
     // Отправка уведомления в Telegram
     try {
-      const configuredIds = (process.env.TELEGRAM_CHAT_IDS || '')
-        .split(',')
-        .map((id) => id.trim())
-        .filter(Boolean);
+      const { data: settingsData } = await supabase
+        .from('settings')
+        .select('tg_id')
+        .eq('id', 'global-settings')
+        .maybeSingle();
 
-      for (const telegramId of configuredIds) {
+      const tgIds = settingsData?.tg_id || [];
+
+      for (const telegramId of tgIds) {
         try {
           if (await telegramRateLimiter.canSend()) {
-            await sendOrderNotification(telegramId, {
+            await sendOrderNotification(String(telegramId), {
               orderNumber,
               customer: {
                 name: customer.name.trim(),
