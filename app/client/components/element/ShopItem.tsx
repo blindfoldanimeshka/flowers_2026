@@ -50,10 +50,11 @@ const ShopItem = memo(({
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const discount = oldPrice ? Math.round((1 - price / oldPrice) * 100) : null;
-  const isPurchasable = inStock || preorderOnly;
   const normalizedStock = typeof stockQuantity === 'number' && Number.isFinite(stockQuantity)
     ? Math.max(0, Math.floor(stockQuantity))
     : null;
+  const hasStock = normalizedStock !== null ? normalizedStock > 0 : inStock;
+  const isPurchasable = preorderOnly || hasStock;
 
   const stockTextClass = useMemo(() => {
     if (normalizedStock == null) return 'text-gray-600';
