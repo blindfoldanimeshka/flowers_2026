@@ -18,6 +18,7 @@ export default function CategoryGrid() {
   const { categories: rawCategories } = useCategoriesViewModel();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
   const [firstProductImages, setFirstProductImages] = useState<CategoryImageMap>({});
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
 
   // Сортируем категории по полю order (уже должны быть отсортированы с сервера, но на всякий случай)
   const categories = [...rawCategories].sort((a, b) => {
@@ -78,6 +79,7 @@ export default function CategoryGrid() {
 
       if (isMounted) {
         setFirstProductImages(imageMap);
+        setIsLoadingImages(false);
       }
     };
 
@@ -135,7 +137,7 @@ export default function CategoryGrid() {
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
-                      firstProductImages[category._id] ||
+                      (!isLoadingImages ? firstProductImages[category._id] : undefined) ||
                       '';
 
                     if (!imageSrc) {
