@@ -1,7 +1,9 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { createToken, setAuthCookie } from '@/lib/auth';
 import { generateCsrfToken, setCsrfCookie } from '@/lib/csrf';
+import { supabase } from '@/lib/supabase';
 
 export const POST = async (request: NextRequest) => {
   try {
@@ -14,39 +16,22 @@ export const POST = async (request: NextRequest) => {
       );
     }
 
-    // Direct Supabase query since doc is text not jsonb
-    const { createClient } = require('@supabase/supabase-js');
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
-    
-    // Get user by collection and search in text
-    const { data: users, error: queryError } = await supabase
-      .from('documents')
-      .select('id, doc')
-      .eq('collection', 1)
-      .ilike('doc', `%username%${username}%`);
-    
-    let user: any = null;
-    if (users && users.length > 0) {
-      const doc = JSON.parse(users[0].doc);
-      if (doc.username === username) {
-        user = { 
-          _id: users[0].id, 
-          ...doc,
-          comparePassword: async (pwd: string) => {
-            const bcrypt = require('bcryptjs');
-            return bcrypt.compare(pwd, doc.password);
-          }
-        };
-      }
+    const { data: user, error: queryError } = await supabase
+      .from('admin_users')
+      .select('id, username, password_hash, role, is_active')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (queryError) {
+      console.error('[LOGIN] Query error:', queryError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-    
-    if (!user) {
+
+    if (!user || !user.is_active) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    const isPasswordValid = await user.comparePassword(password);
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
@@ -56,14 +41,14 @@ export const POST = async (request: NextRequest) => {
     }
 
     const token = await createToken({
-      userId: user._id.toString(),
+      userId: user.id,
       username: user.username,
       role: user.role
     });
 
     const response = NextResponse.json({
       message: 'Login successful',
-      user: { id: user._id.toString(), username: user.username, role: user.role }
+      user: { id: user.id, username: user.username, role: user.role }
     });
 
     setAuthCookie(response, token);

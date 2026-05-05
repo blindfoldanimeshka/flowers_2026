@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase, SUPABASE_COLLECTION_TABLE } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 import { invalidateOrdersCache, invalidateOrderStatsCache } from '@/lib/cache';
 import { sanitizeMongoObject, toIntInRange } from '@/lib/security';
@@ -13,16 +13,63 @@ const ORDER_STATUSES = ['pending', 'confirmed', 'preparing', 'delivering', 'deli
 const PAYMENT_STATUSES = ['pending', 'paid', 'failed'] as const;
 const FULFILLMENT_TYPES = ['delivery', 'pickup'] as const;
 const PAYMENT_METHODS = ['cash', 'card', 'online'] as const;
-const ORDERS_COLLECTION = 5;
 
 function mapOrderRow(row: any) {
-  const doc = typeof row.doc === 'string' ? JSON.parse(row.doc) : row.doc;
+  const items = Array.isArray(row.order_items) ? row.order_items : [];
   return {
     _id: row.id,
-    ...doc,
+    orderNumber: row.order_number,
+    customer: {
+      name: row.customer_name,
+      email: row.customer_email || undefined,
+      phone: row.customer_phone,
+      address: row.customer_address,
+    },
+    items: items.map((item: any) => ({
+      productId: item.product_id || '',
+      quantity: item.quantity,
+      name: item.product_name,
+      price: Number(item.price) || 0,
+      image: item.image_url || '',
+    })),
+    paymentMethod: row.payment_method,
+    fulfillmentMethod: row.fulfillment_method,
+    deliveryDate: row.delivery_date || undefined,
+    deliveryTime: row.delivery_time || undefined,
+    notes: row.notes || undefined,
+    totalAmount: Number(row.total_amount) || 0,
+    status: row.status,
+    paymentStatus: row.payment_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function buildOrderNumber(date: Date, seq: number) {
+  const yyyy = String(date.getFullYear());
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}${mm}${dd}-${String(seq).padStart(4, '0')}`;
+}
+
+async function getNextOrderNumber() {
+  const today = new Date();
+  const dayStart = new Date(today);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const { count, error } = await supabase
+    .from('orders')
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', dayStart.toISOString())
+    .lt('created_at', dayEnd.toISOString());
+
+  if (error) {
+    throw new Error(`Не удалось определить следующий номер заказа: ${error.message}`);
+  }
+
+  return buildOrderNumber(today, (count || 0) + 1);
 }
 
 export const GET = withErrorHandler(async (request: NextRequest) => {
@@ -41,24 +88,48 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Email обязателен для получения заказов клиента' }, { status: 400 });
     }
 
-    let query = supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .select('id, doc, created_at, updated_at')
-      .eq('collection', ORDERS_COLLECTION);
+    let query = supabase.from('orders').select(
+      `
+        id,
+        order_number,
+        customer_name,
+        customer_email,
+        customer_phone,
+        customer_address,
+        status,
+        payment_method,
+        fulfillment_method,
+        delivery_date,
+        delivery_time,
+        notes,
+        total_amount,
+        payment_status,
+        created_at,
+        updated_at,
+        order_items (
+          product_id,
+          product_name,
+          price,
+          quantity,
+          image_url
+        )
+      `,
+      { count: 'exact' }
+    );
 
     if (status) {
-      query = query.eq('doc->>status', status);
+      query = query.eq('status', status);
     }
 
     if (email) {
-      query = query.eq('doc->customer->>email', email);
+      query = query.eq('customer_email', email);
     }
 
     if (deliveryType) {
-      query = query.eq('doc->>fulfillmentMethod', deliveryType);
+      query = query.eq('fulfillment_method', deliveryType);
     }
 
-    const { data, error } = await query
+    const { data, error, count } = await query
       .order('created_at', { ascending: false })
       .range((page - 1) * limit, page * limit - 1);
 
@@ -68,7 +139,7 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     }
 
     const orders = (data || []).map(mapOrderRow);
-    const total = orders.length; // Note: This is simplified, for exact count we'd need a count query
+    const total = count || 0;
 
     return NextResponse.json({ orders, pagination: { page, limit, total, pages: Math.ceil(total / limit) } }, { status: 200 });
   
@@ -100,7 +171,13 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     }
 
     let totalAmount = 0;
-    const orderItems: Array<{ productId: string; quantity: number; name: string; price: number; image: string }> = [];
+    const orderItems: Array<{
+      productId: string;
+      quantity: number;
+      name: string;
+      price: number;
+      image: string;
+    }> = [];
 
     const productIds = items.map((item) =>
       typeof item.productId === 'string'
@@ -114,11 +191,9 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Некорректные позиции заказа' }, { status: 400 });
     }
 
-    // Get products from Supabase
     const { data: productsData, error: productsError } = await supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .select('id, doc')
-      .eq('collection', 4) // products collection
+      .from('products')
+      .select('id, name, price, image_url')
       .in('id', productIds);
 
     if (productsError) {
@@ -126,12 +201,7 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Database error' }, { status: 500 });
     }
 
-    const productMap = new Map(
-      (productsData || []).map((row) => {
-        const doc = typeof row.doc === 'string' ? JSON.parse(row.doc) : row.doc;
-        return [row.id, { ...doc, _id: row.id }];
-      })
-    );
+    const productMap = new Map((productsData || []).map((row) => [row.id, row]));
 
     for (const rawItem of items as Array<{ productId?: string | number; quantity?: number }>) {
       const normalizedProductId =
@@ -156,38 +226,37 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
         return NextResponse.json({ error: `Товар с ID ${normalizedProductId} не найден` }, { status: 404 });
       }
 
-      totalAmount += product.price * rawItem.quantity;
+      const productPrice = Number(product.price) || 0;
+      totalAmount += productPrice * rawItem.quantity;
       orderItems.push({
         productId: normalizedProductId,
         quantity: rawItem.quantity,
         name: product.name,
-        price: product.price,
-        image: product.image,
+        price: productPrice,
+        image: product.image_url || '',
       });
     }
 
-    const orderDoc = {
-      customer: {
-        name: customer.name.trim(),
-        phone: customer.phone.trim(),
-        email: typeof customer.email === 'string' ? customer.email.trim() : undefined,
-        address: customer.address.trim(),
-      },
-      items: orderItems,
-      paymentMethod,
-      fulfillmentMethod,
-      deliveryDate: typeof body.deliveryDate === 'string' ? body.deliveryDate : undefined,
-      deliveryTime: typeof body.deliveryTime === 'string' ? body.deliveryTime.slice(0, 50) : undefined,
-      notes,
-      totalAmount,
-      status: 'pending',
-      paymentStatus: 'pending',
-    };
+    const orderNumber = await getNextOrderNumber();
 
     const { data: newOrder, error: insertError } = await supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .insert({ collection: ORDERS_COLLECTION, doc: orderDoc })
-      .select('id, created_at, updated_at')
+      .from('orders')
+      .insert({
+        order_number: orderNumber,
+        customer_name: customer.name.trim(),
+        customer_email: typeof customer.email === 'string' ? customer.email.trim() || null : null,
+        customer_phone: customer.phone.trim(),
+        customer_address: customer.address.trim(),
+        status: 'pending',
+        payment_method: paymentMethod,
+        fulfillment_method: fulfillmentMethod,
+        delivery_date: typeof body.deliveryDate === 'string' && body.deliveryDate ? body.deliveryDate : null,
+        delivery_time: typeof body.deliveryTime === 'string' ? body.deliveryTime.slice(0, 50) : null,
+        notes: notes || null,
+        total_amount: totalAmount,
+        payment_status: 'pending',
+      })
+      .select('id')
       .single();
 
     if (insertError) {
@@ -198,59 +267,83 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
     invalidateOrdersCache();
     invalidateOrderStatsCache();
 
-    const orderResponse = {
-      _id: newOrder.id,
-      ...orderDoc,
-      createdAt: newOrder.created_at,
-      updatedAt: newOrder.updated_at,
-    };
+    const itemRows = orderItems.map((item) => ({
+      order_id: newOrder.id,
+      product_id: item.productId || null,
+      product_name: item.name,
+      price: item.price,
+      quantity: item.quantity,
+      image_url: item.image || null,
+    }));
+    const { error: orderItemsError } = await supabase.from('order_items').insert(itemRows);
+    if (orderItemsError) {
+      return NextResponse.json({ error: `Failed to create order items: ${orderItemsError.message}` }, { status: 500 });
+    }
+
+    const { data: fullOrder, error: fullOrderError } = await supabase
+      .from('orders')
+      .select(
+        `
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          customer_phone,
+          customer_address,
+          status,
+          payment_method,
+          fulfillment_method,
+          delivery_date,
+          delivery_time,
+          notes,
+          total_amount,
+          payment_status,
+          created_at,
+          updated_at,
+          order_items (
+            product_id,
+            product_name,
+            price,
+            quantity,
+            image_url
+          )
+        `
+      )
+      .eq('id', newOrder.id)
+      .single();
+
+    if (fullOrderError || !fullOrder) {
+      return NextResponse.json({ error: fullOrderError?.message || 'Failed to read created order' }, { status: 500 });
+    }
+
+    const orderResponse = mapOrderRow(fullOrder);
 
     // Отправка уведомления в Telegram
     try {
-      const { data: admins, error: adminsError } = await supabase
-        .from(SUPABASE_COLLECTION_TABLE)
-        .select('doc')
-        .eq('collection', 1) // users collection
-        .eq('doc->>role', 'admin');
+      const configuredIds = (process.env.TELEGRAM_CHAT_IDS || '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter(Boolean);
 
-      if (adminsError) {
-        productionLogger.error('Failed to fetch admins:', adminsError);
-      } else {
-        for (const adminRow of admins || []) {
-          const admin = typeof adminRow.doc === 'string' ? JSON.parse(adminRow.doc) : adminRow.doc;
-          const telegramIds = [
-            admin.telegram_id,
-            admin.telegram_id2,
-            admin.telegram_id3
-          ].filter((id: any) => id && id.trim() !== '');
-
-          for (const telegramId of telegramIds) {
-            try {
-              if (await telegramRateLimiter.canSend()) {
-                await sendOrderNotification(telegramId, {
-                  orderNumber: newOrder.id,
-                  customer: {
-                    name: orderDoc.customer.name,
-                    phone: orderDoc.customer.phone,
-                    email: orderDoc.customer.email,
-                  },
-                  items: orderItems,
-                  totalAmount: totalAmount,
-                });
-              } else {
-                productionLogger.warn('Telegram rate limit exceeded, notification skipped', {
-                  orderId: newOrder.id,
-                  telegramId,
-                  stats: await telegramRateLimiter.getStats(),
-                });
-              }
-            } catch (err) {
-              productionLogger.error('Failed to send Telegram notification', err, {
-                orderId: newOrder.id,
-                telegramId,
-              });
-            }
+      for (const telegramId of configuredIds) {
+        try {
+          if (await telegramRateLimiter.canSend()) {
+            await sendOrderNotification(telegramId, {
+              orderNumber,
+              customer: {
+                name: customer.name.trim(),
+                phone: customer.phone.trim(),
+                email: typeof customer.email === 'string' ? customer.email.trim() : undefined,
+              },
+              items: orderItems,
+              totalAmount,
+            });
           }
+        } catch (err) {
+          productionLogger.error('Failed to send Telegram notification', err, {
+            orderId: newOrder.id,
+            telegramId,
+          });
         }
       }
     } catch (telegramError) {
@@ -273,11 +366,9 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'ID заказа обязателен' }, { status: 400 });
     }
 
-    // First, get the current order to update the doc JSONB field
     const { data: currentOrder, error: fetchError } = await supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .select('id, doc, created_at, updated_at')
-      .eq('collection', ORDERS_COLLECTION)
+      .from('orders')
+      .select('id')
       .eq('id', id)
       .single();
 
@@ -285,27 +376,48 @@ export const PUT = withErrorHandler(async (request: NextRequest) => {
       return NextResponse.json({ error: 'Заказ не найден' }, { status: 404 });
     }
 
-    const currentDoc = typeof currentOrder.doc === 'string' ? JSON.parse(currentOrder.doc) : currentOrder.doc;
     const updateData: Record<string, unknown> = {};
 
     if (ORDER_STATUSES.includes(body.status as any)) updateData.status = body.status;
-    if (PAYMENT_STATUSES.includes(body.paymentStatus as any)) updateData.paymentStatus = body.paymentStatus;
+    if (PAYMENT_STATUSES.includes(body.paymentStatus as any)) updateData.payment_status = body.paymentStatus;
     if (typeof body.notes === 'string') updateData.notes = body.notes.slice(0, 500);
-    if (typeof body.deliveryTime === 'string') updateData.deliveryTime = body.deliveryTime.slice(0, 50);
+    if (typeof body.deliveryTime === 'string') updateData.delivery_time = body.deliveryTime.slice(0, 50);
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
     }
 
-    // Merge updates into doc
-    const updatedDoc = { ...currentDoc, ...updateData };
-
     const { data: updatedOrder, error: updateError } = await supabase
-      .from(SUPABASE_COLLECTION_TABLE)
-      .update({ doc: updatedDoc })
-      .eq('collection', ORDERS_COLLECTION)
+      .from('orders')
+      .update(updateData)
       .eq('id', id)
-      .select('id, doc, created_at, updated_at')
+      .select(
+        `
+          id,
+          order_number,
+          customer_name,
+          customer_email,
+          customer_phone,
+          customer_address,
+          status,
+          payment_method,
+          fulfillment_method,
+          delivery_date,
+          delivery_time,
+          notes,
+          total_amount,
+          payment_status,
+          created_at,
+          updated_at,
+          order_items (
+            product_id,
+            product_name,
+            price,
+            quantity,
+            image_url
+          )
+        `
+      )
       .single();
 
     if (updateError) {
