@@ -308,7 +308,6 @@ export default function ImageUpload({
                         }`}
                         title={item.inLibrary ? 'В медиатеке' : 'Из товара или оформления'}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element -- превью из медиатеки, произвольные URL */}
                         <img
                           src={normalizeMediaUrl(item.url)}
                           alt=""
