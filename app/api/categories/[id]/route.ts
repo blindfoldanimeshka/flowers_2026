@@ -92,7 +92,10 @@ export const DELETE = withErrorHandler(async (request: NextRequest, { params }: 
 
   if (deleteError) {
     productionLogger.error('Error deleting category:', deleteError);
-    return NextResponse.json({ error: 'Ошибка удаления категории' }, { status: 500 });
+    return NextResponse.json({
+      error: `Ошибка удаления категории: ${deleteError.message || 'Неизвестная ошибка'}`,
+      details: deleteError
+    }, { status: 500 });
   }
 
   invalidateCategoriesCache();
