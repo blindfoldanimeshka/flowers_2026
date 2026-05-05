@@ -38,6 +38,7 @@ interface SettingsUpdatePayload {
   homeBannerBackground?: string;
   homeBannerSlides?: string[];
   mediaLibrary?: Array<{ id: string; url: string; createdAt?: string }>;
+  tgId?: number[];
 }
 
 const SETTINGS_KEY = 'global-settings';
@@ -75,6 +76,7 @@ const ALLOWED_FIELDS: (keyof SettingsUpdatePayload)[] = [
   'homeBannerBackground',
   'homeBannerSlides',
   'mediaLibrary',
+  'tgId',
 ];
 
 function sanitizeString(value: unknown): string | undefined {
@@ -204,6 +206,19 @@ function validateAndSanitizeSettings(body: Record<string, unknown>): SettingsUpd
       sanitizedBody.mediaLibrary = cleaned;
       continue;
     }
+
+    if (field === 'tgId' && Array.isArray(value)) {
+      const tgIds: number[] = [];
+      for (const item of value) {
+        if (typeof item === 'number' && Number.isInteger(item) && item > 0 && item <= 32767) {
+          tgIds.push(item);
+        }
+      }
+      if (tgIds.length > 0) {
+        sanitizedBody.tgId = tgIds;
+      }
+      continue;
+    }
   }
 
   return sanitizedBody;
@@ -320,6 +335,7 @@ async function updateOrCreateSettings(body: Record<string, unknown>): Promise<an
     home_banner_background: payload.homeBannerBackground ?? '',
     home_banner_slides: payload.homeBannerSlides ?? [],
     media_library: payload.mediaLibrary ?? [],
+    tg_id: payload.tgId ?? null,
   };
   const byIdUpsert = await supabase
     .from('settings')
