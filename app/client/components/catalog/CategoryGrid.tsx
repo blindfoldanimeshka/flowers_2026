@@ -102,11 +102,12 @@ export default function CategoryGrid() {
                       return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
                     }
 
-                    const imageSrc =
+                    // Приоритет: настройки админки → поле категории → градиент
+                    const adminImage =
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
-                      settings?.homeCategoryCardBackgrounds?.[category.slug] ||
-                      category.image ||
-                      '';
+                      settings?.homeCategoryCardBackgrounds?.[category.slug];
+
+                    const imageSrc = adminImage || category.image || '';
 
                     if (!imageSrc) {
                       return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
