@@ -56,8 +56,8 @@ export default function MediaGalleryPage() {
   const loadMedia = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/media-library');
-      if (!response.ok) throw new Error('Ошибка загрузки медиатеки');
+      const response = await fetch('/api/media-library', { credentials: 'include', cache: 'no-store' });
+      if (!response.ok) throw new Error(response.status === 401 ? 'Требуется вход в админку' : 'Ошибка загрузки медиатеки');
       const data = await response.json();
       setItems(data.items || []);
       setFilteredItems(data.items || []);
@@ -180,6 +180,8 @@ export default function MediaGalleryPage() {
 
         const response = await fetch('/api/upload', {
           method: 'POST',
+          credentials: 'include',
+          cache: 'no-store',
           body: formData,
         });
 
@@ -193,6 +195,8 @@ export default function MediaGalleryPage() {
         const registerResponse = await fetch('/api/media-library', {
           method: 'POST',
           headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+          credentials: 'include',
+          cache: 'no-store',
           body: JSON.stringify({ url: data.url }),
         });
 
@@ -222,6 +226,8 @@ export default function MediaGalleryPage() {
       const response = await fetch('/api/media-library', {
         method: 'DELETE',
         headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({ url }),
       });
 
@@ -244,6 +250,8 @@ export default function MediaGalleryPage() {
       const response = await fetch('/api/media-library', {
         method: 'POST',
         headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({ action: 'sync-bucket' }),
       });
       const data = await response.json().catch(() => ({}));
@@ -285,6 +293,8 @@ export default function MediaGalleryPage() {
       const response = await fetch('/api/media-library', {
         method: 'DELETE',
         headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        credentials: 'include',
+        cache: 'no-store',
         body: JSON.stringify({ urls: targets }),
       });
       const data = await response.json().catch(() => ({}));
@@ -585,7 +595,15 @@ export default function MediaGalleryPage() {
                       }
                     }}
                   >
-                    <Image src={normalizeMediaUrl(item.url)} alt="Media" fill className="object-cover" />
+                    <img
+                      src={normalizeMediaUrl(item.url)}
+                      alt="Media"
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.style.opacity = '0.25';
+                      }}
+                    />
                   </div>
 
                   {/* Desktop hover actions */}

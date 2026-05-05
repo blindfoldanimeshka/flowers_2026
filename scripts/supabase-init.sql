@@ -14,6 +14,59 @@ create index if not exists documents_doc_gin_idx on public.documents using gin (
 
 alter table public.documents enable row level security;
 
+-- RLS: public read access for categories/products documents, admin full access.
+-- categories collection = 2, products collection = 4.
+drop policy if exists documents_public_read_catalog on public.documents;
+create policy documents_public_read_catalog
+on public.documents
+for select
+to public
+using (collection in ('2', '4'));
+
+drop policy if exists documents_admin_full_access_select on public.documents;
+create policy documents_admin_full_access_select
+on public.documents
+for select
+to authenticated
+using (
+  auth.role() = 'service_role'
+  or coalesce(auth.jwt() ->> 'role', '') = 'admin'
+);
+
+drop policy if exists documents_admin_full_access_insert on public.documents;
+create policy documents_admin_full_access_insert
+on public.documents
+for insert
+to authenticated
+with check (
+  auth.role() = 'service_role'
+  or coalesce(auth.jwt() ->> 'role', '') = 'admin'
+);
+
+drop policy if exists documents_admin_full_access_update on public.documents;
+create policy documents_admin_full_access_update
+on public.documents
+for update
+to authenticated
+using (
+  auth.role() = 'service_role'
+  or coalesce(auth.jwt() ->> 'role', '') = 'admin'
+)
+with check (
+  auth.role() = 'service_role'
+  or coalesce(auth.jwt() ->> 'role', '') = 'admin'
+);
+
+drop policy if exists documents_admin_full_access_delete on public.documents;
+create policy documents_admin_full_access_delete
+on public.documents
+for delete
+to authenticated
+using (
+  auth.role() = 'service_role'
+  or coalesce(auth.jwt() ->> 'role', '') = 'admin'
+);
+
 -- Atomic order counter increment function with race condition fix
 -- Uses INSERT ... ON CONFLICT DO UPDATE for atomic upsert
 create or replace function public.increment_order_counter(p_date_key text)

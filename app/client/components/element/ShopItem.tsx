@@ -21,7 +21,7 @@ interface ShopItemProps {
   stockUnit?: string;
 }
 
-const DEFAULT_IMAGE = '/image/items/no_photo.jpg';
+const DEFAULT_IMAGE = '';
 const MAX_GALLERY_IMAGES = 3;
 const SWIPE_THRESHOLD_PX = 36;
 
@@ -68,12 +68,11 @@ const ShopItem = memo(({
     const merged = [...(imageGallery || []), imageSrc]
       .map((src) => src?.trim())
       .filter((src): src is string => Boolean(src));
-    const unique = Array.from(new Set(merged)).slice(0, MAX_GALLERY_IMAGES);
-    return unique.length > 0 ? unique : [DEFAULT_IMAGE];
+    return Array.from(new Set(merged)).slice(0, MAX_GALLERY_IMAGES);
   }, [imageSrc, imageGallery]);
 
-  const activeSource = gallery[activeImageIndex] || DEFAULT_IMAGE;
-  const displaySource = failedImageSrcs.includes(activeSource) ? DEFAULT_IMAGE : activeSource;
+  const activeSource = gallery[activeImageIndex] || '';
+  const displaySource = activeSource && !failedImageSrcs.includes(activeSource) ? activeSource : '';
 
   useEffect(() => {
     const cartItem = cartItems.find((item) => item.id === id);
@@ -184,7 +183,7 @@ const ShopItem = memo(({
   };
 
   const handleImageError = () => {
-    if (!activeSource || activeSource === DEFAULT_IMAGE || failedImageSrcs.includes(activeSource)) return;
+    if (!activeSource || failedImageSrcs.includes(activeSource)) return;
     setFailedImageSrcs((prev) => [...prev, activeSource]);
   };
 
@@ -231,14 +230,18 @@ const ShopItem = memo(({
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
-          <Image
-            src={displaySource}
-            alt={title}
-            fill
-            sizes="(max-width: 1023px) 50vw, (max-width: 1279px) 33vw, 25vw"
-            className="rounded-t-[30px] object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-            onError={handleImageError}
-          />
+          {displaySource ? (
+            <Image
+              src={displaySource}
+              alt={title}
+              fill
+              sizes="(max-width: 1023px) 50vw, (max-width: 1279px) 33vw, 25vw"
+              className="rounded-t-[30px] object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              onError={handleImageError}
+            />
+          ) : (
+            <div className="h-full w-full rounded-t-[30px] bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />
+          )}
 
           <div className="absolute inset-0 z-[10] bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
@@ -333,14 +336,18 @@ const ShopItem = memo(({
               className="relative w-full aspect-square rounded-2xl overflow-hidden bg-[#fff1f1]"
               onMouseMove={handlePreviewMove}
             >
-              <Image
-                src={displaySource}
-                alt={title}
-                fill
-                sizes="(max-width: 768px) 100vw, 50vw"
-                className="object-cover"
-                onError={handleImageError}
-              />
+              {displaySource ? (
+                <Image
+                  src={displaySource}
+                  alt={title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 50vw"
+                  className="object-cover"
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />
+              )}
             </div>
 
             {gallery.length > 1 && (

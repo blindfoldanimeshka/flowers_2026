@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { ICategoryWithStats as Category, ISubcategory as Subcategory } from '@/app/client/models/Category';
 import { useAdminCategoriesViewModel } from '@/features/admin/categories';
@@ -318,7 +318,7 @@ export default function CategoriesPage() {
   );
 
   // Синхронизируем локальный порядок с данными из VM
-  useMemo(() => {
+  useEffect(() => {
     setLocalCategories(categories);
   }, [categories]);
 
@@ -466,3 +466,4 @@ export default function CategoriesPage() {
     </div>
   );
 }
+

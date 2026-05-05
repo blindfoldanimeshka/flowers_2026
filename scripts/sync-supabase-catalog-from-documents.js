@@ -124,7 +124,7 @@ async function syncProducts(sourceProducts, categoriesByLegacy, subcategoriesByL
 
     const categoryId = categoriesByLegacy.get(categoryLegacy) || null;
     const subcategoryId = subcategoriesByLegacy.get(subcategoryLegacy) || null;
-    const image = normalizeString(p.image || (Array.isArray(p.images) ? p.images[0] : ''), '/image/items/no_photo.jpg');
+    const image = normalizeString(p.image || (Array.isArray(p.images) ? p.images[0] : ''));
 
     if (!categoryId) continue;
 
@@ -189,3 +189,5 @@ main().catch((error) => {
   console.error('Catalog sync failed:', error.message || error);
   process.exit(1);
 });
+
+

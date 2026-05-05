@@ -74,7 +74,7 @@ export default function ImageUpload({
         items
           .filter((item: { url?: string }) => typeof item?.url === 'string' && item.url.length > 0)
           .map((item: { url: string; inLibrary?: boolean }) => ({
-            url: item.url,
+            url: normalizeMediaUrl(item.url),
             inLibrary: Boolean(item.inLibrary),
           })),
       );
@@ -90,6 +90,12 @@ export default function ImageUpload({
       void loadMediaLibrary();
     }
   }, [showMediaLibrary, loadMediaLibrary]);
+
+  useEffect(() => {
+    if (libraryOpen && showMediaLibrary) {
+      void loadMediaLibrary();
+    }
+  }, [libraryOpen, showMediaLibrary, loadMediaLibrary]);
 
   const registerUrlInLibrary = useCallback(async (url: string) => {
     if (!registerInLibrary || !url) return;
@@ -318,7 +324,7 @@ export default function ImageUpload({
                             if (img.dataset.fallbackApplied === '1') return;
                             img.dataset.fallbackApplied = '1';
                             console.error('Failed to load image:', item.url, 'normalized:', normalizeMediaUrl(item.url));
-                            img.src = '/image/items/no_photo.jpg';
+                            img.style.visibility = 'hidden';
                           }}
                         />
                       </button>
@@ -395,3 +401,4 @@ export default function ImageUpload({
     </div>
   );
 } 
+
