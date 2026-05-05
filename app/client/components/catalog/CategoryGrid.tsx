@@ -5,21 +5,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useCategoriesViewModel } from '@/features/app/catalog';
-import { getImageUrl } from '@/lib/imageUrl';
 
 interface PublicSettings {
   homeCategoryCardBackgrounds?: Record<string, string>;
 }
 
-interface CategoryImageMap {
-  [categoryId: string]: string;
-}
-
 export default function CategoryGrid() {
   const { categories: rawCategories } = useCategoriesViewModel();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
-  const [firstProductImages, setFirstProductImages] = useState<CategoryImageMap>({});
-  const [isLoadingImages, setIsLoadingImages] = useState(true);
 
   // Сортируем категории по полю order (уже должны быть отсортированы с сервера, но на всякий случай)
   const categories = [...rawCategories].sort((a, b) => {
@@ -53,45 +46,6 @@ export default function CategoryGrid() {
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchFirstProductImages = async () => {
-      const imageMap: CategoryImageMap = {};
-
-      for (const category of categories) {
-        try {
-          const response = await fetch(`/api/products?categoryId=${category._id}&limit=1`, { cache: 'no-store' });
-          if (!response.ok) continue;
-
-          const data = await response.json();
-          const products = Array.isArray(data) ? data : data.products || [];
-
-          if (products.length > 0 && products[0].image) {
-            imageMap[category._id] = products[0].image;
-          } else if (products.length > 0 && products[0].images && products[0].images.length > 0) {
-            imageMap[category._id] = products[0].images[0];
-          }
-        } catch {
-          continue;
-        }
-      }
-
-      if (isMounted) {
-        setFirstProductImages(imageMap);
-        setIsLoadingImages(false);
-      }
-    };
-
-    if (categories.length > 0) {
-      fetchFirstProductImages();
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [categories]);
 
   const getDesktopSpanClass = (index: number) => {
     const indexInGroup = index % 5;
@@ -134,14 +88,11 @@ export default function CategoryGrid() {
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
                 <div className="absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity duration-300">
                   {(() => {
-                    const rawImageSrc =
+                    const imageSrc =
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
-                      (!isLoadingImages ? firstProductImages[category._id] : undefined) ||
                       '';
-
-                    const imageSrc = getImageUrl(rawImageSrc);
 
                     if (!imageSrc) {
                       return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
