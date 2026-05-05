@@ -231,6 +231,7 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
   }
 
   const { mediaLibrary: _adminMediaLibrary, ...rest } = settings;
+  const homeBannerSlidesValue = settings.homeBannerSlides ?? settings.home_banner_slides;
 
   return {
     ...rest,
@@ -254,9 +255,9 @@ function normalizePublicSettings(settings: Record<string, unknown> | null) {
       typeof (settings.homeBannerBackground ?? settings.home_banner_background) === 'string'
         ? String(settings.homeBannerBackground ?? settings.home_banner_background)
         : '',
-    homeBannerSlides: Array.isArray(settings.homeBannerSlides ?? settings.home_banner_slides)
-      ? (settings.homeBannerSlides ?? settings.home_banner_slides)
-          .filter((item): item is string => typeof item === 'string')
+    homeBannerSlides: Array.isArray(homeBannerSlidesValue)
+      ? homeBannerSlidesValue
+          .filter((item: unknown): item is string => typeof item === 'string')
           .slice(0, 6)
       : [],
     socialLinks:
