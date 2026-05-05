@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from 'react';
+import Image from 'next/image';
 import { ICategoryWithStats as Category, ISubcategory as Subcategory } from '@/app/client/models/Category';
 import { useAdminCategoriesViewModel } from '@/features/admin/categories';
+import ImageUpload from '@/app/admin/components/ImageUpload';
 import {
   DndContext,
   closestCenter,
@@ -32,7 +34,7 @@ interface SortableCategoryProps {
   savingId: string | null;
   onToggleExpand: () => void;
   onEdit: () => void;
-  onUpdate: (name: string) => void;
+  onUpdate: (name: string, image?: string) => void;
   onCancelEdit: () => void;
   onDelete: () => void;
   onSubcategoryEdit: (subId: string) => void;
@@ -80,15 +82,26 @@ const SortableCategory = ({
           </button>
           <div className="min-w-0 flex-1">
             {editingId === category._id ? (
-              <EditableName
-                name={category.name}
+              <EditableCategoryForm
+                category={category}
                 onSave={onUpdate}
                 onCancel={onCancelEdit}
                 isLoading={savingId === category._id}
               />
             ) : (
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-bold">{category.name}</h3>
+                <div className="flex items-center gap-3">
+                  {category.image && (
+                    <Image
+                      src={category.image}
+                      alt={category.name}
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 rounded-md object-cover"
+                    />
+                  )}
+                  <h3 className="truncate text-lg font-bold">{category.name}</h3>
+                </div>
                 {category.totalProductCount !== undefined && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
@@ -192,6 +205,57 @@ const SortableCategory = ({
           </ul>
         </div>
       )}
+    </div>
+  );
+};
+
+interface EditableCategoryFormProps {
+  category: Category;
+  onSave: (name: string, image?: string) => void;
+  onCancel: () => void;
+  isLoading?: boolean;
+}
+
+const EditableCategoryForm = ({ category, onSave, onCancel, isLoading = false }: EditableCategoryFormProps) => {
+  const [editingName, setEditingName] = useState(category.name);
+  const [editingImage, setEditingImage] = useState(category.image || '');
+
+  return (
+    <div className="flex w-full flex-col gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          type="text"
+          value={editingName}
+          onChange={(e) => setEditingName(e.target.value)}
+          className="w-full min-w-0 rounded border p-2 sm:w-auto"
+          placeholder="Название категории"
+          autoFocus
+          disabled={isLoading}
+        />
+        <button
+          onClick={() => onSave(editingName, editingImage)}
+          className={`${isLoading ? 'cursor-not-allowed text-gray-400' : 'text-green-600 hover:text-green-800'} flex items-center gap-1 rounded bg-green-50 px-3 py-2`}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Сохранение...' : 'Сохранить'}
+        </button>
+        <button
+          onClick={onCancel}
+          className={`${isLoading ? 'cursor-not-allowed text-gray-400' : 'text-gray-500 hover:text-gray-700'} rounded bg-gray-50 px-3 py-2`}
+          disabled={isLoading}
+        >
+          Отмена
+        </button>
+      </div>
+      <div className="rounded-lg border border-gray-200 bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-gray-700">Изображение категории</p>
+        <ImageUpload
+          value={editingImage}
+          onChange={setEditingImage}
+          showMediaLibrary={true}
+          registerInLibrary={true}
+        />
+      </div>
     </div>
   );
 };
@@ -386,7 +450,7 @@ export default function CategoriesPage() {
                     savingId={savingId}
                     onToggleExpand={() => setExpandedCategoryId(expandedCategoryId === cat._id ? null : cat._id)}
                     onEdit={() => setEditingId(cat._id)}
-                    onUpdate={(name) => handleUpdate('category', cat._id, name)}
+                    onUpdate={(name, image) => handleUpdate('category', cat._id, name, image)}
                     onCancelEdit={() => setEditingId(null)}
                     onDelete={() => handleDelete('category', cat._id, cat.name, cat.totalProductCount)}
                     onSubcategoryEdit={(subId) => setEditingId(subId)}
