@@ -216,3 +216,19 @@ export async function getCategoriesWithStats(): Promise<ICategoryWithStats[]> {
 
   return categoriesStatsInflight;
 }
+
+export function invalidateProductsClientCache() {
+  productsCache.clear();
+  productsInflight.clear();
+}
+
+export function invalidateCategoriesClientCache() {
+  categoryListCache.clear();
+  categoryBySlugCache.clear();
+  subcategoryBySlugCache.clear();
+  categoriesStatsCache.clear();
+  getAllCategoriesInflight = null;
+  categoriesStatsInflight = null;
+  categoryBySlugInflight.clear();
+  subcategoryBySlugInflight.clear();
+}
