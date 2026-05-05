@@ -318,6 +318,7 @@ export default function ImageUpload({
                             const img = e.currentTarget;
                             if (img.dataset.fallbackApplied === '1') return;
                             img.dataset.fallbackApplied = '1';
+                            console.error('Failed to load image:', item.url, 'normalized:', normalizeMediaUrl(item.url));
                             img.src = '/image/items/no_photo.jpg';
                           }}
                         />
