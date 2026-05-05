@@ -31,6 +31,7 @@ function mapSupabaseCategory(category: any, subcategories: any[] = []) {
     id: categoryNumId,
     name: category.name,
     slug: category.slug,
+    image: category.image_url || category.image,
     isActive: category.is_active ?? true,
     subcategories: subcategories.map((sub) => mapSupabaseSubcategory(sub, categoryNumId)),
   };

@@ -18,7 +18,7 @@ export const PUT = withErrorHandler(async (request: NextRequest, { params }: { p
   if (typeof body.name === 'string' && body.name.trim()) updateData.name = body.name.trim();
   if (typeof body.slug === 'string' && body.slug.trim()) updateData.slug = body.slug.trim();
   if (typeof body.isActive === 'boolean') updateData.is_active = body.isActive;
-  if (typeof body.image === 'string') updateData.image = body.image.trim();
+  if (typeof body.image === 'string') updateData.image_url = body.image.trim();
 
   if (Object.keys(updateData).length === 0) {
     return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
