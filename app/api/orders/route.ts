@@ -335,8 +335,8 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
               await sendOrderNotification(String(telegramId), {
                 orderNumber,
                 customer: {
-                  name: customer.name.trim(),
-                  phone: customer.phone.trim(),
+                  name: customer.name?.trim() || '',
+                  phone: customer.phone?.trim() || '',
                   email: typeof customer.email === 'string' ? customer.email.trim() : undefined,
                 },
                 items: orderItems,
