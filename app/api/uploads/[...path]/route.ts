@@ -76,7 +76,7 @@ export const GET = withErrorHandler(async (
       break;
   }
 
-  return new NextResponse(fileBuffer, {
+  return new NextResponse(new Uint8Array(fileBuffer), {
     status: 200,
     headers: {
       'Content-Type': contentType,
