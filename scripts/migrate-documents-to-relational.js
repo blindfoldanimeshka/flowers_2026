@@ -30,6 +30,14 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function toBoundedNumber(value, { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY, fallback = 0 } = {}) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  if (n < min) return min;
+  if (n > max) return max;
+  return n;
+}
+
 async function loadDocuments(collection) {
   const { data, error } = await supabase.from('documents').select('id, created_at, updated_at, doc').eq('collection', collection);
   if (error) throw error;
@@ -38,12 +46,28 @@ async function loadDocuments(collection) {
 
 async function migrateCategories() {
   const docs = await loadDocuments(2);
+  const { data: existingRows, error: existingError } = await supabase
+    .from('categories')
+    .select('legacy_id, slug');
+  if (existingError) throw existingError;
+
+  const takenSlugToLegacy = new Map((existingRows || []).map((r) => [r.slug, r.legacy_id]));
+  const usedSlugs = new Set(takenSlugToLegacy.keys());
+
   for (const row of docs) {
     const doc = parseDoc(row.doc);
     if (!doc || !doc.name) continue;
     const legacyId = toNumber(doc.id || doc._id || row.id, 0) || null;
     const baseSlug = typeof doc.slug === 'string' && doc.slug.trim() ? doc.slug.trim() : slugify(String(doc.name), { lower: true, strict: true });
-    const slug = baseSlug || `category-${row.id}`;
+    let slug = baseSlug || `category-${row.id}`;
+    const ownerLegacy = takenSlugToLegacy.get(slug);
+    if (ownerLegacy !== undefined && ownerLegacy !== null && String(ownerLegacy) !== String(legacyId)) {
+      slug = `${slug}-${legacyId || row.id}`;
+    }
+    while (usedSlugs.has(slug) && String(takenSlugToLegacy.get(slug)) !== String(legacyId)) {
+      slug = `${slug}-x`;
+    }
+    usedSlugs.add(slug);
 
     const payload = {
       legacy_id: legacyId,
@@ -175,6 +199,10 @@ async function migrateOrders(productByLegacy) {
     if (!doc || !doc.customer || !Array.isArray(doc.items)) continue;
     const customer = doc.customer || {};
     const orderNumber = String(doc.orderNumber || `MIGR-${row.id}`);
+    const normalizedTotal = toBoundedNumber(doc.totalAmount, { min: 0, max: 999999999.99, fallback: 0 });
+    if (Number(doc.totalAmount) !== normalizedTotal) {
+      console.warn('Order total normalized:', row.id, doc.totalAmount, '->', normalizedTotal);
+    }
 
     const orderPayload = {
       order_number: orderNumber,
@@ -188,7 +216,7 @@ async function migrateOrders(productByLegacy) {
       delivery_date: doc.deliveryDate || null,
       delivery_time: doc.deliveryTime || null,
       notes: doc.notes || null,
-      total_amount: toNumber(doc.totalAmount, 0),
+      total_amount: normalizedTotal,
       payment_status: String(doc.paymentStatus || 'pending'),
       created_at: row.created_at,
       updated_at: row.created_at,
