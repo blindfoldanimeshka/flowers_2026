@@ -70,17 +70,22 @@ ${itemsList}
 
     await tgBot.sendMessage(telegramId, message, { parse_mode: 'Markdown' });
 
-    if (order.items.length > 0 && order.items[0].image) {
-      const imageUrl = order.items[0].image.startsWith('http')
-        ? order.items[0].image
-        : `${process.env.NEXT_PUBLIC_APP_URL || ''}${order.items[0].image}`;
+    // Отправка фото всех товаров
+    if (order.items.length > 0) {
+      for (const item of order.items) {
+        if (item.image) {
+          const imageUrl = item.image.startsWith('http')
+            ? item.image
+            : `${process.env.NEXT_PUBLIC_APP_URL || ''}${item.image}`;
 
-      try {
-        await tgBot.sendPhoto(telegramId, imageUrl, {
-          caption: `Фото товара: ${order.items[0].name}`
-        });
-      } catch (photoError) {
-        productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
+          try {
+            await tgBot.sendPhoto(telegramId, imageUrl, {
+              caption: `📷 Фото товара: ${item.name}`
+            });
+          } catch (photoError) {
+            productionLogger.error('Ошибка отправки фото в Telegram:', photoError);
+          }
+        }
       }
     }
 
