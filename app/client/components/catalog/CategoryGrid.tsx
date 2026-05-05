@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useCategoriesViewModel } from '@/features/app/catalog';
+import { getImageUrl } from '@/lib/imageUrl';
 
 interface PublicSettings {
   homeCategoryCardBackgrounds?: Record<string, string>;
@@ -133,12 +134,14 @@ export default function CategoryGrid() {
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
                 <div className="absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity duration-300">
                   {(() => {
-                    const imageSrc =
+                    const rawImageSrc =
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
                       (!isLoadingImages ? firstProductImages[category._id] : undefined) ||
                       '';
+
+                    const imageSrc = getImageUrl(rawImageSrc);
 
                     if (!imageSrc) {
                       return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
