@@ -151,6 +151,8 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     const categoryNumId = searchParams.get('categoryNumId');
     const subcategoryNumId = searchParams.get('subcategoryNumId');
     const view = searchParams.get('view');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
     const buildSupabaseQuery = (withCategoryArrayFilter: boolean) => {
       let query = supabase
@@ -180,6 +182,10 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
         if (!isNaN(numId)) {
           query = query.eq('subcategory_num_id', numId);
         }
+      }
+
+      if (limit && !isNaN(limit) && limit > 0) {
+        query = query.limit(limit);
       }
 
       return query;

@@ -10,9 +10,14 @@ interface PublicSettings {
   homeCategoryCardBackgrounds?: Record<string, string>;
 }
 
+interface CategoryImageMap {
+  [categoryId: string]: string;
+}
+
 export default function CategoryGrid() {
   const { categories: rawCategories } = useCategoriesViewModel();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [firstProductImages, setFirstProductImages] = useState<CategoryImageMap>({});
 
   // Сортируем категории по полю order (уже должны быть отсортированы с сервера, но на всякий случай)
   const categories = [...rawCategories].sort((a, b) => {
@@ -46,6 +51,44 @@ export default function CategoryGrid() {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchFirstProductImages = async () => {
+      const imageMap: CategoryImageMap = {};
+
+      for (const category of categories) {
+        try {
+          const response = await fetch(`/api/products?categoryId=${category._id}&limit=1`, { cache: 'no-store' });
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          const products = Array.isArray(data) ? data : data.products || [];
+
+          if (products.length > 0 && products[0].image) {
+            imageMap[category._id] = products[0].image;
+          } else if (products.length > 0 && products[0].images && products[0].images.length > 0) {
+            imageMap[category._id] = products[0].images[0];
+          }
+        } catch {
+          continue;
+        }
+      }
+
+      if (isMounted) {
+        setFirstProductImages(imageMap);
+      }
+    };
+
+    if (categories.length > 0) {
+      fetchFirstProductImages();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [categories]);
 
   const getDesktopSpanClass = (index: number) => {
     const indexInGroup = index % 5;
@@ -92,6 +135,7 @@ export default function CategoryGrid() {
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
                       category.image ||
+                      firstProductImages[category._id] ||
                       '';
 
                     if (!imageSrc) {
