@@ -1,253 +1,179 @@
-# flower_shop
-Здесь будут описываться этапы разработки сайта на HTML+C#
+# FloraMix / Flower Shop
 
----
+Интернет-магазин цветов на Next.js: витрина для покупателей и админ-панель для заказов, каталога и настроек магазина.
 
-# 🌸 Flower Production - Система управления производством цветов
-
-Современная система управления производством и продажей цветов с админ-панелью и клиентской частью.
-
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb)](https://www.mongodb.com/atlas)
-[![Vercel](https://img.shields.io/badge/Vercel-Deploy-black?logo=vercel)](https://vercel.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)](https://supabase.com/)
 
-## 🚀 Технологии
+## Возможности
 
-- **Frontend**: Next.js 15, React 18, TypeScript
-- **Styling**: Tailwind CSS, Framer Motion
-- **Backend**: Next.js API Routes, MongoDB Atlas
-- **Database**: MongoDB с Mongoose
-- **Deployment**: Vercel
-- **Authentication**: JWT, bcryptjs
-- **Tools**: ESLint, Prettier, Husky
+- **Клиентская часть** (`app/client`, `features/app`): главная, каталог по категориям и подкатегориям, карточки товаров, корзина, оформление заказа.
+- **Админ-панель** (`app/admin`, `features/admin`): заказы (фоновое обновление, уведомления о новых заказах, подсветка новых строк), товары, категории, настройки магазина, загрузка изображений.
+- **API** (`app/api`): товары, категории, подкатегории, заказы, авторизация администратора (JWT), настройки, загрузки, health-check.
 
-## 📋 Быстрый старт
+## Стек
 
-### 🚀 Автоматическая настройка (рекомендуется)
+| Область | Технологии |
+|--------|------------|
+| Frontend | Next.js (App Router), React 19, TypeScript |
+| Стили | Tailwind CSS 4, Framer Motion |
+| Данные | Supabase (PostgreSQL), универсальная таблица документов (`documents`) |
+| Auth | JWT (`jose` / `jsonwebtoken`), bcrypt |
+| Формы / UI | react-toastify, react-imask, Lucide / react-icons |
+| Качество | ESLint (eslint-config-next), Jest |
+
+## Требования
+
+- Node.js **>= 18**
+- npm **>= 8**
+- Проект Supabase и выполненный SQL-инициализатор (см. ниже)
+
+## Быстрый старт
+
 ```bash
-# Клонируйте репозиторий
-git clone <your-repo-url>
-cd flower-production
+git clone <url-репозитория>
+cd flower_shop
 
-# Автоматическая настройка (установка зависимостей, создание .env, проверки)
 npm install
-```
 
-### 🔧 Ручная настройка
-```bash
-# 1. Установка зависимостей
-npm install
+cp .env.example .env
+# Заполните переменные (минимум Supabase + JWT_SECRET + NEXT_PUBLIC_API_URL для локали)
 
-# 2. Настройка переменных окружения
-cp env.example .env.local
+npm run generate-secrets   # скопируйте вывод JWT_SECRET в .env.local при необходимости
 
-# 3. Генерация секретов
-npm run generate-secrets
-
-# 4. Проверка настроек
-npm run setup
-```
-
-### 2. Настройка переменных окружения
-Создайте файл `.env.local`:
-```env
-# MongoDB Atlas (обязательно для Vercel)
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/flowers_production?retryWrites=true&w=majority
-
-# JWT секреты (сгенерируйте через node generate-secrets.js)
-JWT_SECRET=your_generated_jwt_secret_here
-SESSION_SECRET=your_generated_session_secret_here
-
-# API URL
-NEXT_PUBLIC_API_URL=http://localhost:3000
-
-# Остальные настройки
-NODE_ENV=development
-LOG_LEVEL=info
-ENABLE_DEBUG_LOGS=true
-ALLOWED_ORIGINS=http://localhost:3000
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-MAX_FILE_SIZE=10485760
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/webp
-```
-
-### 3. Запуск в режиме разработки
-```bash
 npm run dev
 ```
 
-Откройте [http://localhost:3000](http://localhost:3000)
+Сайт по умолчанию: [http://localhost:3000](http://localhost:3000) (в `package.json` dev-сервер слушает `0.0.0.0`).
 
-## 🗄️ Настройка MongoDB Atlas
+### Supabase: схема БД
 
-### 1. Создание кластера
-1. Зайдите на [MongoDB Atlas](https://www.mongodb.com/atlas)
-2. Создайте бесплатный аккаунт
-3. Создайте кластер **M0 Sandbox** (бесплатный)
-4. Настройте пользователя базы данных:
-   - Username: `admin`
-   - Password: сгенерируйте сильный пароль
-5. Добавьте IP `0.0.0.0/0` в Network Access
-6. Получите строку подключения
+1. Создайте проект в [Supabase](https://supabase.com/).
+2. В **SQL Editor** выполните скрипт [`scripts/supabase-init.sql`](scripts/supabase-init.sql) — создаётся таблица `documents` (jsonb-документы по полю `collection`).
+3. В **Project Settings → API** скопируйте URL и ключи в `.env.local`.
 
-### 2. Тестирование подключения
+### Переменные окружения
+
+Ориентир — файл [`.env.example`](.env.example):
+
+| Переменная | Назначение |
+|------------|------------|
+| `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` | URL проекта Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` или `SUPABASE_ANON_KEY` | Ключ API (для серверных операций предпочтителен service role) |
+| `SUPABASE_COLLECTION_TABLE` | Имя таблицы (по умолчанию `documents`) |
+| `JWT_SECRET` | Секрет подписи JWT админ-сессии |
+| `NEXT_PUBLIC_API_URL` | Базовый URL приложения (локально: `http://localhost:3000`) |
+| `ALLOWED_ORIGINS` | CORS (через запятую) |
+
+Опционально: лимиты запросов, логи, настройки платежей — см. комментарии в `env.example`.
+
+### Первый администратор
+
 ```bash
-# Запустите тест подключения к MongoDB Atlas
-npm run test:db
+npm run db:create-admin
 ```
 
-## 🚀 Деплой на Vercel
+Логин и пароль задаются в интерактивном режиме скрипта (или по документации `create-admin.js`). Вход в админку выполняется через форму авторизации администратора.
 
-### 1. Подготовка
+### Тестовые данные
+
 ```bash
-# Сгенерируйте секреты
-node generate-secrets.js
-
-# Закоммитьте изменения
-git add .
-git commit -m "Prepare for Vercel deployment"
-git push origin main
-```
-
-### 2. Настройка Vercel
-1. Зайдите на [Vercel Dashboard](https://vercel.com/dashboard)
-2. Нажмите "New Project"
-3. Подключите GitHub репозиторий
-4. Vercel автоматически определит Next.js проект
-
-### 3. Переменные окружения в Vercel
-В Vercel Dashboard → Settings → Environment Variables добавьте:
-
-```env
-# MongoDB Atlas
-MONGODB_URI=mongodb+srv://admin:password@cluster.mongodb.net/flowers_production?retryWrites=true&w=majority
-
-# JWT секреты (сгенерируйте через generate-secrets.js)
-JWT_SECRET=your_generated_jwt_secret_here
-SESSION_SECRET=your_generated_session_secret_here
-
-# API URL (замените на ваш Vercel домен)
-NEXT_PUBLIC_API_URL=https://your-project.vercel.app
-
-# CORS
-ALLOWED_ORIGINS=https://your-project.vercel.app
-
-# Остальные настройки
-NODE_ENV=production
-LOG_LEVEL=info
-ENABLE_DEBUG_LOGS=false
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-MAX_FILE_SIZE=10485760
-ALLOWED_FILE_TYPES=image/jpeg,image/png,image/webp
-NEXT_DISABLE_FONT_DOWNLOAD=1
-NEXT_TELEMETRY_DISABLED=1
-ENABLE_HEALTH_CHECKS=true
-HEALTH_CHECK_INTERVAL=30000
-```
-
-### 4. После деплоя
-```bash
-# Создайте админа (локально с подключением к Atlas)
-node create-admin.js
-
-# Заполните тестовыми данными
 npm run db:seed
 ```
 
-## 🔧 Доступы
+## Скрипты npm
 
-### Админ-панель
-- **URL**: `НЕВАЖНО`
-- **Логин**: `НЕВАЖНО`
-- **Пароль**: `НЕВАЖНО`
+| Команда | Описание |
+|--------|----------|
+| `npm run dev` | Режим разработки Next.js (`-H 0.0.0.0`) |
+| `npm run build` | Продакшен-сборка |
+| `npm run start` | Запуск после `build` |
+| `npm run preview` | `build` + `start` |
+| `npm run lint` / `npm run lint:fix` | ESLint |
+| `npm run type-check` | `tsc --noEmit` |
+| `npm run test` | Jest |
+| `npm run test:db` | Проверка подключения к приложению/БД (`test-app.js`) |
+| `npm run db:seed` | Заполнение БД |
+| `npm run db:create-admin` | Создание админа |
+| `npm run generate-secrets` | Случайные секреты в консоль |
+| `npm run health-check` | Проверка здоровья (`scripts/health-check.js`) |
+| `npm run setup` | Скрипт начальной настройки |
+| `npm run clean` | Очистка `.next` и кэша |
 
-### API Endpoints
-- **Health Check**: `/api/health`
-- **Products**: `/api/products`
-- **Categories**: `/api/categories`
-- **Orders**: `/api/orders`
-
-## 📁 Структура проекта
+## Структура репозитория
 
 ```
-├── app/                    # Next.js App Router
-│   ├── (root)/            # Главная страница
-│   ├── admin/             # Админ-панель
-│   ├── api/               # API Routes
-│   ├── client/            # Клиентская часть
-│   └── lib/               # Утилиты
-├── components/            # Переиспользуемые компоненты
-├── hooks/                 # React хуки
-├── lib/                   # Общие утилиты
-├── models/                # Mongoose модели
-├── public/                # Статические файлы
-└── scripts/               # Скрипты для управления
+├── app/
+│   ├── (root)/           # Публичная главная
+│   ├── admin/            # Админ-панель (layouts, страницы)
+│   ├── api/              # Route Handlers REST API
+│   ├── client/           # Клиентский UI (layout, компоненты, корзина)
+│   ├── actions/          # Server Actions
+│   └── context/          # React Context (например корзина)
+├── features/             # Фичи: admin/*, app/* (каталог, корзина)
+├── components/           # Общие компоненты (UI, админ-уведомления)
+├── hooks/                # Хуки (auth, уведомления о заказах)
+├── lib/                  # db, supabase, api, csrf, rateLimit, валидации
+├── models/               # Модели домена и работа с коллекциями в Supabase
+├── scripts/              # supabase-init.sql, health-check, setup, deploy
+├── public/               # Статика
+└── __tests__/            # Юнит-тесты
 ```
 
-## 🛠️ Доступные команды
+## API (кратко)
 
-### 🚀 Разработка
+- `GET /api/health` — проверка работоспособности  
+- Товары: `/api/products`, `/api/products/[id]`, фильтры, по категории/подкатегории  
+- Категории и подкатегории: `/api/categories`, `/api/subcategories`  
+- Заказы: `/api/orders`, `/api/orders/latest` (для админ-опроса новых заказов)  
+- `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`  
+- Настройки и загрузки: `/api/settings`, `/api/upload`, `/api/uploads/...`
+
+## Деплой (например Vercel)
+
+1. Подключите репозиторий в Vercel, framework preset: **Next.js**.
+2. Перенесите переменные из `.env.local` в **Environment Variables** проекта (включая Supabase и `JWT_SECRET`).
+3. Укажите `NEXT_PUBLIC_API_URL` и `ALLOWED_ORIGINS` на продакшен-домен.
+4. После деплоя создайте администратора: `npm run db:create-admin` (с доступом к той же БД Supabase) или отдельный защищённый процесс.
+
+## Устранение неполадок
+
+- **Ошибка подключения Supabase** — проверьте `SUPABASE_URL`, ключ и что таблица из `supabase-init.sql` создана; сообщение в логе может указывать на неверную схему `documents`.
+- **401/403 в админке** — сессия JWT, cookie, `JWT_SECRET` одинаковый везде после смены.
+- **Сборка падает** — `npm run lint` и `npm run type-check`; исправьте ошибки, не отключая проверки без необходимости.
+- **Картинки** — проверьте `next.config` и маршрут `/api/upload` / хранение в настройках проекта.
+
+## Статус Отладки (2026-05-04)
+
+- Исправлены падения `next build` из-за ранней инициализации Supabase в API/кэше.
+- Синхронизированы версии ESLint (`eslint@9` + flat config).
+- `npm run type-check` проходит.
+- `npm test -- --runInBand` проходит (63/63).
+- `npm run build` проходит.
+- В `npm run lint` остаётся legacy-техдолг (много `any` и `require` в старых модулях), это отдельный поэтапный рефакторинг.
+
+### Проверки Перед Деплоем
+
 ```bash
-npm run dev                 # Запуск в режиме разработки
-npm run build              # Сборка проекта
-npm run start              # Запуск продакшен версии
-npm run preview            # Предварительный просмотр продакшена
+npm run type-check
+npm test -- --runInBand
+npm run build
 ```
 
-### 🔍 Проверки и тестирование
+Для Windows PowerShell при запрете `npm.ps1`:
+
 ```bash
-npm run lint               # Проверка ESLint
-npm run lint:fix           # Исправление ESLint ошибок
-npm run type-check         # Проверка TypeScript
-npm run test               # Запуск тестов
-npm run health-check       # Проверка здоровья приложения
+npm.cmd run type-check
+npm.cmd test -- --runInBand
+npm.cmd run build
 ```
 
-### 🗄️ База данных
-```bash
-npm run db:seed            # Заполнение тестовыми данными
-npm run db:create-admin    # Создание админа
-npm run test:db            # Тест подключения к базе данных
-```
+## Разработчики
 
-### 🔧 Утилиты
-```bash
-npm run setup              # Автоматическая настройка проекта
-npm run generate-secrets   # Генерация JWT секретов
-npm run deploy             # Деплой в продакшен
-npm run clean              # Очистка кэша
-```
-
-### 📦 Управление зависимостями
-```bash
-npm install                # Установка зависимостей
-npm run postinstall        # Автоматическая настройка после установки
-```
-
-## 🔧 Troubleshooting
-
-### Проблема: "MongoDB connection failed"
-**Решение**: Проверьте MONGODB_URI в переменных окружения
-
-### Проблема: "Build failed"
-**Решение**: 
-1. Проверьте все зависимости в package.json
-2. Убедитесь, что TypeScript ошибки игнорируются
-
-### Проблема: "Images not loading"
-**Решение**: Vercel автоматически обработает статические файлы
-
-## 📞 Поддержка
-
-При возникновении проблем:
-1. Проверьте логи: `npm run dev`
-2. Проверьте health check: `curl http://localhost:3000/api/health`
-3. Проверьте переменные окружения
-4. Проверьте подключение к базе данных
-
----
-
-если ты дочитал до сюда ваня - знай, у меня получилось стартануть наше дело, буду рад видеть тебя в наших рядах.
+blindfoldStudios:
+blindfold
+Z3r00000-cyber
+virpom
+TcKatFire

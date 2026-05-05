@@ -1,26 +1,126 @@
 "use client";
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Image from 'next/image';
+import { withCsrfHeaders } from '@/lib/csrf-client';
+import { productionLogger } from '@/lib/productionLogger';
+
+interface MediaLibraryItem {
+  url: string;
+  inLibrary: boolean;
+}
+
+function normalizeMediaUrl(raw: string): string {
+  const url = String(raw || '').trim();
+  if (!url) return '';
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return url;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' && parsed.hostname.endsWith('.supabase.co')) {
+      parsed.protocol = 'https:';
+      return parsed.toString();
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
 
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
   onUploadStart?: () => void;
   onUploadEnd?: (success: boolean) => void;
+  /** Показать выбор из общей медиатеки (товары, баннеры, фоны категорий) */
+  showMediaLibrary?: boolean;
+  /** После успешной загрузки добавить URL в медиатеку настроек */
+  registerInLibrary?: boolean;
 }
 
-export default function ImageUpload({ value, onChange, onUploadStart, onUploadEnd }: ImageUploadProps) {
-  const [preview, setPreview] = useState<string | null>(value);
+export default function ImageUpload({
+  value,
+  onChange,
+  onUploadStart,
+  onUploadEnd,
+  showMediaLibrary = true,
+  registerInLibrary = true,
+}: ImageUploadProps) {
+  const [preview, setPreview] = useState<string | null>(value || null);
   const [error, setError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [libraryItems, setLibraryItems] = useState<MediaLibraryItem[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreview(value ? value : null);
+  }, [value]);
+
+  const loadMediaLibrary = useCallback(async () => {
+    if (!showMediaLibrary) return;
+    setLibraryLoading(true);
+    setLibraryError(null);
+    try {
+      const res = await fetch('/api/media-library', { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error(res.status === 401 ? 'Требуется вход в админку' : 'Не удалось загрузить медиатеку');
+      }
+      const data = await res.json();
+      const items = Array.isArray(data.items) ? data.items : [];
+      setLibraryItems(
+        items
+          .filter((item: { url?: string }) => typeof item?.url === 'string' && item.url.length > 0)
+          .map((item: { url: string; inLibrary?: boolean }) => ({
+            url: normalizeMediaUrl(item.url),
+            inLibrary: Boolean(item.inLibrary),
+          })),
+      );
+    } catch (e) {
+      setLibraryError(e instanceof Error ? e.message : 'Ошибка медиатеки');
+    } finally {
+      setLibraryLoading(false);
+    }
+  }, [showMediaLibrary]);
+
+  useEffect(() => {
+    if (showMediaLibrary) {
+      void loadMediaLibrary();
+    }
+  }, [showMediaLibrary, loadMediaLibrary]);
+
+  useEffect(() => {
+    if (libraryOpen && showMediaLibrary) {
+      void loadMediaLibrary();
+    }
+  }, [libraryOpen, showMediaLibrary, loadMediaLibrary]);
+
+  const registerUrlInLibrary = useCallback(async (url: string) => {
+    if (!registerInLibrary || !url) return;
+    try {
+      await fetch('/api/media-library', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...withCsrfHeaders(),
+        },
+        credentials: 'include',
+        body: JSON.stringify({ url }),
+      });
+      void loadMediaLibrary();
+    } catch {
+      // не блокируем UI
+    }
+  }, [registerInLibrary, loadMediaLibrary]);
 
   const MAX_UPLOAD_BYTES = 900 * 1024; // Запас под nginx 1MB
-  const MAX_DIMENSION = 2560;
+  const INITIAL_MAX_DIMENSION = 4096;
+  const MIN_DIMENSION = 320;
 
   const optimizeImageForUpload = useCallback(async (file: File): Promise<File> => {
     if (!file.type.startsWith('image/')) return file;
-    if (file.type === 'image/gif') return file;
 
     const objectUrl = URL.createObjectURL(file);
 
@@ -38,7 +138,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
         throw new Error('Не удалось подготовить canvas для сжатия изображения');
       }
 
-      const ratio = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
+      const ratio = Math.min(1, INITIAL_MAX_DIMENSION / Math.max(image.width, image.height));
       let targetWidth = Math.max(1, Math.round(image.width * ratio));
       let targetHeight = Math.max(1, Math.round(image.height * ratio));
 
@@ -47,13 +147,13 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
       });
 
       let bestBlob: Blob | null = null;
-      for (let scaleAttempt = 0; scaleAttempt < 4; scaleAttempt++) {
+      while (targetWidth >= MIN_DIMENSION && targetHeight >= MIN_DIMENSION) {
         canvas.width = targetWidth;
         canvas.height = targetHeight;
         ctx.clearRect(0, 0, targetWidth, targetHeight);
         ctx.drawImage(image, 0, 0, targetWidth, targetHeight);
 
-        for (const quality of [0.9, 0.82, 0.74, 0.66, 0.58]) {
+        for (const quality of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52, 0.44, 0.36, 0.3]) {
           const blob = await toBlob(quality);
           if (!blob) continue;
           bestBlob = blob;
@@ -63,8 +163,9 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
           }
         }
 
-        targetWidth = Math.max(1, Math.round(targetWidth * 0.85));
-        targetHeight = Math.max(1, Math.round(targetHeight * 0.85));
+        targetWidth = Math.max(MIN_DIMENSION, Math.round(targetWidth * 0.82));
+        targetHeight = Math.max(MIN_DIMENSION, Math.round(targetHeight * 0.82));
+        if (targetWidth === MIN_DIMENSION && targetHeight === MIN_DIMENSION) break;
       }
 
       if (!bestBlob) return file;
@@ -81,12 +182,19 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     setIsUploading(true);
     if (onUploadStart) onUploadStart();
 
-    // Жмем изображение на клиенте, чтобы избежать 413 от nginx
-    const optimizedFile = await optimizeImageForUpload(file);
+    // Compress on client to reduce risk of 413 from proxy/server.
+    // If compression fails (rare decoder/format cases), fallback to original file.
+    let optimizedFile: File = file;
+    try {
+      optimizedFile = await optimizeImageForUpload(file);
+    } catch (optimizeError) {
+      productionLogger.warn('Image optimization failed, fallback to original file', optimizeError);
+      optimizedFile = file;
+    }
 
     // Дополнительная защита по размеру после сжатия
     if (optimizedFile.size > MAX_UPLOAD_BYTES) {
-      setError('Файл слишком большой даже после оптимизации. Попробуйте JPG/WebP меньшего веса.');
+      setError('Could not auto-compress this image to upload limit. Please try another photo.');
       setIsUploading(false);
       if (onUploadEnd) onUploadEnd(false);
       return;
@@ -98,6 +206,8 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
+        headers: withCsrfHeaders(),
+        credentials: 'include',
         body: formData,
       });
 
@@ -125,16 +235,19 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
       const data = await res.json();
       if (typeof onChange === 'function') onChange(data.url);
       setPreview(data.url);
+      if (typeof data.url === 'string') {
+        void registerUrlInLibrary(data.url);
+      }
       if (onUploadEnd) onUploadEnd(true);
 
     } catch (err: any) {
-      console.error('Upload error:', err);
+      productionLogger.error('Upload error:', err);
       setError(err.message || 'Ошибка загрузки');
       if (onUploadEnd) onUploadEnd(false);
     } finally {
       setIsUploading(false);
     }
-  }, [MAX_UPLOAD_BYTES, onChange, onUploadEnd, onUploadStart, optimizeImageForUpload]);
+  }, [MAX_UPLOAD_BYTES, onChange, onUploadEnd, onUploadStart, optimizeImageForUpload, registerUrlInLibrary]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -144,7 +257,7 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': ['.jpeg', '.png', '.jpg', '.webp', '.gif'] },
+    accept: { 'image/*': [] },
     multiple: false,
   });
 
@@ -155,14 +268,81 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     onChange('');
   }, [onChange]);
 
+  const pickFromLibrary = (url: string) => {
+    const normalized = normalizeMediaUrl(url);
+    setError(null);
+    onChange(normalized);
+    setPreview(normalized);
+    setLibraryOpen(false);
+  };
+
   return (
-    <div>
+    <div className="space-y-3">
+      {showMediaLibrary && (
+        <div className="rounded-lg border border-gray-200 bg-gray-50/80">
+          <button
+            type="button"
+            onClick={() => {
+              setLibraryOpen((o) => !o);
+              if (!libraryOpen) void loadMediaLibrary();
+            }}
+            className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-100"
+          >
+            <span>Медиатека (общие изображения)</span>
+            <span className="text-gray-400">{libraryOpen ? '▲' : '▼'}</span>
+          </button>
+          {libraryOpen && (
+            <div className="border-t border-gray-200 p-3">
+              <p className="mb-2 text-xs text-gray-500">
+                Загруженные здесь файлы попадают в общий список — их можно снова выбрать в товарах, баннере и фонах категорий.
+              </p>
+              {libraryLoading && <p className="text-sm text-gray-500">Загрузка…</p>}
+              {libraryError && <p className="text-sm text-red-600">{libraryError}</p>}
+              {!libraryLoading && !libraryError && libraryItems.length === 0 && (
+                <p className="text-sm text-gray-500">Пока нет изображений. Загрузите файл ниже — он появится в списке.</p>
+              )}
+              {libraryItems.length > 0 && (
+                <div className="max-h-48 overflow-y-auto overscroll-contain">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                    {libraryItems.map((item) => (
+                      <button
+                        key={item.url}
+                        type="button"
+                        onClick={() => pickFromLibrary(item.url)}
+                        className={`relative aspect-square overflow-hidden rounded-md border-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+                          value === item.url ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                        title={item.inLibrary ? 'В медиатеке' : 'Из товара или оформления'}
+                      >
+                        <img
+                          src={normalizeMediaUrl(item.url)}
+                          alt=""
+                          className="absolute inset-0 h-full w-full object-cover"
+                          loading="lazy"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (img.dataset.fallbackApplied === '1') return;
+                            img.dataset.fallbackApplied = '1';
+                            console.error('Failed to load image:', item.url, 'normalized:', normalizeMediaUrl(item.url));
+                            img.style.visibility = 'hidden';
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       <div
         {...getRootProps()}
-        className={`w-full p-6 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors
+        className={`w-full rounded-lg border-2 border-dashed p-4 text-center transition-colors sm:p-6
           ${isDragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400'}
           ${error ? 'border-red-500 bg-red-50' : ''}
-          ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          ${isUploading ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
       >
         <input {...getInputProps()} />
         
@@ -199,9 +379,9 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
               alt="preview" 
               width={128}
               height={128}
-              className="w-32 h-32 object-cover rounded-lg border shadow-sm"
+              className="h-24 w-24 rounded-lg border object-cover shadow-sm sm:h-32 sm:w-32"
               onError={() => {
-                console.error('Image failed to load:', preview || value);
+                productionLogger.error('Image failed to load:', preview || value);
                 setError('Не удалось загрузить изображение');
               }}
               onLoad={() => {
@@ -221,3 +401,4 @@ export default function ImageUpload({ value, onChange, onUploadStart, onUploadEn
     </div>
   );
 } 
+

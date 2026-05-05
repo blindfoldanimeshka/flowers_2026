@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 
 interface ModalProps {
   isOpen: boolean;
@@ -8,6 +10,7 @@ interface ModalProps {
   title?: string;
   children: React.ReactNode;
   className?: string;
+  contentClassName?: string;
 }
 
 const Modal: React.FC<ModalProps> = ({ 
@@ -15,9 +18,15 @@ const Modal: React.FC<ModalProps> = ({
   onClose, 
   title, 
   children, 
-  className = "" 
+  className = "",
+  contentClassName = "",
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const overflowBackupRef = useRef<{
+    bodyOverflow: string;
+    htmlOverflow: string;
+  } | null>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -26,14 +35,44 @@ const Modal: React.FC<ModalProps> = ({
       }
     };
 
+    let preventTouchMove: EventListener | null = null;
+
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+
+      // На iOS/некоторых mobile-браузерах блокировка скролла только через body может не сработать.
+      // Поэтому фиксируем и body, и html. Плюс перехватываем touchmove, чтобы фон не скроллился.
+      const body = document.body;
+      const html = document.documentElement;
+      overflowBackupRef.current = {
+        bodyOverflow: body.style.overflow,
+        htmlOverflow: html.style.overflow,
+      };
+      body.style.overflow = 'hidden';
+      html.style.overflow = 'hidden';
+
+      preventTouchMove = (event: Event) => {
+        const contentElement = contentRef.current;
+        const target = event.target as Node | null;
+        if (contentElement && target && contentElement.contains(target)) {
+          return;
+        }
+        event.preventDefault();
+      };
+      document.addEventListener('touchmove', preventTouchMove, { passive: false });
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      if (preventTouchMove) {
+        document.removeEventListener('touchmove', preventTouchMove);
+      }
+      const backup = overflowBackupRef.current;
+      const body = document.body;
+      const html = document.documentElement;
+      body.style.overflow = backup?.bodyOverflow ?? '';
+      html.style.overflow = backup?.htmlOverflow ?? '';
+      overflowBackupRef.current = null;
     };
   }, [isOpen, onClose]);
 
@@ -43,51 +82,67 @@ const Modal: React.FC<ModalProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (typeof document === 'undefined') return null;
 
-  return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-[2px]"
-      onClick={handleBackdropClick}
-    >
-      <div 
-        ref={modalRef}
-        className={`bg-white rounded-[20px] shadow-xl max-w-md w-full max-h-[80vh] overflow-hidden ${className}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Заголовок с крестиком */}
-        {title && (
-          <div className="flex items-center justify-between p-4 border-b border-gray-100">
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-            <button
-              onClick={onClose}
-              className="p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
-              aria-label="Закрыть"
+  return createPortal(
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-[2px]"
+          onClick={handleBackdropClick}
+        >
+          <motion.div
+            ref={modalRef}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 12, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            className={`bg-white rounded-[20px] shadow-xl w-full max-h-[calc(var(--app-dvh)-32px)] sm:max-h-[calc(var(--app-dvh)-40px)] overflow-hidden flex flex-col ${className || 'max-w-md'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Заголовок с крестиком */}
+            {title && (
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+                <button
+                  onClick={onClose}
+                  className="p-1 rounded-full hover:bg-gray-100 transition-colors duration-200"
+                  aria-label="Закрыть"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-gray-500"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Контент */}
+            <div
+              ref={contentRef}
+              className={`p-3 sm:p-4 overflow-y-auto flex-1 min-h-0 max-h-[calc(var(--app-dvh)-152px)] sm:max-h-[calc(var(--app-dvh)-160px)] ${contentClassName}`}
             >
-              <svg 
-                width="20" 
-                height="20" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-                className="text-gray-500"
-              >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        )}
-        
-        {/* Контент */}
-        <div className="p-4 overflow-y-auto max-h-[calc(80vh-120px)]">
-          {children}
-        </div>
-      </div>
-    </div>
+              {children}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 };
 

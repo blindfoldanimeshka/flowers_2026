@@ -41,6 +41,9 @@ mongodb-data
 
 # IDE / agent artifacts
 .cursor/
+.playwright-mcp/
+.sisyphus/
 
 # Local run logs
 *.log
+.vscode

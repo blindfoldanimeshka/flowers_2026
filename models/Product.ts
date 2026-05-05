@@ -1,27 +1,26 @@
-import { createSupabaseModel } from '@/lib/supabaseModel';
+// Заглушка для обратной совместимости
+// Проект использует Supabase напрямую через @/lib/supabase
+// Этот файл создан для предотвращения ошибок импорта
 
 export interface IProduct {
-  _id: string;
+  id: string;
+  legacy_id?: number;
   name: string;
+  slug: string;
   price: number;
-  categoryId: string;
-  categoryNumId: number;
-  subcategoryId?: string;
-  subcategoryNumId?: number;
-  image: string;
-  description: string;
-  inStock: boolean;
-  createdAt: string;
-  updatedAt: string;
+  description?: string;
+  images?: string[];
+  subcategory_id: string;
+  is_active: boolean;
+  is_featured: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
-const Product = createSupabaseModel({
-  collection: 'products',
-  defaults: { inStock: true, image: '/uploads/placeholder.jpg' },
-  references: {
-    categoryId: 'categories',
-    subcategoryId: 'subcategories',
-  },
-});
-
-export default Product;
+export default {
+  find: () => ({ lean: () => [] }),
+  findById: () => ({}),
+  findOne: () => ({ lean: () => ({}) }),
+  findByIdAndUpdate: () => ({}),
+  findByIdAndDelete: () => ({}),
+};

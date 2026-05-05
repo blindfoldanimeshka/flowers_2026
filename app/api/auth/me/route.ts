@@ -1,31 +1,30 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyToken } from '@/lib/auth';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-// GET запрос для получения информации о текущем пользователе
-export async function GET(request: NextRequest) {
-  try {
-    const userRole = request.headers.get('x-user-role');
-    const username = request.headers.get('x-username');
-    
-    // Если нет данных о пользователе, возвращаем 401
-    if (!userRole || !username) {
-      return NextResponse.json(
-        { error: 'Пользователь не авторизован' },
-        { status: 401 }
-      );
+export const GET = withErrorHandler(async (request: NextRequest) => {
+    const token = request.cookies.get('auth_token')?.value;
+
+    if (!token) {
+      return NextResponse.json({ user: null }, { status: 200 });
     }
-    
-    // Возвращаем информацию о пользователе
-    return NextResponse.json({
-      username,
-      role: userRole,
-    }, { status: 200 });
-    
-  } catch (error: any) {
-    console.error('Ошибка при получении информации о пользователе:', error);
+
+    const payload = await verifyToken(token);
+    if (!payload?.username || !payload?.role) {
+      return NextResponse.json({ user: null }, { status: 200 });
+    }
+
     return NextResponse.json(
-      { error: 'Ошибка сервера', details: error.message },
-      { status: 500 }
+      {
+        user: {
+          username: payload.username,
+          role: payload.role,
+        },
+      },
+      { status: 200 }
     );
-  }
-} 
+  
+});
+

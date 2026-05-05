@@ -17,7 +17,7 @@ export function useLoginViewModel() {
     setError('');
     try {
       await login({ username, password });
-      startTransition(() => router.refresh());
+      startTransition(() => router.push('/admin/orders'));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось подключиться к серверу');
     } finally {

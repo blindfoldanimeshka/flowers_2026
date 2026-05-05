@@ -18,6 +18,7 @@ export interface ICategory {
   name: string;
   slug: string;
   image?: string;
+  order?: number;
   subcategories: ISubcategory[];
   createdAt?: string;
   updatedAt?: string;

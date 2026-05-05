@@ -4,18 +4,19 @@ export const dynamic = 'force-dynamic';
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import Subcategory from '@/models/Subcategory';
-import Category from '@/models/Category'; // Added import for Category
-import { getCachedSubcategories, invalidateSubcategoriesCache } from '@/lib/cache';
-import { invalidateCategoriesCache } from '@/lib/cache'; // Added import for invalidateCategoriesCache
-import { startSession } from '@/lib/supabaseModel';
+import { createClient } from '@supabase/supabase-js';
+import { invalidateSubcategoriesCache } from '@/lib/cache';
+import { invalidateCategoriesCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Создание новой подкатегории
 export async function createSubcategory(formData: FormData) {
   try {
-    await dbConnect();
-    
     const name = formData.get('name') as string;
     const slug = formData.get('slug') as string;
     const categoryId = formData.get('categoryId') as string;
@@ -31,30 +32,68 @@ export async function createSubcategory(formData: FormData) {
     }
     
     // Получаем категорию, чтобы узнать её числовой ID
-    const category = await Category.findById(categoryId);
-    if (!category) {
+    const { data: category, error: catError } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 2)
+      .eq('id', categoryId)
+      .maybeSingle();
+    
+    if (catError || !category) {
+      productionLogger.error('Supabase category fetch error:', catError);
       return {
         success: false,
         error: 'Категория не найдена'
       };
     }
     
-    const subcategory = await Subcategory.create({
-      name,
-      slug,
-      categoryId,
-      categoryNumId: category.id, // Добавляем числовой ID категории
-      description,
-      image,
-      isActive
-    });
+    const categoryDoc = JSON.parse(category.doc);
+    
+    // Создаем подкатегорию
+    const { data: subcategory, error: subError } = await supabase
+      .from('documents')
+      .insert({
+        collection: 3, // subcategories = 3
+        doc: JSON.stringify({
+          name,
+          slug,
+          categoryId,
+          categoryNumId: categoryDoc.categoryNumId,
+          description,
+          image,
+          isActive
+        })
+      })
+      .select()
+      .single();
+    
+    if (subError || !subcategory) {
+      productionLogger.error('Supabase subcategory create error:', subError);
+      if (subError?.code === '23505') { // unique violation
+        return {
+          success: false,
+          error: 'Подкатегория с таким slug уже существует'
+        };
+      }
+      return {
+        success: false,
+        error: 'Ошибка при создании подкатегории'
+      };
+    }
     
     // Обновляем категорию, добавляя ID подкатегории в массив
-    await Category.findByIdAndUpdate(
-      categoryId,
-      { $addToSet: { subcategories: subcategory._id } },
-      { new: true }
-    );
+    const currentDoc = JSON.parse(category.doc);
+    const updatedSubcategories = [...(currentDoc.subcategories || []), {
+      name,
+      slug,
+      categoryNumId: categoryDoc.categoryNumId,
+      isActive
+    }];
+    
+    await supabase
+      .from('documents')
+      .update({ doc: JSON.stringify({ ...currentDoc, subcategories: updatedSubcategories }) })
+      .eq('id', categoryId);
     
     // Инвалидируем кэш и обновляем страницы
     invalidateSubcategoriesCache();
@@ -64,29 +103,11 @@ export async function createSubcategory(formData: FormData) {
     
     return {
       success: true,
-      subcategory
+      subcategory: JSON.parse(subcategory.doc)
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании подкатегории:', error);
-    
-    if (error.code === 11000) {
-      return {
-        success: false,
-        error: 'Подкатегория с таким slug уже существует'
-      };
-    }
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
+    productionLogger.error('Ошибка при создании подкатегории:', error);
     return {
       success: false,
       error: 'Ошибка при создании подкатегории'
@@ -97,147 +118,174 @@ export async function createSubcategory(formData: FormData) {
 // Обновление подкатегории
 export async function updateSubcategory(id: string, formData: FormData) {
   try {
-    await dbConnect();
-    
     const name = formData.get('name') as string;
     const slug = formData.get('slug') as string;
     const categoryId = formData.get('categoryId') as string;
     const description = formData.get('description') as string;
     const image = formData.get('image') as string;
     const isActive = formData.get('isActive') === 'true';
-    
+
     if (!name || !slug || !categoryId) {
       return {
         success: false,
         error: 'Обязательные поля: название, slug, ID категории'
       };
     }
-    
+
     // Получаем текущую подкатегорию
-    const currentSubcategory = await Subcategory.findById(id);
-    if (!currentSubcategory) {
+    const { data: currentSub, error: currentError } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3)
+      .eq('id', id)
+      .single();
+
+    if (currentError || !currentSub) {
+      productionLogger.error('Supabase subcategory fetch error:', currentError);
       return {
         success: false,
         error: 'Подкатегория не найдена'
       };
     }
-    
+
+    const currentDoc = JSON.parse(currentSub.doc);
+
     // Если изменилась категория, обновляем связи
-    if (currentSubcategory.categoryId.toString() !== categoryId) {
-      const session = await startSession();
-      
-      try {
-        await session.withTransaction(async () => {
-          // Получаем новую категорию для числового ID
-          const newCategory = await Category.findById(categoryId).session(session);
-          if (!newCategory) {
-            throw new Error('Новая категория не найдена');
-          }
-          
-          // Удаляем подкатегорию из старой категории
-          await Category.findByIdAndUpdate(
-            currentSubcategory.categoryId,
-            { $pull: { subcategories: id } },
-            { session }
-          );
-          
-          // Добавляем подкатегорию в новую категорию
-          await Category.findByIdAndUpdate(
-            categoryId,
-            { $addToSet: { subcategories: id } },
-            { session }
-          );
-          
-          // Обновляем подкатегорию с новым числовым ID категории
-          const subcategory = await Subcategory.findByIdAndUpdate(
-            id,
-            {
-              name,
-              slug,
-              categoryId,
-              categoryNumId: newCategory.id, // Обновляем числовой ID категории
-              description,
-              image,
-              isActive
-            },
-            { new: true, runValidators: true, session }
-          );
-          
-          return subcategory;
-        });
-        
-        // Инвалидируем кэш и обновляем страницы
-        invalidateSubcategoriesCache();
-        invalidateCategoriesCache();
-        revalidatePath('/admin/subcategories');
-        revalidatePath('/admin/categories');
-        
+    if (currentDoc.categoryId !== categoryId) {
+      // Получаем новую категорию для числового ID
+      const { data: newCat, error: newCatError } = await supabase
+        .from('documents')
+        .select('id, doc')
+        .eq('collection', 2)
+        .eq('id', categoryId)
+        .single();
+
+      if (newCatError || !newCat) {
+        productionLogger.error('Supabase new category fetch error:', newCatError);
         return {
-          success: true,
-          subcategory: await Subcategory.findById(id)
+          success: false,
+          error: 'Новая категория не найдена'
         };
-        
-      } catch (error: any) {
-        console.error('Ошибка при обновлении подкатегории:', error);
+      }
+
+      const newCatDoc = JSON.parse(newCat.doc);
+
+      // Обновляем подкатегорию с новым числовым ID категории
+      const { data: updatedSub, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          doc: JSON.stringify({
+            name,
+            slug,
+            categoryId,
+            categoryNumId: newCatDoc.categoryNumId,
+            description,
+            image,
+            isActive
+          })
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError || !updatedSub) {
+        productionLogger.error('Supabase subcategory update error:', updateError);
         return {
           success: false,
           error: 'Ошибка при обновлении подкатегории'
         };
-      } finally {
-        await session.endSession();
       }
+
+      // Обновляем старую категорию - удаляем подкатегорию из массива
+      const { data: oldCat, error: oldCatError } = await supabase
+        .from('documents')
+        .select('id, doc')
+        .eq('collection', 2)
+        .eq('id', currentDoc.categoryId)
+        .single();
+
+      if (!oldCatError && oldCat) {
+        const oldCatDoc = JSON.parse(oldCat.doc);
+        const updatedOldSubcategories = (oldCatDoc.subcategories || [])
+          .filter((s: any) => s.slug !== currentDoc.slug);
+
+        await supabase
+          .from('documents')
+          .update({ doc: JSON.stringify({ ...oldCatDoc, subcategories: updatedOldSubcategories }) })
+          .eq('id', currentDoc.categoryId);
+      }
+
+      // Обновляем новую категорию - добавляем подкатегорию в массив
+      const updatedNewSubcategories = [...(newCatDoc.subcategories || []), {
+        name,
+        slug,
+        categoryNumId: newCatDoc.categoryNumId,
+        isActive
+      }];
+
+      await supabase
+        .from('documents')
+        .update({ doc: JSON.stringify({ ...newCatDoc, subcategories: updatedNewSubcategories }) })
+        .eq('id', categoryId);
+
+      // Инвалидируем кэш и обновляем страницы
+      invalidateSubcategoriesCache();
+      invalidateCategoriesCache();
+      revalidatePath('/admin/subcategories');
+      revalidatePath('/admin/categories');
+
+      return {
+        success: true,
+        subcategory: JSON.parse(updatedSub.doc)
+      };
+
     } else {
       // Если категория не изменилась, просто обновляем подкатегорию
-      const subcategory = await Subcategory.findByIdAndUpdate(
-        id,
-        {
-          name,
-          slug,
-          description,
-          image,
-          isActive
-        },
-        { new: true, runValidators: true }
-      );
-      
-      if (!subcategory) {
+      const { data: updatedSub, error: updateError } = await supabase
+        .from('documents')
+        .update({
+          doc: JSON.stringify({
+            ...currentDoc,
+            name,
+            slug,
+            description,
+            image,
+            isActive
+          })
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError || !updatedSub) {
+        productionLogger.error('Supabase subcategory update error:', updateError);
         return {
           success: false,
-          error: 'Подкатегория не найдена'
+          error: 'Ошибка при обновлении подкатегории'
         };
       }
-      
+
       // Инвалидируем кэш и обновляем страницы
       invalidateSubcategoriesCache();
       revalidatePath('/admin/subcategories');
       revalidatePath('/admin/categories');
-      
+
       return {
         success: true,
-        subcategory
+        subcategory: JSON.parse(updatedSub.doc)
       };
     }
-    
+
   } catch (error: any) {
-    console.error('Ошибка при обновлении подкатегории:', error);
-    
-    if (error.code === 11000) {
+    productionLogger.error('Ошибка при обновлении подкатегории:', error);
+
+    if (error.code === '23505') { // unique violation in Supabase
       return {
         success: false,
         error: 'Подкатегория с таким slug уже существует'
       };
     }
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
+
     return {
       success: false,
       error: 'Ошибка при обновлении подкатегории'
@@ -247,70 +295,122 @@ export async function updateSubcategory(id: string, formData: FormData) {
 
 // Удаление подкатегории
 export async function deleteSubcategory(id: string) {
-  const session = await startSession();
-  
   try {
-    await dbConnect();
-    
-    await session.withTransaction(async () => {
-      // Получаем подкатегорию перед удалением, чтобы узнать родительскую категорию
-      const subcategory = await Subcategory.findById(id).session(session);
-      
-      if (!subcategory) {
-        throw new Error('Подкатегория не найдена');
+    // Получаем подкатегорию перед удалением
+    const { data: sub, error: subError } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3)
+      .eq('id', id)
+      .single();
+
+    if (subError || !sub) {
+      productionLogger.error('Supabase subcategory fetch error:', subError);
+      return {
+        success: false,
+        error: 'Подкатегория не найдена'
+      };
+    }
+
+    const subDoc = JSON.parse(sub.doc);
+
+    // Удаляем подкатегорию
+    const { error: deleteError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id);
+
+    if (deleteError) {
+      productionLogger.error('Supabase subcategory delete error:', deleteError);
+      return {
+        success: false,
+        error: 'Ошибка при удалении подкатегории'
+      };
+    }
+
+    // Обновляем категорию - удаляем подкатегорию из массива
+    if (subDoc.categoryId) {
+      const { data: cat, error: catError } = await supabase
+        .from('documents')
+        .select('id, doc')
+        .eq('collection', 2)
+        .eq('id', subDoc.categoryId)
+        .single();
+
+      if (!catError && cat) {
+        const catDoc = JSON.parse(cat.doc);
+        const updatedSubcategories = (catDoc.subcategories || [])
+          .filter((s: any) => s.slug !== subDoc.slug);
+
+        await supabase
+          .from('documents')
+          .update({ doc: JSON.stringify({ ...catDoc, subcategories: updatedSubcategories }) })
+          .eq('id', subDoc.categoryId);
       }
-      
-      // Удаляем подкатегорию
-      await Subcategory.findByIdAndDelete(id, { session });
-      
-      // Удаляем ID подкатегории из родительской категории
-      if (subcategory.categoryId) {
-        await Category.findByIdAndUpdate(
-          subcategory.categoryId,
-          { $pull: { subcategories: id } },
-          { new: true, session }
-        );
-      }
-    });
-    
+    }
+
     // Инвалидируем кэш и обновляем страницы
     invalidateSubcategoriesCache();
     invalidateCategoriesCache();
     revalidatePath('/admin/subcategories');
     revalidatePath('/admin/categories');
-    
+
     return {
       success: true,
       message: 'Подкатегория успешно удалена'
     };
-    
+
   } catch (error: any) {
-    console.error('Ошибка при удалении подкатегории:', error);
+    productionLogger.error('Ошибка при удалении подкатегории:', error);
     return {
       success: false,
       error: 'Ошибка при удалении подкатегории'
     };
-  } finally {
-    await session.endSession();
   }
 }
 
-// Получение всех подкатегорий (с кэшированием)
+// Получение всех подкатегорий
 export async function getSubcategories(filters?: {
   categoryId?: string;
   isActive?: boolean;
 }) {
   try {
-    // Получаем подкатегории из кэша
-    const subcategories = await getCachedSubcategories(filters);
-    
+    let query = supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3)
+      .order('doc->>name', { ascending: true });
+
+    const { data, error } = await query;
+
+    if (error) {
+      productionLogger.error('Supabase subcategories fetch error:', error);
+      return {
+        success: false,
+        error: 'Ошибка при получении подкатегорий'
+      };
+    }
+
+    let subcategories = data?.map(row => ({
+      _id: row.id,
+      ...JSON.parse(row.doc),
+    })) || [];
+
+    // Применяем фильтры
+    if (filters?.categoryId) {
+      subcategories = subcategories.filter(s => s.categoryId === filters.categoryId);
+    }
+    if (filters?.isActive !== undefined) {
+      subcategories = subcategories.filter(s => s.isActive === filters.isActive);
+    }
+
     return {
       success: true,
       subcategories
     };
-    
+
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий:', error);
+    productionLogger.error('Ошибка при получении подкатегорий:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'
@@ -318,7 +418,7 @@ export async function getSubcategories(filters?: {
   }
 }
 
-// Получение подкатегорий по ID категории (с кэшированием)
+// Получение подкатегорий по ID категории
 export async function getSubcategoriesByCategory(categoryId: string) {
   try {
     if (!categoryId) {
@@ -327,17 +427,35 @@ export async function getSubcategoriesByCategory(categoryId: string) {
         error: 'ID категории обязателен'
       };
     }
-    
-    // Получаем подкатегории из кэша с фильтром по категории
-    const subcategories = await getCachedSubcategories({ categoryId });
-    
+
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3)
+      .order('doc->>name', { ascending: true });
+
+    if (error) {
+      productionLogger.error('Supabase subcategories fetch error:', error);
+      return {
+        success: false,
+        error: 'Ошибка при получении подкатегорий'
+      };
+    }
+
+    const subcategories = (data || [])
+      .map(row => ({
+        _id: row.id,
+        ...JSON.parse(row.doc),
+      }))
+      .filter(s => s.categoryId === categoryId);
+
     return {
       success: true,
       subcategories
     };
-    
+
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий категории:', error);
+    productionLogger.error('Ошибка при получении подкатегорий категории:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'
@@ -345,7 +463,7 @@ export async function getSubcategoriesByCategory(categoryId: string) {
   }
 }
 
-// Получение подкатегорий по числовому ID категории (с кэшированием)
+// Получение подкатегорий по числовому ID категории
 export async function getSubcategoriesByCategoryNumId(categoryNumId: number) {
   try {
     if (categoryNumId === undefined) {
@@ -354,17 +472,35 @@ export async function getSubcategoriesByCategoryNumId(categoryNumId: number) {
         error: 'Числовой ID категории обязателен'
       };
     }
-    
-    // Получаем подкатегории из кэша с фильтром по числовому ID категории
-    const subcategories = await getCachedSubcategories({ categoryNumId });
-    
+
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, doc')
+      .eq('collection', 3)
+      .order('doc->>name', { ascending: true });
+
+    if (error) {
+      productionLogger.error('Supabase subcategories fetch error:', error);
+      return {
+        success: false,
+        error: 'Ошибка при получении подкатегорий'
+      };
+    }
+
+    const subcategories = (data || [])
+      .map(row => ({
+        _id: row.id,
+        ...JSON.parse(row.doc),
+      }))
+      .filter(s => s.categoryNumId === categoryNumId);
+
     return {
       success: true,
       subcategories
     };
-    
+
   } catch (error: any) {
-    console.error('Ошибка при получении подкатегорий по числовому ID категории:', error);
+    productionLogger.error('Ошибка при получении подкатегорий по числовому ID категории:', error);
     return {
       success: false,
       error: 'Ошибка при получении подкатегорий'

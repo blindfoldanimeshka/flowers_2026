@@ -1,5 +1,6 @@
 import { IProduct } from '@/app/client/models/Product';
 import { ICategory } from '@/app/client/models/Category';
+import { withCsrfHeaders } from '@/lib/csrf-client';
 
 function normalizeProductsResponse(data: unknown): IProduct[] {
   if (Array.isArray(data)) return data as IProduct[];
@@ -31,26 +32,45 @@ export async function getAllProducts(): Promise<IProduct[]> {
 export async function createProduct(payload: Omit<IProduct, '_id'>): Promise<IProduct> {
   const response = await fetch('/api/products', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to create product'));
-  return response.json();
+  const data = await response.json();
+  return (data?.product ?? data) as IProduct;
 }
 
 export async function updateProduct(id: string, payload: Omit<IProduct, '_id'>): Promise<IProduct> {
-  const response = await fetch(`/api/products/${id}`, {
+  const encodedId = encodeURIComponent(id);
+  const response = await fetch(`/api/products?id=${encodedId}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   });
   if (!response.ok) throw new Error(await parseError(response, 'Failed to update product'));
-  return response.json();
+  const data = await response.json();
+  return (data?.product ?? data) as IProduct;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const response = await fetch(`/api/products/${id}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error(await parseError(response, 'Failed to delete product'));
+  const encodedId = encodeURIComponent(id);
+  const response = await fetch(`/api/products/${encodedId}`, {
+    method: 'DELETE',
+    headers: withCsrfHeaders(),
+  });
+  if (response.ok) return;
+
+  // Fallback for legacy endpoint shape used in parts of the codebase.
+  const legacyResponse = await fetch(`/api/products?id=${encodedId}`, {
+    method: 'DELETE',
+    headers: withCsrfHeaders(),
+  });
+
+  if (!legacyResponse.ok) {
+    const primaryError = await parseError(response, 'Failed to delete product');
+    const legacyError = await parseError(legacyResponse, 'Failed to delete product');
+    throw new Error(`${primaryError}. Legacy fallback: ${legacyError}`);
+  }
 }
 
 export async function getAllCategories(): Promise<ICategory[]> {

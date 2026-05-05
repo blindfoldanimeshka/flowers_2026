@@ -1,133 +1,116 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import { Category } from '@/models/Category';
-import Subcategory from '@/models/Subcategory';
+import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 import { invalidateCategoriesCache, invalidateSubcategoriesCache } from '@/lib/cache';
 import { isValidId } from '@/lib/id';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
-) {
-  try {
-    await connect();
-
-    const { id, subcategoryId } = params;
-    const category = await Category.findById(id);
-
-    if (!category) {
-      return NextResponse.json(
-        { error: 'Категория не найдена' },
-        { status: 404 }
-      );
-    }
-
-    const subcategory = await Subcategory.findOne({ _id: subcategoryId, categoryId: id }).lean();
-    if (!subcategory) {
-      return NextResponse.json(
-        { error: 'Подкатегория не найдена' },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(subcategory, { status: 200 });
-  } catch (error: unknown) {
-    console.error(`Ошибка при получении подкатегории с ID ${params.subcategoryId}:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при получении подкатегории',
-        details: errorMessage
-      },
-      { status: 500 }
-    );
-  }
+function toSafeNumber(input: unknown, fallback = 0): number {
+  const next = typeof input === 'number' ? input : Number(input);
+  return Number.isFinite(next) ? next : fallback;
 }
 
-export async function PUT(
+function mapSupabaseSubcategory(sub: any, fallbackCategoryNumId = 0) {
+  return {
+    _id: sub.id,
+    name: sub.name,
+    slug: sub.slug,
+    categoryId: sub.category_id,
+    categoryNumId: toSafeNumber(sub.category_num_id ?? sub.categoryNumId, fallbackCategoryNumId),
+    isActive: sub.is_active ?? true,
+  };
+}
+
+export const GET = withErrorHandler(async (
   request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
-) {
-  try {
-    await connect();
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
+) => {
+    const { id, subcategoryId } = await params;
 
-    const { id, subcategoryId } = params;
-    const body = await request.json();
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    const category = await Category.findById(id);
-    if (!category) {
+    if (categoryError || !category) {
       return NextResponse.json(
         { error: 'Категория не найдена' },
         { status: 404 }
       );
     }
 
-    const subcategory = await Subcategory.findOne({ _id: subcategoryId, categoryId: id });
-    if (!subcategory) {
+    const { data: subcategory, error: subError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('id', subcategoryId)
+      .eq('category_id', id)
+      .single();
+
+    if (subError || !subcategory) {
       return NextResponse.json(
         { error: 'Подкатегория не найдена' },
         { status: 404 }
       );
     }
 
-    Object.assign(subcategory, body);
-    await subcategory.save();
+    return NextResponse.json(mapSupabaseSubcategory(subcategory), { status: 200 });
+});
+
+export const PUT = withErrorHandler(async (
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
+) => {
+    const { id, subcategoryId } = await params;
+    const body = await request.json();
+
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (categoryError || !category) {
+      return NextResponse.json(
+        { error: 'Категория не найдена' },
+        { status: 404 }
+      );
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (typeof body.name === 'string') updateData.name = body.name.trim();
+    if (typeof body.slug === 'string') updateData.slug = body.slug.trim();
+    if (typeof body.isActive === 'boolean') updateData.is_active = body.isActive;
+
+    const { data: updated, error: updateError } = await supabase
+      .from('subcategories')
+      .update(updateData)
+      .eq('id', subcategoryId)
+      .eq('category_id', id)
+      .select('*')
+      .single();
+
+    if (updateError || !updated) {
+      return NextResponse.json(
+        { error: 'Подкатегория не найдена или ошибка обновления' },
+        { status: updateError ? 500 : 404 }
+      );
+    }
 
     invalidateCategoriesCache();
     invalidateSubcategoriesCache();
     revalidatePath('/admin/categories');
 
-    return NextResponse.json(subcategory, { status: 200 });
-  } catch (error: unknown) {
-    console.error(`Ошибка при обновлении подкатегории с ID ${params.subcategoryId}:`, error);
+    return NextResponse.json(mapSupabaseSubcategory(updated), { status: 200 });
+});
 
-    if (error instanceof Error) {
-      if ('name' in error && error.name === 'ValidationError' && 'errors' in error) {
-        const validationErrors = Object.values(error.errors as Record<string, { message: string }>).map(
-          (err) => err.message
-        );
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Ошибка валидации',
-            details: validationErrors
-          },
-          { status: 400 }
-        );
-      }
-
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Ошибка при обновлении подкатегории',
-          details: error.message
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при обновлении подкатегории',
-        details: 'Неизвестная ошибка'
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
+export const DELETE = withErrorHandler(async (
   request: NextRequest,
-  { params }: { params: { id: string, subcategoryId: string } }
-) {
-  try {
-    await connect();
-
-    const { id, subcategoryId } = params;
-    console.log('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
+  { params }: { params: Promise<{ id: string, subcategoryId: string }> }
+) => {
+    const { id, subcategoryId } = await params;
+    productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Deleting subcategory:', { categoryId: id, subcategoryId });
 
     if (!isValidId(id) || !isValidId(subcategoryId)) {
       return NextResponse.json(
@@ -136,31 +119,48 @@ export async function DELETE(
       );
     }
 
-    const category = await Category.findById(id);
-    if (!category) {
-      console.log('[CATEGORY SUBCATEGORY DELETE] Category not found:', id);
+    const { data: category, error: categoryError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (categoryError || !category) {
+      productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Category not found:', id);
       return NextResponse.json(
         { success: false, error: 'Категория не найдена' },
         { status: 404 }
       );
     }
 
-    const subcategory = await Subcategory.findOne({ _id: subcategoryId, categoryId: id });
-    if (!subcategory) {
-      console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory not found in category:', subcategoryId);
+    const { data: subcategory, error: subError } = await supabase
+      .from('subcategories')
+      .select('id, category_id')
+      .eq('id', subcategoryId)
+      .eq('category_id', id)
+      .single();
+
+    if (subError || !subcategory) {
+      productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Subcategory not found in category:', subcategoryId);
       return NextResponse.json(
         { success: false, error: 'Подкатегория не найдена' },
         { status: 404 }
       );
     }
 
-    await Subcategory.deleteOne({ _id: subcategoryId });
-    await Category.updateOne(
-      { _id: id },
-      { $pull: { subcategories: subcategoryId } }
-    );
+    const { error: deleteError } = await supabase
+      .from('subcategories')
+      .delete()
+      .eq('id', subcategoryId);
 
-    console.log('[CATEGORY SUBCATEGORY DELETE] Subcategory deleted successfully');
+    if (deleteError) {
+      return NextResponse.json(
+        { success: false, error: 'Ошибка удаления подкатегории' },
+        { status: 500 }
+      );
+    }
+
+    productionLogger.info('[CATEGORY SUBCATEGORY DELETE] Subcategory deleted successfully');
 
     revalidatePath('/admin/categories');
     invalidateCategoriesCache();
@@ -177,17 +177,5 @@ export async function DELETE(
       },
       { status: 200 }
     );
-  } catch (error: unknown) {
-    console.error(`[CATEGORY SUBCATEGORY DELETE] Error deleting subcategory ${params.subcategoryId}:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Неизвестная ошибка';
+});
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при удалении подкатегории',
-        details: errorMessage
-      },
-      { status: 500 }
-    );
-  }
-}

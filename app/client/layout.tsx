@@ -3,16 +3,24 @@ import Footer from "./components/layout/Footer";
 import SocialButton from "./components/layout/SocialButton";
 import HeaderSwitcher from "./components/widget/HeaderSwitcher";
 import FadeWrapper from "./components/FadeWrapper";
-import TopInfoPanel from "./components/layout/TopInfoPanel";
 import { getCachedSettings } from "@/lib/cache";
+import { productionLogger } from '@/lib/productionLogger';
 
 const defaultPublicSettings = {
     siteName: "Floramix",
     siteDescription: "",
     contactPhone: "",
+    contactPhone2: "",
+    contactPhone3: "",
     address: "",
     workingHours: "",
+    pickupHours: "",
+    deliveryHours: "",
+    deliveryInfo: "",
     socialLinks: {},
+    homeCategoryCardBackgrounds: {},
+    homeBannerBackground: "",
+    homeBannerSlides: [],
 };
 
 export default async function ClientLayout({
@@ -31,32 +39,26 @@ export default async function ClientLayout({
             };
         }
     } catch (error) {
-        console.error("Failed to load public settings, using defaults:", error);
+        productionLogger.error("Failed to load public settings, using defaults:", error);
     }
 
     return (
-        <>
+        <div className="relative flex min-h-screen flex-col overflow-x-clip">
             <div
+                className="pointer-events-none fixed inset-0 -z-10"
                 style={{
-                    position: "fixed",
-                    top: 0,
-                    left: 0,
-                    width: "100%",
-                    height: "100%",
                     backgroundImage: "url('/image/bg.png')",
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                     opacity: 0.5,
-                    zIndex: -1,
                 }}
             />
             <HeaderSwitcher />
-            <TopInfoPanel settings={plainSettings} />
-            <FadeWrapper>
-              {children}
-            </FadeWrapper>
+            <main className="flex-1">
+                <FadeWrapper>{children}</FadeWrapper>
+            </main>
             <SocialButton settings={plainSettings} />
             <Footer settings={plainSettings} />
-        </>
+        </div>
     )
 }

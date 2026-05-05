@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { productionLogger } from '@/lib/productionLogger';
 
 // Загрузка изображения
 export async function uploadImage(formData: FormData) {
@@ -57,11 +58,11 @@ export async function uploadImage(formData: FormData) {
     return {
       success: true,
       url: result.url,
-      fileName: result.fileName
+      fileName: result.fileName || result.filename
     };
 
   } catch (error: any) {
-    console.error('Ошибка при загрузке изображения:', error);
+    productionLogger.error('Ошибка при загрузке изображения:', error);
     return {
       success: false,
       error: 'Ошибка при загрузке изображения'
@@ -92,7 +93,7 @@ export async function getUploadedImages() {
     };
 
   } catch (error: any) {
-    console.error('Ошибка при получении списка изображений:', error);
+    productionLogger.error('Ошибка при получении списка изображений:', error);
     return {
       success: false,
       error: 'Ошибка при получении списка изображений'

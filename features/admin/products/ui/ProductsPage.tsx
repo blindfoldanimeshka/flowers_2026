@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, useEffect, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import ImageUpload from '@/app/admin/components/ImageUpload';
 import { ICategory, ISubcategory } from '@/app/client/models/Category';
@@ -18,6 +18,38 @@ interface ProductFormProps {
 
 const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSubmit, onCancel }: ProductFormProps) => {
   const [priceInput, setPriceInput] = useState(String(draft.price || ''));
+  const getCategoryKey = (category: ICategory): string => String((category as any)._id ?? (category as any).id ?? '');
+  const isFlowersCategory = (category: ICategory): boolean => {
+    const slug = String((category as any).slug ?? '').trim().toLowerCase();
+    const name = String((category as any).name ?? '').trim().toLowerCase();
+    return slug === 'cvety' || slug === 'flowers' || name === 'цветы';
+  };
+  const validCategoryIds = useMemo(() => new Set(categories.map((category) => getCategoryKey(category)).filter(Boolean)), [categories]);
+  const flowersCategoryId = useMemo(() => {
+    const flowersCategory = categories.find((category) => isFlowersCategory(category));
+    return flowersCategory ? getCategoryKey(flowersCategory) : '';
+  }, [categories]);
+
+  // Инициализируем categoryIds из categoryId если массив пустой (для обратной совместимости)
+  const selectedCategoryIds = useMemo(() => {
+    const source = draft.categoryIds && draft.categoryIds.length > 0
+      ? draft.categoryIds
+      : (draft.categoryId ? [draft.categoryId] : []);
+    return source
+      .map((id) => String(id))
+      .filter((id) => validCategoryIds.has(id));
+  }, [draft.categoryId, draft.categoryIds, validCategoryIds]);
+
+  const updateImageAt = (index: number, value: string) => {
+    const nextImages = [...(draft.images || [])];
+    nextImages[index] = value;
+    const normalized = nextImages
+      .map((src) => src?.trim())
+      .filter((src): src is string => Boolean(src))
+      .slice(0, 3);
+    onChange('images', normalized);
+    onChange('image', normalized[0] || '');
+  };
 
   useEffect(() => {
     setPriceInput(String(draft.price || ''));
@@ -26,17 +58,14 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
   const normalizePrice = (raw: string) => {
     const sanitized = raw.replace(',', '.').replace(/[^\d.]/g, '');
     const parts = sanitized.split('.');
-    const normalized = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
-    return normalized;
+    return parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : sanitized;
   };
 
   const handlePriceChange = (value: string) => {
     const normalized = normalizePrice(value);
     setPriceInput(normalized);
     const parsed = Number(normalized);
-    if (!Number.isNaN(parsed)) {
-      onChange('price', parsed);
-    }
+    if (!Number.isNaN(parsed)) onChange('price', parsed);
   };
 
   const handlePriceBlur = () => {
@@ -49,86 +78,359 @@ const ProductForm = ({ draft, categories, subcategories, saving, onChange, onSub
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = event.target;
     if (name === 'price') return handlePriceChange(value);
-    if (name === 'inStock' && type === 'checkbox' && 'checked' in event.target) return onChange('inStock', event.target.checked);
+    if ((name === 'inStock' || name === 'preorderOnly') && type === 'checkbox' && 'checked' in event.target) {
+      return onChange(name as 'inStock' | 'preorderOnly', event.target.checked);
+    }
+    if (name === 'stockQuantity') {
+      const nextValue = Number(value);
+      return onChange('stockQuantity', Number.isFinite(nextValue) ? Math.max(0, Math.floor(nextValue)) : 0);
+    }
     onChange(name as keyof AdminProductDraft, value as never);
   };
 
+  const handleCategoryToggle = (categoryId: string) => {
+    if (flowersCategoryId && categoryId === flowersCategoryId && selectedCategoryIds.includes(categoryId)) {
+      return;
+    }
+
+    const currentIds = selectedCategoryIds;
+    const newIds = currentIds.includes(categoryId)
+      ? currentIds.filter(id => id !== categoryId)
+      : [...currentIds, categoryId];
+
+    onChange('categoryIds', newIds);
+    if (!newIds.includes(draft.categoryId)) {
+      const nextPrimary = newIds.find((id) => id !== flowersCategoryId) || newIds[0] || '';
+      onChange('categoryId', nextPrimary);
+    }
+
+    // Если убрали категорию, в которой был закреплен товар, сбрасываем закрепление
+    if (draft.pinnedInCategory && !newIds.includes(draft.pinnedInCategory)) {
+      onChange('pinnedInCategory', '');
+    }
+  };
+
   return (
-    <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 bg-white p-6 rounded-lg shadow-md">
-      <input name="name" value={draft.name} onChange={handleChange} placeholder="Название товара" className="w-full p-2 border rounded" required />
-      <textarea name="description" value={draft.description} onChange={handleChange} placeholder="Описание" className="w-full p-2 border rounded" />
-      <input
-        type="text"
-        inputMode="decimal"
-        name="price"
-        value={priceInput}
-        onChange={handleChange}
-        onBlur={handlePriceBlur}
-        placeholder="Цена"
-        className="w-full p-2 border rounded"
-        required
-      />
-      <select name="categoryId" value={draft.categoryId} onChange={handleChange} className="w-full p-2 border rounded" required>
-        <option value="">Выберите категорию</option>
-        {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
-      </select>
-      <select name="subcategoryId" value={draft.subcategoryId} onChange={handleChange} className="w-full p-2 border rounded">
-        <option value="">Выберите подкатегорию (необязательно)</option>
-        {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
-      </select>
-      <ImageUpload value={draft.image || ''} onChange={(url: string) => onChange('image', url)} />
-      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
-        <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} />
-        В наличии
-      </label>
-      <div className="flex gap-2">
-        <button type="submit" disabled={saving} className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:opacity-50">{saving ? 'Сохранение...' : 'Сохранить'}</button>
-        <button type="button" onClick={onCancel} className="bg-gray-300 p-2 rounded">Отмена</button>
+    <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="space-y-4 rounded-xl border border-gray-100 bg-gray-50 p-4 sm:p-6">
+      <h3 className="text-lg font-semibold text-gray-800">{draft._id ? 'Редактирование товара' : 'Новый товар'}</h3>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <input name="name" value={draft.name} onChange={handleChange} placeholder="Название товара" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" required />
+        <input
+          type="text"
+          inputMode="decimal"
+          name="price"
+          value={priceInput}
+          onChange={handleChange}
+          onBlur={handlePriceBlur}
+          placeholder="Цена"
+          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          required
+        />
+      </div>
+
+      <textarea name="description" value={draft.description} onChange={handleChange} placeholder="Описание" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" rows={3} />
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-gray-700">Категории (можно выбрать несколько)</label>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {categories.map((category) => {
+            const categoryKey = getCategoryKey(category);
+            const isFlowers = flowersCategoryId === categoryKey;
+            return (
+            <label
+              key={categoryKey}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                selectedCategoryIds.includes(categoryKey)
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selectedCategoryIds.includes(categoryKey)}
+                onChange={() => handleCategoryToggle(categoryKey)}
+                disabled={isFlowers}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+              />
+              <span className="truncate">{category.name}{isFlowers ? ' (авто)' : ''}</span>
+            </label>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {selectedCategoryIds.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Главная категория</label>
+            <select
+              name="categoryId"
+              value={draft.categoryId || ''}
+              onChange={handleChange}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              {categories
+                .filter((cat) => selectedCategoryIds.includes(getCategoryKey(cat)))
+                .map((category) => (
+                  <option key={getCategoryKey(category)} value={getCategoryKey(category)}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
+        <select name="subcategoryId" value={draft.subcategoryId} onChange={handleChange} className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+          <option value="">Подкатегория (необязательно)</option>
+          {subcategories.map((subcategory) => <option key={subcategory._id} value={subcategory._id}>{subcategory.name}</option>)}
+        </select>
+
+        {selectedCategoryIds.length > 0 && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Закрепить в категории</label>
+            <select
+              value={draft.pinnedInCategory || ''}
+              onChange={(e) => onChange('pinnedInCategory', e.target.value)}
+              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <option value="">Не закреплять</option>
+              {categories
+                .filter(cat => selectedCategoryIds.includes(getCategoryKey(cat)))
+                .map((category) => (
+                  <option key={getCategoryKey(category)} value={getCategoryKey(category)}>
+                    {category.name}
+                  </option>
+                ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">Закрепленный товар будет показываться первым в выбранной категории</p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray-700">Фото товара (до 3)</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[0, 1, 2].map((slot) => (
+            <div key={`image-slot-${slot}`} className="rounded-lg border border-gray-200 bg-white p-3">
+              <p className="mb-2 text-xs font-medium text-gray-600">Фото {slot + 1}{slot === 0 ? ' (главное)' : ''}</p>
+              <ImageUpload value={draft.images?.[slot] || ''} onChange={(url: string) => updateImageAt(slot, url)} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" name="inStock" checked={draft.inStock} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200" />
+          В наличии
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" name="preorderOnly" checked={draft.preorderOnly} onChange={handleChange} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200" />
+          Только под заказ
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <input name="assemblyTime" value={draft.assemblyTime} onChange={handleChange} placeholder="Время сборки" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        <input type="number" min={0} step={1} name="stockQuantity" value={draft.stockQuantity} onChange={handleChange} placeholder="Остаток" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+        <input name="stockUnit" value={draft.stockUnit} onChange={handleChange} placeholder="Ед. измерения" className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200" />
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="submit" disabled={saving} className="w-full rounded-lg bg-blue-500 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">{saving ? 'Сохранение...' : 'Сохранить'}</button>
+        <button type="button" onClick={onCancel} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 font-medium text-gray-700 transition-colors hover:bg-gray-50 sm:w-auto">Отмена</button>
       </div>
     </form>
   );
 };
 
 export default function ProductsPage() {
-  const { products, categories, currentSubcategories, loading, saving, error, toasts, isFormVisible, draft, openCreateForm, openEditForm, closeForm, updateDraft, saveDraft, removeProduct } = useAdminProductsViewModel();
+  const {
+    products,
+    categories,
+    currentSubcategories,
+    loading,
+    saving,
+    error,
+    toasts,
+    isFormVisible,
+    draft,
+    openCreateForm,
+    openEditForm,
+    closeForm,
+    updateDraft,
+    saveDraft,
+    removeProduct,
+  } = useAdminProductsViewModel();
 
-  if (loading) return <div>Загрузка...</div>;
+  const [tab, setTab] = useState<'list' | 'form'>('list');
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (isFormVisible) setTab('form');
+  }, [isFormVisible]);
+
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter((product) => product.name.toLowerCase().includes(q) || String(product.price).includes(q));
+  }, [products, search]);
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredProducts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredProducts.map(p => p._id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+
+    const confirmed = window.confirm(`Вы уверены, что хотите удалить ${selectedIds.size} товаров? Это действие нельзя отменить.`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      for (const id of selectedIds) {
+        const product = products.find(p => p._id === id);
+        if (product) {
+          await removeProduct(product);
+        }
+      }
+      setSelectedIds(new Set());
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  if (loading) return <div className="flex min-h-0 w-full max-w-full flex-1 flex-col bg-gray-100 px-1 py-2 sm:px-3 sm:py-4"><div className="w-full max-w-none rounded-2xl border border-gray-100 bg-white p-3 shadow-xl sm:p-5 lg:p-6"><div className="text-center text-gray-500">Загрузка...</div></div></div>;
 
   return (
-    <div className="p-8 bg-gray-50 min-h-screen">
-      <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="flex min-h-0 w-full max-w-full flex-1 flex-col bg-gray-100 px-1 py-2 sm:px-3 sm:py-4">
+      <div className="w-full max-w-none rounded-2xl border border-gray-100 bg-white p-3 shadow-xl sm:p-5 lg:p-6">
+      <div className="fixed right-3 top-16 z-50 space-y-2 sm:right-4 sm:top-20">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`px-4 py-3 rounded-lg shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+          <div key={toast.id} className={`rounded-lg px-4 py-3 shadow-lg ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
             <span className="font-medium">{toast.message}</span>
           </div>
         ))}
       </div>
-      <h1 className="text-3xl font-bold mb-8">Управление товарами</h1>
+
+      <h1 className="mb-4 sm:mb-8 text-xl sm:text-3xl font-extrabold tracking-tight text-gray-800">Управление товарами</h1>
       {error && <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-red-600">{error}</div>}
-      {!isFormVisible ? (
-        <button onClick={openCreateForm} className="bg-green-500 text-white p-3 rounded-lg mb-8 shadow-md hover:bg-green-600">+ Добавить новый товар</button>
-      ) : (
-        <div className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">{draft._id ? 'Редактировать товар' : 'Новый товар'}</h2>
+
+      <div className="mb-4 shrink-0 sm:mb-6">
+        <div className="overflow-x-auto border-b border-gray-200">
+          <nav className="-mb-px flex space-x-2 sm:space-x-8 min-w-max" aria-label="Tabs">
+            <button
+              type="button"
+              onClick={() => setTab('list')}
+              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${tab === 'list' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+            >
+              Список товаров
+            </button>
+            <button
+              type="button"
+              onClick={() => { setTab('form'); if (!isFormVisible) openCreateForm(); }}
+              className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${tab === 'form' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'}`}
+            >
+              {draft._id ? 'Редактирование' : 'Добавить товар'}
+            </button>
+          </nav>
+        </div>
+      </div>
+
+      {tab === 'form' && isFormVisible && (
+        <div className="mb-6">
           <ProductForm draft={draft} categories={categories} subcategories={currentSubcategories} saving={saving} onChange={updateDraft} onSubmit={saveDraft} onCancel={closeForm} />
         </div>
       )}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-2xl font-semibold mb-4">Список товаров</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {products.map((product: IProduct) => (
-            <div key={product._id} className="border rounded-lg p-4 shadow-sm">
-              <Image src={product.image || '/placeholder.jpg'} alt={product.name} width={300} height={192} className="w-full h-48 object-cover rounded-md mb-4" />
-              <h3 className="font-bold text-lg">{product.name}</h3>
-              <p className="text-gray-600">{product.price} руб.</p>
-              <div className="mt-4 flex gap-2">
-                <button onClick={() => openEditForm(product)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">Редактировать</button>
-                <button onClick={() => removeProduct(product)} className="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">Удалить</button>
-              </div>
+
+      {tab === 'list' && (
+        <div>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-semibold text-gray-700">Все товары</h2>
+              {selectedIds.size > 0 && (
+                <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+                  Выбрано: {selectedIds.size}
+                </span>
+              )}
             </div>
-          ))}
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Поиск по названию или цене" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 sm:w-72" />
+          </div>
+
+          {filteredProducts.length > 0 && (
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size === filteredProducts.length && filteredProducts.length > 0}
+                  onChange={toggleSelectAll}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                />
+                Выбрать все
+              </label>
+
+              {selectedIds.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeleting ? 'Удаление...' : `Удалить выбранные (${selectedIds.size})`}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredProducts.map((product: IProduct) => (
+              <div key={product._id} className={`rounded-lg border bg-white p-2.5 shadow-sm transition-all hover:shadow-md sm:p-4 ${selectedIds.has(product._id) ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'}`}>
+                <div className="mb-2 flex items-start justify-between">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(product._id)}
+                    onChange={() => toggleSelect(product._id)}
+                    className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  {product.pinnedInCategory && (
+                    <span className="rounded bg-yellow-100 px-2 py-0.5 text-[10px] font-semibold text-yellow-800">
+                      Закреплен
+                    </span>
+                  )}
+                </div>
+                <Image src={product.image || 'https://placehold.co/600x600/f3f4f6/6b7280?text=Нет+фото'} alt={product.name} width={300} height={192} className="mb-2 h-28 w-full rounded-md object-cover sm:mb-4 sm:h-48" />
+                <h3 className="truncate text-sm font-bold text-gray-900 sm:text-lg">{product.name}</h3>
+                <p className="text-xs font-semibold text-gray-900 sm:text-base">{product.price} ₽</p>
+                {product.preorderOnly && <p className="text-xs font-semibold text-amber-700">Только под заказ</p>}
+                {product.assemblyTime && <p className="text-xs text-gray-600">Сборка: {product.assemblyTime}</p>}
+                <p className="text-xs text-gray-700">В наличии: {Math.max(0, Math.floor(product.stockQuantity ?? 0))} {product.stockUnit || 'шт.'}</p>
+                <div className="mt-2 flex flex-col gap-1.5 sm:mt-4 sm:gap-2">
+                  <button onClick={() => { openEditForm(product); setTab('form'); }} className="rounded bg-blue-500 px-2 py-1.5 text-xs text-white transition-colors hover:bg-blue-600 sm:px-3 sm:py-2 sm:text-sm">Редактировать</button>
+                  <button onClick={() => removeProduct(product)} className="rounded bg-red-500 px-2 py-1.5 text-xs text-white transition-colors hover:bg-red-600 sm:px-3 sm:py-2 sm:text-sm">Удалить</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+    </div>
     </div>
   );
 }

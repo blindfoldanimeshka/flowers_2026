@@ -4,8 +4,13 @@ export const dynamic = 'force-dynamic';
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import PaymentSettings, { IPaymentSettings } from '@/models/PaymentSettings';
+import { productionLogger } from '@/lib/productionLogger';
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Type guard для безопасной обработки ошибок
 function isError(error: unknown): error is Error {
@@ -20,19 +25,16 @@ interface PaymentSettingsUpdate {
   stripe: {
     enabled: boolean;
     publishableKey: string;
-    // Секретные ключи загружаются из переменных окружения
   };
   
   yookassa: {
     enabled: boolean;
     shopId: string;
-    // Секретные ключи загружаются из переменных окружения
   };
   
   sberbank: {
     enabled: boolean;
     merchantId: string;
-    // Секретные ключи загружаются из переменных окружения
   };
   
   cashOnDelivery: {
@@ -55,9 +57,27 @@ interface PaymentSettingsUpdate {
 // Получение настроек платежей
 export async function getPaymentSettings() {
   try {
-    await dbConnect();
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('collection', 8)
+      .single();
     
-    const settings = await PaymentSettings.getSettings();
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return {
+          success: true,
+          settings: null
+        };
+      }
+      productionLogger.error('Ошибка при получении настроек платежей (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка при получении настроек платежей'
+      };
+    }
+    
+    const settings = data ? { id: data.id, ...JSON.parse(data.doc) } : null;
     
     return {
       success: true,
@@ -66,7 +86,7 @@ export async function getPaymentSettings() {
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при получении настроек платежей:', errorMessage);
+    productionLogger.error('Ошибка при получении настроек платежей:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении настроек платежей'
@@ -77,11 +97,22 @@ export async function getPaymentSettings() {
 // Обновление настроек платежей
 export async function updatePaymentSettings(formData: FormData) {
   try {
-    await dbConnect();
+    const { data: existing, error: existingError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('collection', 8)
+      .single();
     
-    const settings = await PaymentSettings.getSettings();
+    if (existingError && existingError.code !== 'PGRST116') {
+      productionLogger.error('Ошибка поиска настроек платежей (Supabase):', existingError);
+      return {
+        success: false,
+        error: 'Ошибка получения настроек'
+      };
+    }
     
-    // Получаем данные из формы (БЕЗ секретных ключей)
+    const currentSettings = existing ? JSON.parse(existing.doc) : {};
+    
     const updateData: PaymentSettingsUpdate = {
       isEnabled: formData.get('isEnabled') === 'true',
       currency: formData.get('currency') as string,
@@ -89,19 +120,16 @@ export async function updatePaymentSettings(formData: FormData) {
       stripe: {
         enabled: formData.get('stripeEnabled') === 'true',
         publishableKey: formData.get('stripePublishableKey') as string
-        // secretKey и webhookSecret загружаются из переменных окружения
       },
       
       yookassa: {
         enabled: formData.get('yookassaEnabled') === 'true',
         shopId: formData.get('yookassaShopId') as string
-        // secretKey загружается из переменных окружения
       },
       
       sberbank: {
         enabled: formData.get('sberbankEnabled') === 'true',
         merchantId: formData.get('sberbankMerchantId') as string
-        // apiKey загружается из переменных окружения
       },
       
       cashOnDelivery: {
@@ -121,7 +149,7 @@ export async function updatePaymentSettings(formData: FormData) {
       freeDeliveryThreshold: parseFloat(formData.get('freeDeliveryThreshold') as string) || 3000
     };
     
-    // Валидируем обязательные переменные окружения для включенных платежных систем
+    // Валидируем обязательные переменные окружения
     if (updateData.stripe.enabled && !process.env.STRIPE_SECRET_KEY) {
       return {
         success: false,
@@ -147,8 +175,8 @@ export async function updatePaymentSettings(formData: FormData) {
       };
     }
 
-    // Загружаем секретные ключи из переменных окружения только для включенных провайдеров
-    const secureUpdateData = {
+    // Загружаем секретные ключи из переменных окружения
+    const secureUpdateDoc = {
       ...updateData,
       stripe: {
         ...updateData.stripe,
@@ -171,23 +199,53 @@ export async function updatePaymentSettings(formData: FormData) {
       }
     };
     
-    // Обновляем настройки
-    const updatedSettings = await PaymentSettings.findByIdAndUpdate(
-      settings._id,
-      secureUpdateData,
-      { new: true, runValidators: true }
-    );
+    let updatedData;
+    if (existing) {
+      // Обновляем существующий документ
+      const { data, error } = await supabase
+        .from('documents')
+        .update({ doc: JSON.stringify(secureUpdateDoc) })
+        .eq('id', existing.id)
+        .eq('collection', 8)
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка обновления настроек платежей (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка обновления настроек платежей'
+        };
+      }
+      updatedData = data;
+    } else {
+      // Создаем новый документ
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({ collection: 8, doc: JSON.stringify(secureUpdateDoc) })
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка создания настроек платежей (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка создания настроек платежей'
+        };
+      }
+      updatedData = data;
+    }
     
     revalidatePath('/admin/settings');
     
     return {
       success: true,
-      settings: updatedSettings
+      settings: { id: updatedData.id, ...JSON.parse(updatedData.doc) }
     };
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при обновлении настроек платежей:', errorMessage);
+    productionLogger.error('Ошибка при обновлении настроек платежей:', errorMessage);
     
     if (isError(error) && error.name === 'ValidationError') {
       const validationErrors = Object.values((error as any).errors).map(
@@ -209,9 +267,21 @@ export async function updatePaymentSettings(formData: FormData) {
 // Получение доступных способов оплаты
 export async function getAvailablePaymentMethods(orderAmount: number) {
   try {
-    await dbConnect();
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('collection', 8)
+      .single();
     
-    const settings = await PaymentSettings.getSettings();
+    if (error || !data) {
+      productionLogger.error('Ошибка получения настроек платежей (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка получения настроек платежей'
+      };
+    }
+    
+    const settings = JSON.parse(data.doc);
     
     if (!settings.isEnabled) {
       return {
@@ -288,7 +358,7 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
     
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при получении способов оплаты:', errorMessage);
+    productionLogger.error('Ошибка при получении способов оплаты:', errorMessage);
     return {
       success: false,
       error: 'Ошибка при получении способов оплаты'
@@ -299,11 +369,10 @@ export async function getAvailablePaymentMethods(orderAmount: number) {
 // Обработка платежа
 export async function processPayment(orderId: string, paymentMethod: string, paymentData?: any) {
   try {
-    // Создаем AbortController для timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 8000); // 8 секунд timeout
+    }, 8000);
     
     const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/payments/process`, {
       method: 'POST',
@@ -318,7 +387,6 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
       signal: controller.signal
     });
     
-    // Очищаем timeout после завершения запроса
     clearTimeout(timeoutId);
 
     if (!response.ok) {
@@ -340,9 +408,8 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
 
   } catch (error: unknown) {
     const errorMessage = isError(error) ? error.message : String(error);
-    console.error('Ошибка при обработке платежа:', errorMessage);
+    productionLogger.error('Ошибка при обработке платежа:', errorMessage);
     
-    // Проверяем, является ли ошибка timeout
     if (isError(error) && error.name === 'AbortError') {
       return {
         success: false,
@@ -355,4 +422,4 @@ export async function processPayment(orderId: string, paymentMethod: string, pay
       error: 'Ошибка при обработке платежа'
     };
   }
-} 
+}

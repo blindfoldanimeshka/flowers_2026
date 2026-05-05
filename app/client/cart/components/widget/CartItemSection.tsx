@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const CartItemSection = () => {
     const { cartItems, clearCart } = useCart();
-    console.log('CART ITEMS DEBUG:', cartItems);
     const [loading, setLoading] = useState(true);
     const [displayedItems, setDisplayedItems] = useState<typeof cartItems>([]);
     

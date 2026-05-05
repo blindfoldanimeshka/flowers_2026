@@ -1,4 +1,5 @@
 import { ICategory, ICategoryWithStats, ISubcategory } from '@/app/client/models/Category';
+import { withCsrfHeaders } from '@/lib/csrf-client';
 
 async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -44,7 +45,7 @@ export async function getCategoriesWithStats(): Promise<ICategoryWithStats[]> {
 export async function createCategory(name: string) {
   const response = await fetch('/api/categories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name }),
   });
   return parseJson(response);
@@ -53,17 +54,17 @@ export async function createCategory(name: string) {
 export async function createSubcategory(name: string, categoryId: string) {
   const response = await fetch('/api/subcategories', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name, categoryId }),
   });
   return parseJson(response);
 }
 
-export async function updateCategoryName(id: string, name: string) {
+export async function updateCategoryName(id: string, name: string, image?: string) {
   const response = await fetch(`/api/categories/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ name, image }),
   });
   return parseJson(response);
 }
@@ -71,17 +72,27 @@ export async function updateCategoryName(id: string, name: string) {
 export async function updateSubcategoryName(id: string, name: string) {
   const response = await fetch(`/api/subcategories/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name }),
   });
   return parseJson(response);
 }
 
-export async function deleteCategory(id: string, force = false) {
-  return parseJson(await fetch(`/api/categories/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }));
+export async function deleteCategory(id: string) {
+  return parseJson(
+    await fetch(`/api/categories/${id}`, {
+      method: 'DELETE',
+      headers: withCsrfHeaders(),
+    })
+  );
 }
 
-export async function deleteSubcategory(id: string, force = false) {
-  return parseJson(await fetch(`/api/subcategories/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }));
+export async function deleteSubcategory(id: string) {
+  return parseJson(
+    await fetch(`/api/subcategories/${id}`, {
+      method: 'DELETE',
+      headers: withCsrfHeaders(),
+    })
+  );
 }
 

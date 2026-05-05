@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(claude plugin *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'docs: add production refactoring design spec *)",
+      "Bash(git commit *)",
+      "mcp__plugin_context7-plugin_context7__resolve-library-id",
+      "mcp__plugin_context7-plugin_context7__query-docs",
+      "Bash(npm run *)",
+      "Bash(tail *)",
+      "Bash(git push *)",
+      "Bash(npx supabase *)",
+      "Bash(curl *)",
+      "Bash(mongosh *)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_click",
+      "Bash(taskkill //F //PID 3516)",
+      "Bash(iconv -f UTF-8 -t UTF-8)",
+      "Bash(python -c \"import sys, json; data = json.load\\(sys.stdin\\); print\\(data[0]['name']\\)\")",
+      "mcp__playwright__browser_evaluate",
+      "Bash(node *)",
+      "Bash(git diff *)",
+      "Bash(npx next *)",
+      "WebFetch(domain:floramix24.ru)",
+      "Bash(dir *)",
+      "Bash(claude mcp *)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
+}

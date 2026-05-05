@@ -3,9 +3,14 @@ export const dynamic = 'force-dynamic';
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import Settings from '@/models/Settings';
 import { getCachedSettings, invalidateSettingsCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 const SETTINGS_KEY = 'global-settings';
 
@@ -19,7 +24,7 @@ export async function getSettings() {
     };
 
   } catch (error: any) {
-    console.error('Ошибка при получении настроек:', error);
+    productionLogger.error('Ошибка при получении настроек:', error);
     return {
       success: false,
       error: 'Ошибка при получении настроек'
@@ -29,8 +34,6 @@ export async function getSettings() {
 
 export async function updateSettings(formData: FormData) {
   try {
-    await dbConnect();
-
     const siteName = formData.get('siteName') as string;
     const siteDescription = formData.get('siteDescription') as string;
     const contactEmail = formData.get('contactEmail') as string;
@@ -94,7 +97,7 @@ export async function updateSettings(formData: FormData) {
       };
     }
 
-    const updateData: any = {
+    const updateDoc = {
       settingKey: SETTINGS_KEY,
       siteName,
       siteDescription,
@@ -120,16 +123,66 @@ export async function updateSettings(formData: FormData) {
       }
     };
 
-    const updatedSettings = await Settings.findOneAndUpdate(
-      { settingKey: SETTINGS_KEY },
-      {
-        $set: updateData,
-        $setOnInsert: { settingKey: SETTINGS_KEY }
-      },
-      { upsert: true, new: true, runValidators: true }
-    );
+    // Ищем существующие настройки
+    const { data: existing, error: existingError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('collection', 7)
+      .filter('doc->>settingKey', 'eq', SETTINGS_KEY)
+      .single();
 
-    await Settings.deleteMany({ _id: { $ne: updatedSettings._id } });
+    if (existingError && existingError.code !== 'PGRST116') {
+      productionLogger.error('Ошибка поиска настроек (Supabase):', existingError);
+      return {
+        success: false,
+        error: 'Ошибка получения настроек'
+      };
+    }
+
+    let updatedData;
+    if (existing) {
+      // Обновляем существующий документ
+      const { data, error } = await supabase
+        .from('documents')
+        .update({ doc: JSON.stringify(updateDoc) })
+        .eq('id', existing.id)
+        .eq('collection', 7)
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка обновления настроек (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка обновления настроек'
+        };
+      }
+      updatedData = data;
+    } else {
+      // Создаем новый документ
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({ collection: 7, doc: JSON.stringify(updateDoc) })
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка создания настроек (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка создания настроек'
+        };
+      }
+      updatedData = data;
+    }
+
+    // Удаляем дубликаты
+    await supabase
+      .from('documents')
+      .delete()
+      .eq('collection', 7)
+      .filter('doc->>settingKey', 'eq', SETTINGS_KEY)
+      .neq('id', updatedData.id);
 
     invalidateSettingsCache();
     revalidatePath('/admin/settings');
@@ -137,11 +190,11 @@ export async function updateSettings(formData: FormData) {
 
     return {
       success: true,
-      settings: updatedSettings
+      settings: { id: updatedData.id, ...JSON.parse(updatedData.doc) }
     };
 
   } catch (error: any) {
-    console.error('Ошибка при обновлении настроек:', error);
+    productionLogger.error('Ошибка при обновлении настроек:', error);
 
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
@@ -162,22 +215,73 @@ export async function updateSettings(formData: FormData) {
 
 export async function toggleMaintenanceMode() {
   try {
-    await dbConnect();
+    // Получаем текущие настройки
+    const { data: existing, error: existingError } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('collection', 7)
+      .filter('doc->>settingKey', 'eq', SETTINGS_KEY)
+      .single();
 
-    const current = await Settings.findOne({ settingKey: SETTINGS_KEY });
-    const updatedSettings = await Settings.findOneAndUpdate(
-      { settingKey: SETTINGS_KEY },
-      {
-        $set: {
-          settingKey: SETTINGS_KEY,
-          maintenanceMode: !(current?.maintenanceMode ?? false),
-        },
-        $setOnInsert: { settingKey: SETTINGS_KEY },
-      },
-      { upsert: true, new: true }
-    );
+    if (existingError && existingError.code !== 'PGRST116') {
+      productionLogger.error('Ошибка поиска настроек (Supabase):', existingError);
+      return {
+        success: false,
+        error: 'Ошибка получения настроек'
+      };
+    }
 
-    await Settings.deleteMany({ _id: { $ne: updatedSettings._id } });
+    const currentDoc = existing ? JSON.parse(existing.doc) : {};
+    const newMaintenanceMode = !(currentDoc.maintenanceMode ?? false);
+
+    const updateDoc = {
+      ...currentDoc,
+      settingKey: SETTINGS_KEY,
+      maintenanceMode: newMaintenanceMode
+    };
+
+    let updatedData;
+    if (existing) {
+      const { data, error } = await supabase
+        .from('documents')
+        .update({ doc: JSON.stringify(updateDoc) })
+        .eq('id', existing.id)
+        .eq('collection', 7)
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка переключения режима (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка переключения режима обслуживания'
+        };
+      }
+      updatedData = data;
+    } else {
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({ collection: 7, doc: JSON.stringify(updateDoc) })
+        .select()
+        .single();
+      
+      if (error || !data) {
+        productionLogger.error('Ошибка создания настроек (Supabase):', error);
+        return {
+          success: false,
+          error: 'Ошибка создания настроек'
+        };
+      }
+      updatedData = data;
+    }
+
+    // Удаляем дубликаты
+    await supabase
+      .from('documents')
+      .delete()
+      .eq('collection', 7)
+      .filter('doc->>settingKey', 'eq', SETTINGS_KEY)
+      .neq('id', updatedData.id);
 
     invalidateSettingsCache();
     revalidatePath('/admin/settings');
@@ -185,11 +289,11 @@ export async function toggleMaintenanceMode() {
 
     return {
       success: true,
-      settings: updatedSettings
+      settings: { id: updatedData.id, ...JSON.parse(updatedData.doc) }
     };
 
   } catch (error: any) {
-    console.error('Ошибка при переключении режима обслуживания:', error);
+    productionLogger.error('Ошибка при переключении режима обслуживания:', error);
     return {
       success: false,
       error: 'Ошибка при переключении режима обслуживания'

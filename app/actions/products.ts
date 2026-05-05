@@ -4,15 +4,18 @@ export const dynamic = 'force-dynamic';
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import dbConnect from '@/lib/db';
-import Product from '@/models/Product';
 import { getCachedProducts, invalidateProductsCache } from '@/lib/cache';
+import { productionLogger } from '@/lib/productionLogger';
+
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 // Создание нового товара
 export async function createProduct(formData: FormData) {
   try {
-    await dbConnect();
-    
     const name = formData.get('name') as string;
     const price = parseFloat(formData.get('price') as string);
     const categoryId = formData.get('categoryId') as string;
@@ -21,7 +24,6 @@ export async function createProduct(formData: FormData) {
     const description = formData.get('description') as string;
     const inStock = formData.get('inStock') === 'true';
     
-    // Валидация
     if (!name || !price || !categoryId || !image) {
       return {
         success: false,
@@ -49,9 +51,22 @@ export async function createProduct(formData: FormData) {
       productData.subcategoryId = subcategoryId;
     }
     
-    const product = await Product.create(productData);
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({ collection: 4, doc: JSON.stringify(productData) })
+      .select()
+      .single();
     
-    // Инвалидируем кэш и обновляем страницы
+    if (error) {
+      productionLogger.error('Ошибка при создании товара (Supabase):', error);
+      return {
+        success: false,
+        error: 'Ошибка при создании товара'
+      };
+    }
+    
+    const product = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateProductsCache();
     revalidatePath('/admin/products');
     revalidatePath('/');
@@ -62,18 +77,7 @@ export async function createProduct(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при создании товара:', error);
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
+    productionLogger.error('Ошибка при создании товара:', error);
     return {
       success: false,
       error: 'Ошибка при создании товара'
@@ -84,8 +88,6 @@ export async function createProduct(formData: FormData) {
 // Обновление товара
 export async function updateProduct(formData: FormData) {
   try {
-    await dbConnect();
-    
     const id = formData.get('id') as string;
     const name = formData.get('name') as string;
     const price = parseFloat(formData.get('price') as string);
@@ -102,7 +104,6 @@ export async function updateProduct(formData: FormData) {
       };
     }
     
-    // Валидация обязательных полей (как в createProduct)
     if (!name || !name.trim()) {
       return {
         success: false,
@@ -144,20 +145,24 @@ export async function updateProduct(formData: FormData) {
       updateData.subcategoryId = subcategoryId;
     }
     
-    const product = await Product.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const { data, error } = await supabase
+      .from('documents')
+      .update({ doc: JSON.stringify(updateData) })
+      .eq('id', id)
+      .eq('collection', 4)
+      .select()
+      .single();
     
-    if (!product) {
+    if (error || !data) {
+      productionLogger.error('Ошибка при обновлении товара (Supabase):', error);
       return {
         success: false,
         error: 'Товар не найден'
       };
     }
     
-    // Инвалидируем кэш и обновляем страницы
+    const product = { id: data.id, ...JSON.parse(data.doc) };
+    
     invalidateProductsCache();
     revalidatePath('/admin/products');
     revalidatePath('/');
@@ -168,18 +173,7 @@ export async function updateProduct(formData: FormData) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при обновлении товара:', error);
-    
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(
-        (err: any) => err.message
-      );
-      return {
-        success: false,
-        error: `Ошибка валидации: ${validationErrors.join(', ')}`
-      };
-    }
-    
+    productionLogger.error('Ошибка при обновлении товара:', error);
     return {
       success: false,
       error: 'Ошибка при обновлении товара'
@@ -190,8 +184,6 @@ export async function updateProduct(formData: FormData) {
 // Удаление товара
 export async function deleteProduct(id: string) {
   try {
-    await dbConnect();
-    
     if (!id) {
       return {
         success: false,
@@ -199,16 +191,22 @@ export async function deleteProduct(id: string) {
       };
     }
     
-    const product = await Product.findByIdAndDelete(id);
+    const { data, error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id)
+      .eq('collection', 4)
+      .select()
+      .single();
     
-    if (!product) {
+    if (error || !data) {
+      productionLogger.error('Ошибка при удалении товара (Supabase):', error);
       return {
         success: false,
         error: 'Товар не найден'
       };
     }
     
-    // Инвалидируем кэш и обновляем страницы
     invalidateProductsCache();
     revalidatePath('/admin/products');
     revalidatePath('/');
@@ -219,7 +217,7 @@ export async function deleteProduct(id: string) {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при удалении товара:', error);
+    productionLogger.error('Ошибка при удалении товара:', error);
     return {
       success: false,
       error: 'Ошибка при удалении товара'
@@ -235,7 +233,6 @@ export async function getProducts(filters?: {
   inStock?: boolean;
 }) {
   try {
-    // Получаем товары из кэша
     const result = await getCachedProducts(filters);
     
     return {
@@ -244,10 +241,10 @@ export async function getProducts(filters?: {
     };
     
   } catch (error: any) {
-    console.error('Ошибка при получении товаров:', error);
+    productionLogger.error('Ошибка при получении товаров:', error);
     return {
       success: false,
       error: 'Ошибка при получении товаров'
     };
   }
-} 
+}

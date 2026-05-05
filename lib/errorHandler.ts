@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { productionLogger } from '@/lib/productionLogger';
 
-// Типы ошибок
 export enum ErrorType {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
@@ -16,17 +16,16 @@ export interface AppError {
   type: ErrorType;
   message: string;
   statusCode: number;
-  details?: any;
+  details?: unknown;
   timestamp: Date;
   path?: string;
   method?: string;
 }
 
-// Класс для создания ошибок
 export class AppErrorClass extends Error {
   public readonly type: ErrorType;
   public readonly statusCode: number;
-  public readonly details?: any;
+  public readonly details?: unknown;
   public readonly timestamp: Date;
   public readonly path?: string;
   public readonly method?: string;
@@ -35,7 +34,7 @@ export class AppErrorClass extends Error {
     type: ErrorType,
     message: string,
     statusCode: number,
-    details?: any,
+    details?: unknown,
     path?: string,
     method?: string
   ) {
@@ -62,104 +61,114 @@ export class AppErrorClass extends Error {
   }
 }
 
-// Фабрика ошибок
 export const createError = {
-  validation: (message: string, details?: any) =>
+  validation: (message: string, details?: unknown) =>
     new AppErrorClass(ErrorType.VALIDATION_ERROR, message, 400, details),
-  
-  authentication: (message: string = 'Требуется аутентификация') =>
+
+  authentication: (message = 'Authentication required') =>
     new AppErrorClass(ErrorType.AUTHENTICATION_ERROR, message, 401),
-  
-  authorization: (message: string = 'Недостаточно прав') =>
+
+  authorization: (message = 'Insufficient permissions') =>
     new AppErrorClass(ErrorType.AUTHORIZATION_ERROR, message, 403),
-  
-  notFound: (message: string = 'Ресурс не найден') =>
+
+  notFound: (message = 'Resource not found') =>
     new AppErrorClass(ErrorType.NOT_FOUND_ERROR, message, 404),
-  
-  conflict: (message: string, details?: any) =>
+
+  conflict: (message: string, details?: unknown) =>
     new AppErrorClass(ErrorType.CONFLICT_ERROR, message, 409, details),
-  
-  internal: (message: string = 'Внутренняя ошибка сервера', details?: any) =>
+
+  internal: (message = 'Internal server error', details?: unknown) =>
     new AppErrorClass(ErrorType.INTERNAL_ERROR, message, 500, details),
-  
-  network: (message: string = 'Ошибка сети') =>
-    new AppErrorClass(ErrorType.NETWORK_ERROR, message, 503),
-  
-  database: (message: string = 'Ошибка базы данных', details?: any) =>
+
+  network: (message = 'Network error') => new AppErrorClass(ErrorType.NETWORK_ERROR, message, 503),
+
+  database: (message = 'Database error', details?: unknown) =>
     new AppErrorClass(ErrorType.DATABASE_ERROR, message, 500, details),
 };
 
-// Обработчик ошибок для API routes
-export function handleApiError(
-  error: unknown,
-  request?: NextRequest
-): NextResponse {
-  console.error('API Error:', error);
+function normalizeUnknownError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
 
-  // Если это наша кастомная ошибка
+  return new Error(typeof error === 'string' ? error : JSON.stringify(error));
+}
+
+export function handleApiError(error: unknown, request?: NextRequest): NextResponse {
+  const isDev = process.env.NODE_ENV === 'development';
+
   if (error instanceof AppErrorClass) {
     return NextResponse.json(
       {
         success: false,
         error: error.message,
         type: error.type,
-        details: error.details,
+        details: isDev ? error.details : undefined,
         timestamp: error.timestamp,
       },
       { status: error.statusCode }
     );
   }
 
-  // Если это ошибка валидации Zod
   if (error && typeof error === 'object' && 'issues' in error) {
-    const zodError = error as any;
+    const zodError = error as { issues: unknown };
     return NextResponse.json(
       {
         success: false,
-        error: 'Ошибка валидации данных',
+        error: 'Validation error',
         type: ErrorType.VALIDATION_ERROR,
-        details: zodError.issues,
+        details: isDev ? zodError.issues : undefined,
         timestamp: new Date(),
       },
       { status: 400 }
     );
   }
 
-  // Если это ошибка MongoDB
   if (error && typeof error === 'object' && 'code' in error) {
-    const mongoError = error as any;
-    let message = 'Ошибка базы данных';
-    let statusCode = 500;
+    const dbError = error as { code?: number | string };
 
-    switch (mongoError.code) {
-      case 11000:
-        message = 'Дублирование данных';
-        statusCode = 409;
-        break;
-      case 11001:
-        message = 'Дублирование уникального ключа';
-        statusCode = 409;
-        break;
+    if (dbError.code === 'PGRST116') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Resource not found',
+          type: ErrorType.NOT_FOUND_ERROR,
+          timestamp: new Date(),
+        },
+        { status: 404 }
+      );
+    }
+
+    if (dbError.code === '23505' || dbError.code === 11000 || dbError.code === 11001) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Duplicate entry',
+          type: ErrorType.CONFLICT_ERROR,
+          details: isDev ? error : undefined,
+          timestamp: new Date(),
+        },
+        { status: 409 }
+      );
     }
 
     return NextResponse.json(
       {
         success: false,
-        error: message,
+        error: 'Database error',
         type: ErrorType.DATABASE_ERROR,
-        details: process.env.NODE_ENV === 'development' ? mongoError : undefined,
+        details: isDev ? error : undefined,
         timestamp: new Date(),
       },
-      { status: statusCode }
+      { status: 500 }
     );
   }
 
-  // Общая ошибка
-  const message = error instanceof Error ? error.message : 'Неизвестная ошибка';
+  const normalizedError = normalizeUnknownError(error);
   return NextResponse.json(
     {
       success: false,
-      error: message,
+      error: isDev ? normalizedError.message : 'Internal server error',
       type: ErrorType.INTERNAL_ERROR,
       timestamp: new Date(),
     },
@@ -167,93 +176,96 @@ export function handleApiError(
   );
 }
 
-// Декоратор для обработки ошибок в API routes
-export function withErrorHandler(
-  handler: (request: NextRequest, context?: any) => Promise<NextResponse>
-) {
-  return async (request: NextRequest, context?: any): Promise<NextResponse> => {
+export function withErrorHandler<T extends (...args: any[]) => Promise<NextResponse>>(handler: T): T {
+  const wrapped = async (...args: Parameters<T>): Promise<NextResponse> => {
     try {
-      return await handler(request, context);
+      return await handler(...args);
     } catch (error) {
-      return handleApiError(error, request);
+      const firstArg = args[0];
+
+      if (firstArg instanceof NextRequest) {
+        productionLogger.error(
+          `API Error: ${firstArg.method} ${firstArg.nextUrl.pathname}`,
+          error,
+          {
+            path: firstArg.nextUrl.pathname,
+            method: firstArg.method,
+            query: firstArg.nextUrl.search,
+          },
+          firstArg
+        );
+        return handleApiError(error, firstArg);
+      }
+
+      productionLogger.error('API Error', error);
+      return handleApiError(error);
     }
   };
+
+  return wrapped as T;
 }
 
-// Утилиты для работы с ошибками
 export const ErrorUtils = {
-  // Проверка типа ошибки
   isErrorType: (error: unknown, type: ErrorType): boolean => {
     return error instanceof AppErrorClass && error.type === type;
   },
 
-  // Получение сообщения об ошибке
   getErrorMessage: (error: unknown): string => {
-    if (error instanceof AppErrorClass) {
+    if (error instanceof AppErrorClass || error instanceof Error) {
       return error.message;
     }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    return 'Неизвестная ошибка';
+    return 'Unknown error';
   },
 
-  // Логирование ошибки
-  logError: (error: unknown, context?: string) => {
+  logError: (error: unknown, context?: string): void => {
     const timestamp = new Date().toISOString();
-    const contextStr = context ? ` [${context}]` : '';
-    
+    const contextLabel = context ? ` [${context}]` : '';
+
     if (error instanceof AppErrorClass) {
-      console.error(`${timestamp}${contextStr} AppError:`, {
+      productionLogger.error(`${timestamp}${contextLabel} AppError`, error, {
         type: error.type,
-        message: error.message,
         statusCode: error.statusCode,
         path: error.path,
         method: error.method,
         details: error.details,
       });
-    } else {
-      console.error(`${timestamp}${contextStr} Error:`, error);
+      return;
     }
+
+    productionLogger.error(`${timestamp}${contextLabel} Error`, error);
   },
 
-  // Создание пользовательского сообщения об ошибке
   getUserMessage: (error: unknown): string => {
     if (error instanceof AppErrorClass) {
       switch (error.type) {
         case ErrorType.VALIDATION_ERROR:
-          return 'Проверьте правильность введенных данных';
+          return 'Please check your input data';
         case ErrorType.AUTHENTICATION_ERROR:
-          return 'Необходимо войти в систему';
+          return 'Authentication is required';
         case ErrorType.AUTHORIZATION_ERROR:
-          return 'У вас нет прав для выполнения этого действия';
+          return 'Insufficient permissions';
         case ErrorType.NOT_FOUND_ERROR:
-          return 'Запрашиваемый ресурс не найден';
+          return 'Resource not found';
         case ErrorType.CONFLICT_ERROR:
-          return 'Конфликт данных';
+          return 'Data conflict detected';
         case ErrorType.NETWORK_ERROR:
-          return 'Ошибка сети. Попробуйте позже';
+          return 'Network error, please try again later';
         case ErrorType.DATABASE_ERROR:
-          return 'Ошибка базы данных. Попробуйте позже';
+          return 'Database is temporarily unavailable';
         default:
           return error.message;
       }
     }
-    
+
     if (error instanceof Error) {
       return error.message;
     }
-    
-    return 'Произошла неизвестная ошибка';
+
+    return 'An unknown error occurred';
   },
 };
 
-// Middleware для обработки ошибок
-export function errorMiddleware(
-  error: unknown,
-  request: NextRequest
-): NextResponse {
+export function errorMiddleware(error: unknown, request: NextRequest): NextResponse {
   ErrorUtils.logError(error, `API ${request.method} ${request.url}`);
   return handleApiError(error, request);
 }
-

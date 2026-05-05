@@ -1,19 +1,22 @@
 'use client'
 
-import { motion } from "framer-motion";
 import CategoryGrid from "@/app/client/components/catalog/CategoryGrid";
+import HomeBanner from "@/app/client/components/catalog/HomeBanner";
 import { HomeCatalogSection } from '@/features/app/catalog';
 
 export default function HomePage() {
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35 }}>
-      <motion.div className="mt-40" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.35, delay: 0.05 }}>
+    <div className="pt-[calc(var(--mobile-top-offset)+32px)] md:pt-[var(--tablet-top-offset)] lg:pt-[var(--desktop-top-offset)]">
+      <div>
+        <HomeBanner />
+      </div>
+      <div className="mt-10">
         <CategoryGrid />
-      </motion.div>
-      <motion.div className="mt-16" initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.35, delay: 0.08 }}>
+      </div>
+      <div className="mt-16" id="catalog-section">
         <HomeCatalogSection />
-      </motion.div>
-    </motion.div>
+      </div>
+    </div>
   );
 }
 

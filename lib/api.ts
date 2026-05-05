@@ -1,5 +1,7 @@
 
 // Типы для API ответов
+import { withCsrfHeaders } from '@/lib/csrf-client';
+
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
@@ -89,6 +91,7 @@ export class ApiClient {
   async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -97,6 +100,7 @@ export class ApiClient {
   async put<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PUT',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -105,6 +109,7 @@ export class ApiClient {
   async patch<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'PATCH',
+      headers: withCsrfHeaders(),
       body: data ? JSON.stringify(data) : undefined,
     });
   }
@@ -113,6 +118,7 @@ export class ApiClient {
   async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'DELETE',
+      headers: withCsrfHeaders(),
     });
   }
 
@@ -166,6 +172,17 @@ export class ApiClient {
         xhr.setRequestHeader(key, value);
       });
 
+      const csrfHeaders = withCsrfHeaders();
+      if (csrfHeaders instanceof Headers) {
+        csrfHeaders.forEach((value, key) => xhr.setRequestHeader(key, value));
+      } else if (Array.isArray(csrfHeaders)) {
+        csrfHeaders.forEach(([key, value]) => xhr.setRequestHeader(key, value));
+      } else {
+        Object.entries(csrfHeaders).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+      }
+
       xhr.send(formData);
     });
   }
@@ -178,12 +195,12 @@ export const apiClient = new ApiClient();
 export class DataUtils {
   // Форматирование цены
   static formatPrice(price: number, currency: string = '₽'): string {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
+    const formatted = new Intl.NumberFormat('ru-RU', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(price).replace('RUB', currency);
+    }).format(price).replace(/\u00A0/g, ' ');
+
+    return `${formatted} ${currency}`;
   }
 
   // Форматирование даты
@@ -200,8 +217,13 @@ export class DataUtils {
   // Форматирование телефона
   static formatPhone(phone: string): string {
     const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 11 && cleaned.startsWith('7')) {
-      return `+7 (${cleaned.slice(1, 4)}) ${cleaned.slice(4, 7)}-${cleaned.slice(7, 9)}-${cleaned.slice(9)}`;
+    if (cleaned.startsWith('7') && cleaned.length >= 10) {
+      const body = cleaned.slice(1);
+      const p1 = body.slice(0, 3);
+      const p2 = body.slice(3, 6);
+      const p3 = body.slice(6, 8);
+      const p4 = body.slice(8);
+      return `+7 (${p1}) ${p2}-${p3}-${p4}`;
     }
     return phone;
   }
@@ -223,7 +245,8 @@ export class DataUtils {
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-')
-      .trim();
+      .trim()
+      .replace(/^-+|-+$/g, '');
   }
 
   // Валидация email

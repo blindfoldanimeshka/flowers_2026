@@ -1,6 +1,6 @@
-import Subcategory, { ISubcategory } from '@/models/Subcategory';
-import Category from '@/models/Category';
-import { Logger } from '@/lib/logger';
+import { supabase } from '@/lib/supabase';
+import { escapeRegExp } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
 
 export interface CreateSubcategoryParams {
   name: string;
@@ -8,11 +8,40 @@ export interface CreateSubcategoryParams {
   description?: string;
   image?: string;
   isActive?: boolean;
-  session?: any;
 }
 
-export interface UpdateSubcategoryParams extends Partial<CreateSubcategoryParams> {
+export interface UpdateSubcategoryParams {
   subcategoryId: string;
+  name?: string;
+  description?: string;
+  image?: string;
+  isActive?: boolean;
+  categoryId?: string;
+}
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\\s+/g, '-')
+    .replace(/[^\\w\\-]+/g, '')
+    .replace(/\\-\\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '');
+}
+
+function mapSupabaseSubcategory(sub: any) {
+  return {
+    _id: sub.id,
+    id: sub.id,
+    name: sub.name,
+    slug: sub.slug,
+    categoryId: sub.category_id,
+    description: sub.description,
+    image: sub.image,
+    isActive: sub.is_active ?? true,
+    createdAt: sub.created_at,
+    updatedAt: sub.updated_at,
+  };
 }
 
 export const SubcategoryService = {
@@ -22,73 +51,94 @@ export const SubcategoryService = {
     description,
     image,
     isActive = true,
-    session
   }: CreateSubcategoryParams) {
     try {
       // Check if category exists
-      const category = await Category.findById(categoryId).session(session || null);
-      if (!category) {
+      const { data: category, error: categoryError } = await supabase
+        .from('categories')
+        .select('id')
+        .eq('id', categoryId)
+        .single();
+
+      if (categoryError || !category) {
         throw new Error('Category not found');
       }
 
       // Check for existing subcategory with same name in this category
-      const existingSubcategory = await Subcategory.findOne({
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
-        categoryId
-      }).session(session || null);
+      const { data: existingSubcategory } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('category_id', categoryId)
+        .ilike('name', name)
+        .maybeSingle();
 
       if (existingSubcategory) {
         throw new Error('Subcategory with this name already exists in the category');
       }
 
       // Generate slug
-      const slug = name.toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^\w\-]+/g, '')
-        .replace(/\-\-+/g, '-')
-        .replace(/^-+/, '')
-        .replace(/-+$/, '');
+      const slug = generateSlug(name);
 
       // Create new subcategory
-      const newSubcategory = new Subcategory({
-        name,
-        slug,
-        categoryId,
-        description,
-        image,
-        isActive
-      });
+      const { data: savedSubcategory, error: createError } = await supabase
+        .from('subcategories')
+        .insert({
+          name,
+          slug,
+          category_id: categoryId,
+          description,
+          image,
+          is_active: isActive,
+        })
+        .select('*')
+        .single();
 
-      // Save subcategory
-      const savedSubcategory = await newSubcategory.save({ session });
+      if (createError || !savedSubcategory) {
+        throw new Error(`Failed to create subcategory: ${createError?.message}`);
+      }
 
-      // Add subcategory to category's subcategories array
-      await Category.findByIdAndUpdate(
-        categoryId,
-        { $addToSet: { subcategories: savedSubcategory._id } },
-        { session, new: true }
-      );
-
-      return savedSubcategory;
+      return mapSupabaseSubcategory(savedSubcategory);
     } catch (error) {
-      Logger.error('Error in createSubcategory', error as Error);
+      productionLogger.error('[SUBCATEGORY SERVICE] Error in createSubcategory', error as Error);
       throw error;
     }
   },
 
   async getSubcategoryById(id: string) {
-    return Subcategory.findById(id).populate('categoryId', 'name');
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('*, categories(name)')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return null;
+    return mapSupabaseSubcategory(data);
   },
 
   async getSubcategoryBySlug(slug: string) {
-    return Subcategory.findOne({ slug }).populate('categoryId', 'name');
+    const { data, error } = await supabase
+      .from('subcategories')
+      .select('*, categories(name)')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return mapSupabaseSubcategory(data);
   },
 
   async getAllSubcategories(categoryId?: string) {
-    const query = categoryId ? { categoryId } : {};
-    return Subcategory.find(query)
-      .populate('categoryId', 'name')
-      .sort({ name: 1 });
+    let query = supabase
+      .from('subcategories')
+      .select('*, categories(name)')
+      .order('name', { ascending: true });
+
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
+
+    const { data, error } = await query;
+    if (error) return [];
+    return (data || []).map(mapSupabaseSubcategory);
   },
 
   async updateSubcategory({
@@ -98,59 +148,59 @@ export const SubcategoryService = {
     image,
     isActive,
     categoryId,
-    session
   }: UpdateSubcategoryParams) {
-    const updateData: Partial<ISubcategory> = {};
-    
-    if (name) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (image !== undefined) updateData.image = image;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (categoryId) {
-      // Convert string to ObjectId if necessary
-      updateData.categoryId = categoryId;
-    }
-    
-    updateData.updatedAt = new Date().toISOString();
-
-    const updated = await Subcategory.findByIdAndUpdate(
-      subcategoryId,
-      updateData,
-      { new: true, session }
-    );
-
-    if (categoryId && updated) {
-      // Update category references if category was changed
-      await Category.updateMany(
-        { subcategories: updated._id },
-        { $pull: { subcategories: updated._id } },
-        { session }
-      );
+    try {
+      const updateData: Record<string, unknown> = {};
       
-      await Category.findByIdAndUpdate(
-        categoryId,
-        { $addToSet: { subcategories: updated._id } },
-        { session, new: true }
-      );
-    }
+      if (name !== undefined) {
+        updateData.name = name;
+        updateData.slug = generateSlug(name);
+      }
+      if (description !== undefined) updateData.description = description;
+      if (image !== undefined) updateData.image = image;
+      if (isActive !== undefined) updateData.is_active = isActive;
 
-    return updated;
+      const { data: updated, error } = await supabase
+        .from('subcategories')
+        .update(updateData)
+        .eq('id', subcategoryId)
+        .select('*, categories(name)')
+        .single();
+
+      if (error || !updated) {
+        throw new Error(`Failed to update subcategory: ${error?.message}`);
+      }
+
+      // If category changed, we need to handle the reference
+      // Note: In Supabase, we don't have arrays of references like Mongoose
+      // The category_id field on subcategory is the source of truth
+
+      return mapSupabaseSubcategory(updated);
+    } catch (error) {
+      productionLogger.error('[SUBCATEGORY SERVICE] Error in updateSubcategory', error as Error);
+      throw error;
+    }
   },
 
   async deleteSubcategory(id: string) {
-    console.log('[SUBCATEGORY SERVICE] Deleting subcategory:', id);
+    productionLogger.info('[SUBCATEGORY SERVICE] Deleting subcategory:', id);
     
-    const deleted = await Subcategory.findByIdAndDelete(id);
-    
-    if (deleted) {
-      console.log('[SUBCATEGORY SERVICE] Removing subcategory reference from categories');
-      await Category.updateMany(
-        { subcategories: deleted._id },
-        { $pull: { subcategories: deleted._id } }
-      );
-      console.log('[SUBCATEGORY SERVICE] ✅ Subcategory deleted and references removed');
+    const { data: deleted, error } = await supabase
+      .from('subcategories')
+      .delete()
+      .eq('id', id)
+      .select('id')
+      .single();
+
+    if (error) {
+      productionLogger.error('[SUBCATEGORY SERVICE] Delete error:', error);
+      return null;
     }
-    
+
+    if (deleted) {
+      productionLogger.info('[SUBCATEGORY SERVICE] ✅ Subcategory deleted');
+    }
+
     return deleted;
-  }
+  },
 };

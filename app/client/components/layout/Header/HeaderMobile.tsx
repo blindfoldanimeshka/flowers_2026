@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import Link from "next/link";
@@ -10,8 +10,6 @@ export default function HeaderMobile() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [nextUrl, setNextUrl] = useState("");
   const router = useRouter();
   const { categories } = useCategoriesViewModel();
 
@@ -37,11 +35,8 @@ export default function HeaderMobile() {
   };
 
   const handleAnimatedNav = (url: string) => {
-    setIsTransitioning(true);
     setIsClosing(true);
-    setNextUrl(url);
     setTimeout(() => {
-      setIsTransitioning(false);
       setIsClosing(false);
       setMenuOpen(false);
       router.push(url);
@@ -50,26 +45,25 @@ export default function HeaderMobile() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFE1E1] h-14 flex items-center justify-between px-4">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/image/logo.svg" alt="Floramix" width={32} height={32} />
-          <span className="font-bold text-lg">Floramix</span>
-        </Link>
-        <div className="relative">
-          <button
-            className="flex flex-col justify-center items-center w-10 h-10"
-            onClick={() => menuOpen ? handleClose() : setMenuOpen(true)}
-            aria-label="Открыть меню"
-          >
-            <span className={`block w-6 h-0.5 bg-black mb-1 transition-all ${menuOpen ? 'rotate-45 translate-y-1.5' : ''}`}></span>
-            <span className={`block w-6 h-0.5 bg-black mb-1 transition-all ${menuOpen ? 'opacity-0' : ''}`}></span>
-            <span className={`block w-6 h-0.5 bg-black transition-all ${menuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}></span>
-          </button>
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#FFE1E1]" style={{ paddingTop: "var(--safe-area-top)" }}>
+        <div className="h-[var(--header-mobile-height)] flex items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2">
+            <Image src="/image/logo.svg" alt="Floramix" width={32} height={32} loading="eager" />
+            <span className="font-bold text-lg">Floramix</span>
+          </Link>
+          <div className="relative">
+            <button
+              className="flex flex-col justify-center items-center w-10 h-10"
+              onClick={() => menuOpen ? handleClose() : setMenuOpen(true)}
+              aria-label="Открыть меню"
+            >
+              <span className={`block w-6 h-0.5 bg-black mb-1 transition-all ${menuOpen ? 'rotate-45 translate-y-1.5' : ''}`}></span>
+              <span className={`block w-6 h-0.5 bg-black mb-1 transition-all ${menuOpen ? 'opacity-0' : ''}`}></span>
+              <span className={`block w-6 h-0.5 bg-black transition-all ${menuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}></span>
+            </button>
+          </div>
         </div>
       </header>
-      <div className="w-full bg-[#FFE1E1] text-center py-1 text-[13px] font-medium border-b border-[#FFD6D6]">
-        <span>+7 (999) 123-45-67</span> &nbsp;|&nbsp; <span>Ежедневно 9:00–21:00</span>
-      </div>
       {mounted && menuOpen && createPortal(
         <>
           <div
@@ -78,8 +72,11 @@ export default function HeaderMobile() {
             aria-label="Закрыть меню"
           />
           <nav
-            className={`fixed top-0 right-0 h-full w-72 max-w-full bg-white z-50 shadow-2xl p-4 ${isClosing ? 'animate-slideOut' : 'animate-slideIn'}`}
-            style={{ boxShadow: "-8px 0 32px 0 rgba(0,0,0,0.10)" }}
+            className={`fixed top-0 right-0 h-[var(--app-dvh)] w-72 max-w-full bg-white z-50 shadow-2xl p-4 pb-[calc(16px+var(--safe-area-bottom))] ${isClosing ? 'animate-slideOut' : 'animate-slideIn'}`}
+            style={{
+              paddingTop: "max(16px, var(--safe-area-top))",
+              boxShadow: "-8px 0 32px 0 rgba(0,0,0,0.10)",
+            }}
           >
             <div className="relative">
               <button

@@ -1,34 +1,58 @@
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Category from '@/models/Category';
-import Subcategory from '@/models/Subcategory';
+import { supabase } from '@/lib/supabase';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    await connect();
+type CategorySubcategoriesRouteContext = { params: Promise<{ id: string }> };
 
-    const { id } = params;
-    const category = await Category.findById(id);
+export const GET = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
+    const { id } = await params;
 
-    if (!category) {
+    const { data: category, error: catError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (catError || !category) {
+      productionLogger.error('Supabase category fetch error:', catError);
       return NextResponse.json(
         { error: 'Категория не найдена' },
         { status: 404 }
       );
     }
+    
+    const { data: subcategories, error: subError } = await supabase
+      .from('subcategories')
+      .select('id, legacy_id, category_id, name, slug, created_at, updated_at')
+      .eq('category_id', id)
+      .order('name', { ascending: true });
 
-    const subcategories = await Subcategory.find({ categoryId: id }).lean();
-    return NextResponse.json({ subcategories }, { status: 200 });
-  } catch (error: any) {
-    console.error(`Ошибка при получении подкатегорий для категории с ID ${params.id}:`, error);
-    return NextResponse.json(
-      { error: 'Ошибка при получении подкатегорий', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+    if (subError) {
+      productionLogger.error('Supabase subcategories fetch error:', subError);
+      return NextResponse.json(
+        { error: 'Ошибка получения подкатегорий' },
+        { status: 500 }
+      );
+    }
+    
+    const subcategoryList = (subcategories || []).map((row) => ({
+      _id: row.id,
+      id: row.id,
+      legacyId: row.legacy_id,
+      categoryId: row.category_id,
+      name: row.name,
+      slug: row.slug,
+      isActive: true,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
 
-export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
+    return NextResponse.json({ subcategories: subcategoryList }, { status: 200 });
+  });
+
+export const POST = withErrorHandler(async (_request: NextRequest, { params }: CategorySubcategoriesRouteContext) => {
+  const { id } = await params;
   return NextResponse.json(
     {
       error: 'Этот API-маршрут устарел. Используйте POST /api/subcategories с параметром categoryId в теле запроса.',
@@ -38,7 +62,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
         method: 'POST',
         body: {
           name: 'Название подкатегории',
-          categoryId: params.id,
+          categoryId: id,
           description: 'Описание (необязательно)',
           image: 'URL изображения (необязательно)',
           isActive: true
@@ -47,9 +71,9 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
     },
     { status: 301 }
   );
-}
+});
 
-export async function PUT(_request: NextRequest, _params: { params: { id: string } }) {
+export const PUT = withErrorHandler(async (_request: NextRequest, _params: CategorySubcategoriesRouteContext) => {
   return NextResponse.json(
     {
       error: 'Этот API-маршрут не поддерживается. Используйте PUT /api/subcategories/[subcategoryId] для обновления отдельной подкатегории.',
@@ -57,4 +81,5 @@ export async function PUT(_request: NextRequest, _params: { params: { id: string
     },
     { status: 405 }
   );
-}
+});
+

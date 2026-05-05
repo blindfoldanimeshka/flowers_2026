@@ -1,81 +1,102 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
-import { join, normalize } from 'path';
-import { existsSync } from 'fs';
+import { basename, normalize } from 'path';
+import { withErrorHandler } from '@/lib/errorHandler';
+import { supabase } from '@/lib/supabase';
 
-// Функция для определения директории загрузки
-function resolveUploadDir(): string {
-  return process.env.UPLOAD_DIR || join(process.cwd(), 'public/uploads');
+const STORAGE_BUCKET_CANDIDATES = Array.from(
+  new Set(
+    [process.env.SUPABASE_STORAGE_BUCKET_PRODUCTS, process.env.SUPABASE_STORAGE_BUCKET, 'product-images'].filter(
+      (value): value is string => Boolean(value && value.trim())
+    )
+  )
+);
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
-export async function GET(
+export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
-) {
-  try {
-    const resolvedParams = await params;
-    const parts = resolvedParams.path || [];
-    const filePath = parts.join('/');
-    const uploadDir = resolveUploadDir();
-    const normalizedPath = normalize(filePath).replace(/^([/\\])+/, '');
+) => {
+  const resolvedParams = await params;
+  const parts = resolvedParams.path || [];
+  const filePath = parts.join('/');
+  const normalizedPath = normalize(filePath).replace(/^([/\\])+/, '');
 
-    // Проверяем безопасность пути
-    if (!filePath || normalizedPath.includes('..')) {
-      return new NextResponse('File not found', { status: 404 });
-    }
+  console.log('[UPLOADS] Requested path:', filePath);
+  console.log('[UPLOADS] Normalized path:', normalizedPath);
 
-    // Поддерживаем основной и legacy-пути, чтобы старые ссылки не ломались
-    const candidatePaths = Array.from(new Set([
-      join(uploadDir, normalizedPath),
-      join(process.cwd(), 'public/uploads', normalizedPath),
-      join('/tmp/uploads', normalizedPath),
-    ]));
-
-    const existingPath = candidatePaths.find((candidate) => existsSync(candidate));
-    let fileBuffer: Buffer;
-    let extension = normalizedPath.split('.').pop()?.toLowerCase();
-
-    if (existingPath) {
-      fileBuffer = await readFile(existingPath);
-    } else {
-      // Фолбэк, чтобы Next/Image не падал на битых старых ссылках
-      const fallbackPath = join(process.cwd(), 'public/image/items/11.png');
-      fileBuffer = await readFile(fallbackPath);
-      extension = 'png';
-    }
-
-    // Определяем MIME-тип
-    let contentType = 'application/octet-stream';
-    
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg':
-        contentType = 'image/jpeg';
-        break;
-      case 'png':
-        contentType = 'image/png';
-        break;
-      case 'webp':
-        contentType = 'image/webp';
-        break;
-      case 'gif':
-        contentType = 'image/gif';
-        break;
-      case 'svg':
-        contentType = 'image/svg+xml';
-        break;
-    }
-
-    return new NextResponse(new Uint8Array(fileBuffer), {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
-
-  } catch (error) {
-    console.error('Error serving file:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+  if (!filePath || normalizedPath.includes('..')) {
+    console.log('[UPLOADS] Invalid path, returning 404');
+    return new NextResponse('File not found', { status: 404 });
   }
-} 
+
+  const storageCandidates = Array.from(
+    new Set([normalizedPath, safeDecode(normalizedPath), basename(normalizedPath), safeDecode(basename(normalizedPath))])
+  );
+
+  console.log('[UPLOADS] Storage candidates:', storageCandidates);
+  console.log('[UPLOADS] Buckets to check:', STORAGE_BUCKET_CANDIDATES);
+
+  let fileBuffer: Buffer | null = null;
+  let extension = normalizedPath.split('.').pop()?.toLowerCase();
+
+  for (const bucket of STORAGE_BUCKET_CANDIDATES) {
+    for (const storagePath of storageCandidates) {
+      console.log(`[UPLOADS] Trying bucket: ${bucket}, path: ${storagePath}`);
+      const { data, error } = await supabase.storage.from(bucket).download(storagePath);
+      if (error) {
+        console.log(`[UPLOADS] Error downloading from ${bucket}/${storagePath}:`, error.message);
+      }
+      if (!error && data) {
+        console.log(`[UPLOADS] Successfully downloaded from ${bucket}/${storagePath}`);
+        const arrayBuffer = await data.arrayBuffer();
+        fileBuffer = Buffer.from(arrayBuffer);
+        extension = storagePath.split('.').pop()?.toLowerCase();
+        break;
+      }
+    }
+    if (fileBuffer) break;
+  }
+
+  if (!fileBuffer) {
+    console.log('[UPLOADS] File not found in any bucket, returning 404');
+    return new NextResponse('Image not found', { status: 404 });
+  }
+
+  console.log(`[UPLOADS] Returning file, size: ${fileBuffer.length}, type: ${extension}`);
+
+  let contentType = 'application/octet-stream';
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      contentType = 'image/jpeg';
+      break;
+    case 'png':
+      contentType = 'image/png';
+      break;
+    case 'webp':
+      contentType = 'image/webp';
+      break;
+    case 'gif':
+      contentType = 'image/gif';
+      break;
+    case 'svg':
+      contentType = 'image/svg+xml';
+      break;
+  }
+
+  return new NextResponse(new Uint8Array(fileBuffer), {
+    status: 200,
+    headers: {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'Content-Length': String(fileBuffer.length),
+    },
+  });
+});

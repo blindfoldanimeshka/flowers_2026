@@ -75,11 +75,11 @@ export function useAdminCategoriesViewModel() {
     }
   }, [fetchAllData, newSubcategoryName, selectedCategoryId, showToast]);
 
-  const handleUpdate = useCallback(async (type: 'category' | 'subcategory', id: string, name: string) => {
+  const handleUpdate = useCallback(async (type: 'category' | 'subcategory', id: string, name: string, image?: string) => {
     if (!name.trim()) return showToast('Название не может быть пустым', 'error');
     try {
       setSavingId(id);
-      if (type === 'category') await updateCategoryName(id, name.trim());
+      if (type === 'category') await updateCategoryName(id, name.trim(), image);
       else await updateSubcategoryName(id, name.trim());
       showToast(`${type === 'category' ? 'Категория' : 'Подкатегория'} "${name.trim()}" успешно обновлена!`);
       setEditingId(null);
@@ -96,35 +96,25 @@ export function useAdminCategoriesViewModel() {
   const handleDelete = useCallback(async (type: 'category' | 'subcategory', id: string, name: string, productCount?: number) => {
     const itemType = type === 'category' ? 'категорию' : 'подкатегорию';
     let confirmMessage = `Вы уверены, что хотите удалить ${itemType} "${name}"?`;
-    if (productCount && productCount > 0) confirmMessage += `\n\nВнимание: найдено товаров: ${productCount}`;
+
+    if (productCount && productCount > 0) {
+      confirmMessage += `\n\n⚠️ ВНИМАНИЕ: В этой ${itemType} находится ${productCount} товар(ов).\nОни будут помечены как "не в наличии" (inStock = false).`;
+    }
+
     if (!window.confirm(confirmMessage)) return;
+
     try {
       if (type === 'category') await deleteCategory(id);
       else await deleteSubcategory(id);
-      showToast(`${type === 'category' ? 'Категория' : 'Подкатегория'} "${name}" успешно удалена!`);
+
+      const successMessage = productCount && productCount > 0
+        ? `${type === 'category' ? 'Категория' : 'Подкатегория'} "${name}" удалена. ${productCount} товар(ов) помечены как "не в наличии".`
+        : `${type === 'category' ? 'Категория' : 'Подкатегория'} "${name}" успешно удалена!`;
+
+      showToast(successMessage);
       await fetchAllData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка при удалении';
-      if (message.includes('товары')) {
-        const forceMessage = `${message}\n\nУдалить вместе с товарами?`;
-        if (!window.confirm(forceMessage)) {
-          setError(message);
-          showToast(message, 'error');
-          return;
-        }
-        try {
-          if (type === 'category') await deleteCategory(id, true);
-          else await deleteSubcategory(id, true);
-          showToast(`${type === 'category' ? 'Категория' : 'Подкатегория'} "${name}" успешно удалена!`);
-          await fetchAllData();
-          return;
-        } catch (forceErr) {
-          const forceMessageText = forceErr instanceof Error ? forceErr.message : 'Ошибка при принудительном удалении';
-          setError(forceMessageText);
-          showToast(forceMessageText, 'error');
-          return;
-        }
-      }
       setError(message);
       showToast(message, 'error');
     }

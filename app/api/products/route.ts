@@ -1,106 +1,259 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Product from '@/models/Product';
-import Category from '@/models/Category';
-import Subcategory from '@/models/Subcategory';
+import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { sanitizeMongoObject } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
+
+const PRODUCTS_CACHE_CONTROL = 'public, max-age=30, stale-while-revalidate=120';
+
+type ProductBody = Record<string, unknown>;
+const OPTIONAL_SUPABASE_COLUMNS = [
+  'images',
+  'category_ids',
+  'category_num_id',
+  'subcategory_num_id',
+  'preorder_only',
+  'assembly_time',
+  'stock_quantity',
+  'stock_unit',
+  'pinned_in_category',
+] as const;
+
+function normalizeProductImages(input: unknown): { image?: string; images?: string[] } {
+  const raw = Array.isArray(input) ? input : [];
+  const images = Array.from(
+    new Set(
+      raw
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean)
+    )
+  ).slice(0, 3);
+
+  if (images.length === 0) return {};
+  return { image: images[0], images };
+}
+
+function normalizeProductMeta(input: Record<string, unknown>) {
+  const preorderOnly = typeof input.preorderOnly === 'boolean' ? input.preorderOnly : false;
+  const assemblyTime = typeof input.assemblyTime === 'string' ? input.assemblyTime.trim() : '';
+  const stockUnit = typeof input.stockUnit === 'string' && input.stockUnit.trim() ? input.stockUnit.trim() : 'шт.';
+  const rawStock = typeof input.stockQuantity === 'number' ? input.stockQuantity : Number(input.stockQuantity);
+  const stockQuantity = Number.isFinite(rawStock) ? Math.max(0, Math.floor(rawStock)) : 0;
+
+  return { preorderOnly, assemblyTime, stockUnit, stockQuantity };
+}
+
+function normalizeStringArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).map((item) => item.trim());
+}
+
+function toSafeNumber(input: unknown, fallback = 0): number {
+  const next = typeof input === 'number' ? input : Number(input);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function mapSupabaseProduct(product: any) {
+  const rawImages = normalizeStringArray(product.images);
+  const image =
+    (typeof product.image_url === 'string' && product.image_url.trim()) ||
+    (typeof product.image === 'string' && product.image.trim()) ||
+    rawImages[0] ||
+    '';
+
+  const images = Array.from(new Set([image, ...rawImages].filter(Boolean))).slice(0, 3);
+  const categoryId = typeof product.category_id === 'string' ? product.category_id : (typeof product.categoryId === 'string' ? product.categoryId : '');
+  const categoryIdsRaw = normalizeStringArray(product.category_ids ?? product.categoryIds);
+  const categoryIds = categoryIdsRaw.length > 0 ? categoryIdsRaw : (categoryId ? [categoryId] : []);
+
+  return {
+    _id: product.id,
+    name: product.name,
+    description: typeof product.description === 'string' ? product.description : '',
+    price: toSafeNumber(product.price, 0),
+    oldPrice: product.old_price ?? product.oldPrice ?? undefined,
+    image,
+    images,
+    inStock: typeof product.in_stock === 'boolean' ? product.in_stock : (typeof product.inStock === 'boolean' ? product.inStock : true),
+    preorderOnly: typeof product.preorder_only === 'boolean' ? product.preorder_only : (typeof product.preorderOnly === 'boolean' ? product.preorderOnly : false),
+    assemblyTime: typeof product.assembly_time === 'string' ? product.assembly_time : (typeof product.assemblyTime === 'string' ? product.assemblyTime : ''),
+    stockQuantity: Math.max(0, Math.floor(toSafeNumber(product.stock_quantity ?? product.stockQuantity, 0))),
+    stockUnit: typeof product.stock_unit === 'string' ? product.stock_unit : (typeof product.stockUnit === 'string' ? product.stockUnit : 'шт.'),
+    categoryId,
+    categoryIds,
+    categoryNumId: toSafeNumber(product.category_num_id ?? product.categoryNumId, 0),
+    subcategoryId: typeof product.subcategory_id === 'string' ? product.subcategory_id : (typeof product.subcategoryId === 'string' ? product.subcategoryId : ''),
+    subcategoryNumId: toSafeNumber(product.subcategory_num_id ?? product.subcategoryNumId, 0),
+    pinnedInCategory:
+      typeof product.pinned_in_category === 'string'
+        ? product.pinned_in_category
+        : (typeof product.pinnedInCategory === 'string' ? product.pinnedInCategory : ''),
+  };
+}
+
+function buildSupabaseProductPayload(body: ProductBody) {
+  const normalizedImages = normalizeProductImages(body.images);
+  if (normalizedImages.images) {
+    body.images = normalizedImages.images;
+    body.image = normalizedImages.image;
+  }
+  const meta = normalizeProductMeta(body);
+  const categoryId = typeof body.categoryId === 'string' ? body.categoryId.trim() : '';
+  const categoryIds = normalizeStringArray(body.categoryIds);
+  const subcategoryId = typeof body.subcategoryId === 'string' ? body.subcategoryId.trim() : '';
+  const image = typeof body.image === 'string' ? body.image.trim() : '';
+  const images = normalizeStringArray(body.images);
+  const pinnedInCategory = typeof body.pinnedInCategory === 'string' ? body.pinnedInCategory.trim() : '';
+  const fallbackCategoryIds = categoryIds.length > 0 ? categoryIds : (categoryId ? [categoryId] : []);
+
+  return {
+    name: typeof body.name === 'string' ? body.name.trim() : '',
+    description: typeof body.description === 'string' ? body.description.trim() : '',
+    price: toSafeNumber(body.price, 0),
+    old_price: body.oldPrice ?? null,
+    image_url: image || images[0] || '',
+    images,
+    in_stock: typeof body.inStock === 'boolean' ? body.inStock : true,
+    preorder_only: meta.preorderOnly,
+    assembly_time: meta.assemblyTime,
+    stock_quantity: meta.stockQuantity,
+    stock_unit: meta.stockUnit,
+    category_id: categoryId || fallbackCategoryIds[0] || null,
+    category_ids: fallbackCategoryIds,
+    category_num_id: toSafeNumber(body.categoryNumId, 0),
+    subcategory_id: subcategoryId || null,
+    subcategory_num_id: toSafeNumber(body.subcategoryNumId, 0),
+    pinned_in_category: pinnedInCategory || null,
+  };
+}
+
+function isMissingColumnError(error: unknown): boolean {
+  const message = String((error as { message?: string })?.message || '').toLowerCase();
+  const code = String((error as { code?: string })?.code || '');
+  return code === 'PGRST204' || (message.includes('column') && message.includes('does not exist'));
+}
+
+function stripOptionalSupabaseColumns(payload: Record<string, unknown>) {
+  const next = { ...payload };
+  for (const key of OPTIONAL_SUPABASE_COLUMNS) {
+    delete next[key];
+  }
+  return next;
+}
 
 // GET all products
-export async function GET(request: NextRequest) {
-  try {
-    await connect();
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
     const subcategoryId = searchParams.get('subcategoryId');
     const categoryNumId = searchParams.get('categoryNumId');
     const subcategoryNumId = searchParams.get('subcategoryNumId');
+    const view = searchParams.get('view');
+    const limitParam = searchParams.get('limit');
+    const limit = limitParam ? parseInt(limitParam, 10) : undefined;
 
-    const query: any = {};
-    
-    // Фильтрация по ObjectId категории
-    if (categoryId) query.categoryId = categoryId;
-    
-    // Фильтрация по ObjectId подкатегории
-    if (subcategoryId) query.subcategoryId = subcategoryId;
-    
-    // Фильтрация по числовому ID категории
-    if (categoryNumId) {
-      const numId = parseInt(categoryNumId, 10);
-      if (!isNaN(numId)) {
-        query.categoryNumId = numId;
+    const buildSupabaseQuery = (withCategoryArrayFilter: boolean) => {
+      let query = supabase
+        .from('products')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (categoryId) {
+        query = withCategoryArrayFilter
+          ? query.or(`category_id.eq.${categoryId},category_ids.cs.{${categoryId}}`)
+          : query.eq('category_id', categoryId);
       }
-    }
-    
-    // Фильтрация по числовому ID подкатегории
-    if (subcategoryNumId) {
-      const numId = parseInt(subcategoryNumId, 10);
-      if (!isNaN(numId)) {
-        query.subcategoryNumId = numId;
+
+      if (subcategoryId) {
+        query = query.eq('subcategory_id', subcategoryId);
       }
+
+      if (categoryNumId) {
+        const numId = parseInt(categoryNumId, 10);
+        if (!isNaN(numId)) {
+          query = query.eq('category_num_id', numId);
+        }
+      }
+
+      if (subcategoryNumId) {
+        const numId = parseInt(subcategoryNumId, 10);
+        if (!isNaN(numId)) {
+          query = query.eq('subcategory_num_id', numId);
+        }
+      }
+
+      if (limit && !isNaN(limit) && limit > 0) {
+        query = query.limit(limit);
+      }
+
+      return query;
+    };
+
+    let { data, error } = await buildSupabaseQuery(true);
+    if (error && isMissingColumnError(error) && categoryId) {
+      const retryResult = await buildSupabaseQuery(false);
+      data = retryResult.data;
+      error = retryResult.error;
     }
-    
-    console.log('PRODUCTS API QUERY:', query);
-    const products = await Product.find(query).lean();
-    console.log('PRODUCTS API RESULT:', products);
-    return NextResponse.json(products);
-  } catch (error) {
-    console.error('Ошибка при получении товаров:', error);
-    return NextResponse.json([], { status: 500 });
-  }
-}
+
+    if (error) {
+      productionLogger.error('Supabase products fetch error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const products = (data || []).map(mapSupabaseProduct);
+
+    return NextResponse.json(products, {
+      headers: { 'Cache-Control': PRODUCTS_CACHE_CONTROL },
+ 
+
+});
+
+  });
 
 // POST a new product
-export async function POST(request: NextRequest) {
-  try {
-    await connect();
-    const body = await request.json();
+export const POST = withErrorHandler(async (request: NextRequest) => {
+    const body = sanitizeMongoObject(await request.json());
+    const payload = buildSupabaseProductPayload(body as ProductBody);
 
-    // Получаем категорию для числового ID
-    if (body.categoryId) {
-      const category = await Category.findById(body.categoryId);
-      if (!category) {
-        return NextResponse.json({ error: 'Категория не найдена' }, { status: 404 });
-      }
-      body.categoryNumId = category.id; // Устанавливаем числовой ID категории
-    } else {
+    if (!payload.name) {
+      return NextResponse.json({ error: 'Название товара обязательно' }, { status: 400 });
+    }
+
+    if (!payload.category_id) {
       return NextResponse.json({ error: 'ID категории обязателен' }, { status: 400 });
     }
 
-    // Обрабатываем подкатегорию, если она указана
-    if (body.subcategoryId) {
-      const subcategory = await Subcategory.findById(body.subcategoryId);
-      if (!subcategory) {
-        return NextResponse.json({ error: 'Подкатегория не найдена' }, { status: 404 });
-      }
-      body.subcategoryNumId = subcategory.categoryNumId; // Устанавливаем числовой ID подкатегории
-    } else {
-      // Удаляем subcategoryId если оно пустое или null
-      delete body.subcategoryId;
-      delete body.subcategoryNumId;
+    if (payload.pinned_in_category && !payload.category_ids.includes(payload.pinned_in_category)) {
+      return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
     }
 
-    const newProduct = await Product.create(body);
+    let { data, error } = await supabase
+      .from('products')
+      .insert(payload)
+      .select('*')
+      .single();
 
-    // Revalidate paths
+    if (error && isMissingColumnError(error)) {
+      const fallbackPayload = stripOptionalSupabaseColumns(payload);
+      const retryResult = await supabase.from('products').insert(fallbackPayload).select('*').single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
+    if (error) {
+      productionLogger.error('Supabase product create error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
     revalidatePath('/');
     revalidatePath('/category', 'layout');
+    return NextResponse.json(mapSupabaseProduct(data), { status: 201 });
+});
 
-    return NextResponse.json(newProduct, { status: 201 });
-  } catch (error: any) {
-    console.error('Ошибка при создании товара:', error);
-    if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map((err: any) => err.message);
-      return NextResponse.json({ error: 'Ошибка валидации', details: validationErrors }, { status: 400 });
-    }
-    return NextResponse.json({ error: 'Ошибка при создании товара', details: error.message }, { status: 500 });
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    await connect();
-    
+export const DELETE = withErrorHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -108,44 +261,86 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'ID товара обязателен' }, { status: 400 });
     }
 
-    const deletedProduct = await Product.findByIdAndDelete(id);
-
-    if (!deletedProduct) {
-      return NextResponse.json({ error: 'Товар не найден' }, { status: 404 });
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      productionLogger.error('Supabase product delete error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    revalidatePath('/');
+    revalidatePath('/category', 'layout');
     return NextResponse.json({ message: 'Товар успешно удалён' });
-  } catch (error) {
-    console.error('Ошибка при удалении товара:', error);
-    return NextResponse.json({ error: 'Ошибка при удалении товара' }, { status: 500 });
-  }
-}
+});
 
-export async function PUT(request: NextRequest) {
-  try {
-    await connect();
-
+export const PUT = withErrorHandler(async (request: NextRequest) => {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    const body = await request.json();
+    const body = sanitizeMongoObject(await request.json());
+    const normalizedImages = normalizeProductImages(body.images);
+    if (normalizedImages.images) {
+      body.images = normalizedImages.images;
+      body.image = normalizedImages.image;
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'ID товара обязателен' }, { status: 400 });
     }
 
-    const updatedProduct = await Product.findByIdAndUpdate(id, body, {
-      new: true,
-      runValidators: true,
-    });
-
-    if (!updatedProduct) {
-      return NextResponse.json({ error: 'Товар не найден' }, { status: 404 });
+    const payload = buildSupabaseProductPayload(body as ProductBody);
+    if (payload.pinned_in_category && !payload.category_ids.includes(payload.pinned_in_category)) {
+      return NextResponse.json({ error: 'Категория для закрепления должна быть в списке категорий товара' }, { status: 400 });
     }
 
-    return NextResponse.json(updatedProduct);
-  } catch (error) {
-    console.error('Ошибка при обновлении товара:', error);
-    // ... (error handling)
-    return NextResponse.json({ error: 'Ошибка при обновлении товара' }, { status: 500 });
-  }
-}
+    const updatePayload: Record<string, unknown> = {};
+    if (typeof body.name === 'string' && body.name.trim()) updatePayload.name = payload.name;
+    if (typeof body.description === 'string') updatePayload.description = payload.description;
+    if (typeof body.price !== 'undefined') updatePayload.price = payload.price;
+    if (typeof body.oldPrice !== 'undefined') updatePayload.old_price = payload.old_price;
+    if (typeof body.inStock === 'boolean') updatePayload.in_stock = payload.in_stock;
+    if (typeof body.preorderOnly === 'boolean') updatePayload.preorder_only = payload.preorder_only;
+    if (typeof body.assemblyTime === 'string') updatePayload.assembly_time = payload.assembly_time;
+    if (typeof body.stockQuantity !== 'undefined') updatePayload.stock_quantity = payload.stock_quantity;
+    if (typeof body.stockUnit === 'string') updatePayload.stock_unit = payload.stock_unit;
+    if (typeof body.image === 'string' || Array.isArray(body.images)) updatePayload.image_url = payload.image_url;
+    if (Array.isArray(body.images)) updatePayload.images = payload.images;
+    if (typeof body.categoryId === 'string' || Array.isArray(body.categoryIds)) {
+      updatePayload.category_id = payload.category_id;
+      updatePayload.category_ids = payload.category_ids;
+      updatePayload.category_num_id = payload.category_num_id;
+    }
+    if (typeof body.subcategoryId === 'string') {
+      updatePayload.subcategory_id = payload.subcategory_id;
+      updatePayload.subcategory_num_id = payload.subcategory_num_id;
+    }
+    if (body.pinnedInCategory !== undefined) updatePayload.pinned_in_category = payload.pinned_in_category;
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: 'Нет допустимых полей для обновления' }, { status: 400 });
+    }
+
+    let { data, error } = await supabase
+      .from('products')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error && isMissingColumnError(error)) {
+      const fallbackPayload = stripOptionalSupabaseColumns(updatePayload);
+      const retryResult = await supabase
+        .from('products')
+        .update(fallbackPayload)
+        .eq('id', id)
+        .select('*')
+        .single();
+      data = retryResult.data;
+      error = retryResult.error;
+    }
+
+    if (error) {
+      productionLogger.error('Supabase product update error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(mapSupabaseProduct(data));
+});

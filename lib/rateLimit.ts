@@ -1,79 +1,68 @@
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
 interface RateLimitConfig {
   windowMs: number;
   maxRequests: number;
 }
 
-interface RateLimitStore {
-  [key: string]: {
-    count: number;
-    resetTime: number;
-  };
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+const hasRedisConfig = Boolean(redisUrl && redisToken);
+const redis = hasRedisConfig ? new Redis({ url: redisUrl!, token: redisToken! }) : null;
+
+function createRateLimiter(config: RateLimitConfig): Ratelimit {
+  const windowSeconds = Math.floor(config.windowMs / 1000);
+  if (!redis) {
+    throw new Error('Upstash Redis is not configured');
+  }
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(config.maxRequests, `${windowSeconds} s`),
+    prefix: 'ratelimit',
+  });
 }
 
-class RateLimiter {
-  private store: RateLimitStore = {};
-  private config: RateLimitConfig;
+const rateLimiter = hasRedisConfig
+  ? createRateLimiter({
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+      maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+    })
+  : null;
 
-  constructor(config: RateLimitConfig) {
-    this.config = config;
+const fallbackHits = new Map<string, { count: number; resetAt: number }>();
+const fallbackWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000');
+const fallbackMaxRequests = parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100');
+
+function limitInMemory(identifier: string) {
+  const now = Date.now();
+  const state = fallbackHits.get(identifier);
+
+  if (!state || state.resetAt <= now) {
+    const next = { count: 1, resetAt: now + fallbackWindowMs };
+    fallbackHits.set(identifier, next);
+    return { success: true, remaining: fallbackMaxRequests - 1, reset: Math.floor(next.resetAt / 1000) };
   }
 
-  isAllowed(identifier: string): boolean {
-    const now = Date.now();
-    const record = this.store[identifier];
-
-    // Если записи нет или время сброса прошло, создаем новую
-    if (!record || now > record.resetTime) {
-      this.store[identifier] = {
-        count: 1,
-        resetTime: now + this.config.windowMs,
-      };
-      return true;
-    }
-
-    // Если лимит превышен
-    if (record.count >= this.config.maxRequests) {
-      return false;
-    }
-
-    // Увеличиваем счетчик
-    record.count++;
-    return true;
-  }
-
-  getRemaining(identifier: string): number {
-    const record = this.store[identifier];
-    if (!record) {
-      return this.config.maxRequests;
-    }
-    return Math.max(0, this.config.maxRequests - record.count);
-  }
-
-  getResetTime(identifier: string): number {
-    const record = this.store[identifier];
-    return record ? record.resetTime : Date.now() + this.config.windowMs;
-  }
-
-  // Очистка устаревших записей
-  cleanup(): void {
-    const now = Date.now();
-    Object.keys(this.store).forEach(key => {
-      if (now > this.store[key].resetTime) {
-        delete this.store[key];
-      }
-    });
-  }
+  state.count += 1;
+  fallbackHits.set(identifier, state);
+  const remaining = Math.max(0, fallbackMaxRequests - state.count);
+  return { success: state.count <= fallbackMaxRequests, remaining, reset: Math.floor(state.resetAt / 1000) };
 }
 
-// Создаем глобальный экземпляр rate limiter
-const rateLimiter = new RateLimiter({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 минут по умолчанию
-  maxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // 100 запросов по умолчанию
-});
+export async function isAllowed(identifier: string): Promise<boolean> {
+  const { success } = hasRedisConfig && rateLimiter ? await rateLimiter.limit(identifier) : limitInMemory(identifier);
+  return success;
+}
 
-// Очищаем устаревшие записи каждые 5 минут
-setInterval(() => {
-  rateLimiter.cleanup();
-}, 5 * 60 * 1000);
+export async function getRemaining(identifier: string): Promise<number> {
+  const { remaining } = hasRedisConfig && rateLimiter ? await rateLimiter.limit(identifier) : limitInMemory(identifier);
+  return remaining;
+}
 
-export default rateLimiter;
+export async function getResetTime(identifier: string): Promise<number> {
+  const { reset } = hasRedisConfig && rateLimiter ? await rateLimiter.limit(identifier) : limitInMemory(identifier);
+  return reset * 1000;
+}
+
+export default { isAllowed, getRemaining, getResetTime };

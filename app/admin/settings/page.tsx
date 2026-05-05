@@ -10,7 +10,7 @@ export default async function SettingsPage() {
   const plainSettings = JSON.parse(JSON.stringify(settings));
 
   return (
-    <div className="min-h-screen bg-gray-100 p-8">
+    <div className="min-h-0 bg-gray-100 p-2 sm:p-4 lg:p-6">
       <SettingsForm initialSettings={plainSettings} />
     </div>
   );

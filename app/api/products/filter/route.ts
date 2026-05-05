@@ -1,82 +1,114 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Product from '@/models/Product';
+import { supabase } from '@/lib/supabase';
+import { escapeRegExp, safeSearchTerm, toIntInRange } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
-    await connect();
-
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const searchParams = request.nextUrl.searchParams;
     const filterConditions: any = {};
 
     const categoryId = searchParams.get('categoryId');
     if (categoryId) {
-      filterConditions.categoryId = categoryId;
+      filterConditions.category_id = categoryId;
     }
 
     const subcategoryId = searchParams.get('subcategoryId');
     if (subcategoryId) {
-      filterConditions.subcategoryId = subcategoryId;
+      filterConditions.subcategory_id = subcategoryId;
     }
 
     const inStock = searchParams.get('inStock');
     if (inStock !== null) {
-      filterConditions.inStock = inStock === 'true';
+      filterConditions.in_stock = inStock === 'true';
     }
 
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
-    if (minPrice || maxPrice) {
-      filterConditions.price = {};
 
-      if (minPrice) {
-        filterConditions.price.$gte = Number(minPrice);
-      }
+    const query = safeSearchTerm(searchParams.get('query'));
+    
+    // Build Supabase query
+    let supabaseQuery = supabase
+      .from('products')
+      .select('*', { count: 'exact' });
 
-      if (maxPrice) {
-        filterConditions.price.$lte = Number(maxPrice);
+    if (categoryId) {
+      supabaseQuery = supabaseQuery.or(`category_id.eq.${categoryId},category_ids.cs.{${categoryId}}`);
+    }
+
+    if (subcategoryId) {
+      supabaseQuery = supabaseQuery.eq('subcategory_id', subcategoryId);
+    }
+
+    if (inStock !== null) {
+      supabaseQuery = supabaseQuery.eq('in_stock', inStock === 'true');
+    }
+
+    if (minPrice) {
+      const parsedMinPrice = Number(minPrice);
+      if (Number.isFinite(parsedMinPrice) && parsedMinPrice >= 0) {
+        supabaseQuery = supabaseQuery.gte('price', parsedMinPrice);
       }
     }
 
-    const query = searchParams.get('query');
+    if (maxPrice) {
+      const parsedMaxPrice = Number(maxPrice);
+      if (Number.isFinite(parsedMaxPrice) && parsedMaxPrice >= 0) {
+        supabaseQuery = supabaseQuery.lte('price', parsedMaxPrice);
+      }
+    }
+
     if (query) {
-      filterConditions.$or = [
-        { name: { $regex: query, $options: 'i' } },
-        { description: { $regex: query, $options: 'i' } }
-      ];
+      const escaped = escapeRegExp(query);
+      supabaseQuery = supabaseQuery.or(`name.ilike.%${escaped}%,description.ilike.%${escaped}%`);
     }
 
-    const sortField = searchParams.get('sortField') || 'createdAt';
-    const sortOrder = searchParams.get('sortOrder') === 'asc' ? 1 : -1;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    // Sorting
+    const allowedSortFields = new Set(['created_at', 'price', 'name']);
+    const rawSortField = searchParams.get('sortField') || 'created_at';
+    const sortField = allowedSortFields.has(rawSortField) ? rawSortField : 'created_at';
+    const sortOrder = searchParams.get('sortOrder') === 'asc' ? true : false;
+
+    supabaseQuery = supabaseQuery.order(sortField, { ascending: sortOrder });
+
+    // Pagination
+    const page = toIntInRange(searchParams.get('page'), 1, 1, 1000);
+    const limit = toIntInRange(searchParams.get('limit'), 10, 1, 100);
     const skip = (page - 1) * limit;
 
-    const products = await Product.find(filterConditions)
-      .sort({ [sortField]: sortOrder })
-      .skip(skip)
-      .limit(limit);
+    supabaseQuery = supabaseQuery.range(skip, skip + limit - 1);
 
-    const totalCount = await Product.countDocuments(filterConditions);
+    const { data, error, count } = await supabaseQuery;
+
+    if (error) {
+      productionLogger.error('Supabase product filter error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const products = (data || []).map((product: any) => ({
+      _id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      oldPrice: product.old_price,
+      image: product.image_url || '',
+      inStock: product.in_stock,
+      categoryId: product.category_id || '',
+      subcategoryId: product.subcategory_id || '',
+    }));
 
     return NextResponse.json(
       {
         products,
         pagination: {
-          total: totalCount,
+          total: count || 0,
           page,
           limit,
-          pages: Math.ceil(totalCount / limit)
+          pages: Math.ceil((count || 0) / limit)
         }
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('Ошибка при фильтрации товаров:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при фильтрации товаров', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+});

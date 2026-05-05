@@ -1,16 +1,14 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
-import User from '@/models/User';
+import bcrypt from 'bcryptjs';
 import { createToken, setAuthCookie } from '@/lib/auth';
+import { generateCsrfToken, setCsrfCookie } from '@/lib/csrf';
+import { supabase } from '@/lib/supabase';
 
-export async function POST(request: NextRequest) {
+export const POST = async (request: NextRequest) => {
   try {
-    await dbConnect();
-    
     const { username, password } = await request.json();
 
-    // Валидация входных данных
     if (!username || !password) {
       return NextResponse.json(
         { error: 'Username and password are required' },
@@ -18,63 +16,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Поиск пользователя
-    const user = await User.findOne({ username });
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
+    const { data: user, error: queryError } = await supabase
+      .from('admin_users')
+      .select('id, username, password_hash, role, is_active')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (queryError) {
+      console.error('[LOGIN] Query error:', queryError);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
-    // Проверка пароля
-    const isPasswordValid = await user.comparePassword(password);
+    if (!user || !user.is_active) {
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
     if (!isPasswordValid) {
-      return NextResponse.json(
-        { error: 'Invalid credentials' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
 
-    // Проверка роли админа
     if (user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Создание JWT токена
     const token = await createToken({
-      userId: user._id.toString(),
+      userId: user.id,
       username: user.username,
       role: user.role
     });
 
-    // Создание ответа с cookie
     const response = NextResponse.json({
       message: 'Login successful',
-      user: {
-        id: user._id,
-        username: user.username,
-        role: user.role
-      },
-      token: token
+      user: { id: user.id, username: user.username, role: user.role }
     });
 
-    // Установка cookie
     setAuthCookie(response, token);
-
+    setCsrfCookie(response, generateCsrfToken());
     return response;
-
-  } catch (error) {
-    console.error('Login error:', error);
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.message : undefined,
-      },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    console.error('[LOGIN] Error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-}
+};

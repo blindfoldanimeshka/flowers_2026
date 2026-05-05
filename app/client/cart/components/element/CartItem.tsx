@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, memo } from "react";
+import React, { memo, useCallback } from "react";
 import Image from "next/image";
 import { CartItem as CartItemType, useCart } from '@/features/app/cart';
 
@@ -9,83 +9,84 @@ interface CartItemProps {
 }
 
 const CartItem = memo(({ item }: CartItemProps) => {
-    const { updateQuantity, removeFromCart } = useCart();
-    
-    const incrementQuantity = useCallback(() => {
-      const newQuantity = item.quantity + 1;
-      // Сразу обновляем количество без дополнительных проверок
-      updateQuantity(item.id, newQuantity);
-    }, [item.id, item.quantity, updateQuantity]);
-    
-    const decrementQuantity = useCallback(() => {
-      if (item.quantity > 1) {
-        const newQuantity = item.quantity - 1;
-        // Сразу обновляем количество без дополнительных проверок
-        updateQuantity(item.id, newQuantity);
-      } else {
-        // Если количество = 1, то удаляем товар из корзины
-        removeFromCart(item.id);
-      }
-    }, [item.id, item.quantity, updateQuantity, removeFromCart]);
-    
-    const handleRemove = useCallback(() => {
-      // Сразу удаляем товар без дополнительных проверок
-      removeFromCart(item.id);
-    }, [item.id, removeFromCart]);
-    
-    // Мемоизация промежуточных вычислений
-    const totalPrice = item.price * item.quantity;
-    
-    return (
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white border-[1px] border-[#FFDADA] p-3 rounded-[15px] shadow-sm hover:shadow-md transition-shadow duration-300 will-change-transform">
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-                <div className="w-[100px] h-[120px] relative rounded-[10px] overflow-hidden">
-                    <Image 
-                        src={item.imageSrc} 
-                        alt={item.title} 
-                        fill 
-                        sizes="100px"
-                        loading="eager"
-                        style={{
-                            objectFit: 'cover',
-                            transform: 'translateZ(0)', // Включает аппаратное ускорение
-                        }}
-                        className="rounded-lg will-change-transform"
-                        onLoadingComplete={(img) => {
-                            img.classList.add('transition-transform', 'duration-300', 'hover:scale-105');
-                        }}
-                    />
-                </div>
-                <div className="text-center sm:text-left">
-                    <h2 className="text-lg font-semibold">{item.title}</h2>
-                    <p className="text-gray-600 mt-1">Цена: {item.price} ₽</p>
-                    <p className="text-lg font-bold mt-2">Итого: {totalPrice} ₽</p>
-                </div>
+  const { updateQuantity, removeFromCart } = useCart();
+
+  const incrementQuantity = useCallback(() => {
+    updateQuantity(item.id, item.quantity + 1);
+  }, [item.id, item.quantity, updateQuantity]);
+
+  const decrementQuantity = useCallback(() => {
+    if (item.quantity > 1) {
+      updateQuantity(item.id, item.quantity - 1);
+      return;
+    }
+    removeFromCart(item.id);
+  }, [item.id, item.quantity, updateQuantity, removeFromCart]);
+
+  const handleRemove = useCallback(() => {
+    removeFromCart(item.id);
+  }, [item.id, removeFromCart]);
+
+  const totalPrice = item.price * item.quantity;
+
+  return (
+    <div className="rounded-2xl border border-[#FFDADA] bg-white p-3 shadow-sm sm:p-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[120px_1fr] sm:gap-4">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#fff6f6] sm:h-[120px] sm:w-[120px]">
+        <Image
+          src={item.imageSrc}
+          alt={item.title}
+          fill
+          sizes="(max-width: 640px) 92vw, 120px"
+          loading="eager"
+          style={{ objectFit: 'cover', transform: 'translateZ(0)' }}
+          className="will-change-transform"
+        />
+      </div>
+
+        <div className="min-w-0">
+          <h3 className="truncate text-base font-semibold text-[#2e2e2e] sm:text-lg">{item.title}</h3>
+          <p className="mt-1 text-sm text-[#8d4a4a]">{item.price} ₽ / шт.</p>
+
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <div className="inline-flex items-center rounded-xl border border-[#ffcccc] bg-[#fff7f7] p-1">
+              <button
+                onClick={decrementQuantity}
+                className="h-8 w-8 rounded-lg text-base font-bold leading-none text-[#5f4150] transition hover:bg-[#ffe7e7]"
+                aria-label="Уменьшить количество"
+              >
+                -
+              </button>
+              <span className="min-w-[28px] text-center text-sm font-semibold text-[#2e2e2e]">{item.quantity}</span>
+              <button
+                onClick={incrementQuantity}
+                className="h-8 w-8 rounded-lg text-base font-bold leading-none text-[#5f4150] transition hover:bg-[#ffe7e7]"
+                aria-label="Увеличить количество"
+              >
+                +
+              </button>
             </div>
-            
-            <div className="flex items-center gap-1">
-                <button 
-                    onClick={decrementQuantity}
-                    className="bg-[#FFE1E1] p-1.5 rounded-full hover:bg-[#FFD1D1] transition-colors duration-300"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#000"><path d="M200-440v-80h560v80H200Z" /></svg>
-                </button>
-                <span className="text-lg font-medium mx-1">{item.quantity}</span>
-                <button 
-                    onClick={incrementQuantity}
-                    className="bg-[#FFE1E1] p-1.5 rounded-full hover:bg-[#FFD1D1] transition-colors duration-300"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#000"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" /></svg>
-                </button>
+
+            <div className="text-right text-sm font-medium text-[#8d4a4a]">
+              Итого: <span className="font-semibold text-[#2e2e2e]">{totalPrice} ₽</span>
             </div>
-            <button 
-                onClick={handleRemove}
-                className="bg-[#ffcece] p-1.5 rounded-full hover:bg-[#ffb5b5] transition-colors duration-300"
+          </div>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              onClick={handleRemove}
+              aria-label="Удалить товар из корзины"
+              className="inline-flex items-center rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.98]"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" height="18px" viewBox="0 -960 960 960" width="18px" fill="#000"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 -960 960 960" width="18" fill="currentColor" aria-hidden="true">
+                <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360Z" />
+              </svg>
             </button>
+          </div>
         </div>
-    );
+      </div>
+    </div>
+  );
 });
 
 CartItem.displayName = 'CartItem';

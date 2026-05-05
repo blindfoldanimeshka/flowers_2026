@@ -1,14 +1,13 @@
-export const dynamic = 'force-dynamic';
+﻿export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
-import Product from '@/models/Product';
+import { supabase } from '@/lib/supabase';
+import { escapeRegExp, safeSearchTerm } from '@/lib/security';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
-    await connect();
-
+export const GET = withErrorHandler(async (request: NextRequest) => {
     const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('query');
+    const query = safeSearchTerm(searchParams.get('query'));
 
     if (!query) {
       return NextResponse.json(
@@ -17,19 +16,30 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const products = await Product.find({
-      $or: [
-        { name: { $regex: query, $options: 'i' } },
-        { description: { $regex: query, $options: 'i' } }
-      ]
-    });
+    const escaped = escapeRegExp(query);
+
+    // Use Supabase full-text search or ILIKE for search
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .or(`name.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+
+    if (error) {
+      productionLogger.error('Supabase product search error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const products = (data || []).map((product: any) => ({
+      _id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      oldPrice: product.old_price,
+      image: product.image_url || '',
+      inStock: product.in_stock,
+      categoryId: product.category_id || '',
+      subcategoryId: product.subcategory_id || '',
+    }));
 
     return NextResponse.json({ products }, { status: 200 });
-  } catch (error: any) {
-    console.error('Ошибка при поиске товаров:', error);
-    return NextResponse.json(
-      { error: 'Ошибка при поиске товаров', details: error.message },
-      { status: 500 }
-    );
-  }
-}
+});

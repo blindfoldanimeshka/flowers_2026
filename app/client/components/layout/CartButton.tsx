@@ -3,11 +3,16 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import { useCart } from '@/features/app/cart'
 
 export default function CartButton() {
   const pathname = usePathname();
   const router = useRouter();
+  const { getTotalItems } = useCart();
+  const totalItems = getTotalItems();
   const isCartPage = pathname === '/client/cart';
+  const isAdminRoute = pathname?.startsWith('/admin');
+  const isAuthRoute = pathname?.startsWith('/auth');
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
@@ -16,26 +21,30 @@ export default function CartButton() {
     return () => clearTimeout(timer);
   }, [pathname]);
 
+  if (isAdminRoute || isAuthRoute) {
+    return null;
+  }
+
   const buttonClasses = "w-14 h-14 rounded-full bg-pink-400 hover:bg-pink-300 active:scale-90 shadow-lg flex items-center justify-center transition-all duration-300";
   const iconClasses = `transition-all duration-300 ${isAnimating ? 'scale-0 rotate-180' : 'scale-100 rotate-0'}`;
 
   if (isCartPage) {
     return (
-      <div className="fixed bottom-6 right-24 z-50 md:hidden">
+      <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", left: "calc(16px + var(--safe-area-left))" }}>
         <button
           onClick={() => router.back()}
           className={buttonClasses}
           aria-label="Вернуться назад"
         >
           <div className={iconClasses}>
-            <svg 
-              width="28" 
-              height="28" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="#ffffff" 
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#ffffff"
               strokeWidth="2"
-              strokeLinecap="round" 
+              strokeLinecap="round"
               strokeLinejoin="round"
             >
               <path d="M19 12H5" />
@@ -48,7 +57,7 @@ export default function CartButton() {
   }
 
   return (
-    <div className="fixed bottom-6 right-24 z-50 md:hidden">
+    <div className="fixed z-[75] md:hidden" style={{ bottom: "var(--float-offset-bottom)", left: "calc(16px + var(--safe-area-left))" }}>
       <Link
         href="/client/cart"
         className={buttonClasses}
@@ -59,8 +68,13 @@ export default function CartButton() {
             <path d="M20 20a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
           </svg>
+          {totalItems > 0 && (
+            <span className="absolute -top-1 -right-1 bg-white text-pink-500 font-bold w-5 h-5 flex items-center justify-center rounded-full text-xs border-2 border-pink-400">
+              {totalItems}
+            </span>
+          )}
         </div>
       </Link>
     </div>
   )
-} 
+}

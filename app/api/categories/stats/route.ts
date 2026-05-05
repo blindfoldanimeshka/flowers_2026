@@ -1,77 +1,103 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import connect from '@/lib/db';
+import { supabase } from '@/lib/supabase';
+import { productionLogger } from '@/lib/productionLogger';
+import { withErrorHandler } from '@/lib/errorHandler';
 
-export async function GET(request: NextRequest) {
-  try {
-    await connect();
-    const { default: Category } = await import('@/models/Category');
-    const { default: Subcategory } = await import('@/models/Subcategory');
-    const { default: Product } = await import('@/models/Product');
+export const GET = withErrorHandler(async (request: NextRequest) => {
+    // Получаем все продукты для подсчета статистики
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, category_id, subcategory_id');
 
-    const categoryStats = await Product.aggregate([
-      {
-        $group: {
-          _id: '$categoryId',
-          productCount: { $sum: 1 }
-        }
+    if (productsError) {
+      productionLogger.error('[CATEGORIES STATS] Products fetch error:', productsError);
+      return NextResponse.json(
+        { success: false, error: 'Ошибка получения данных о продуктах' },
+        { status: 500 }
+      );
+    }
+
+    // Получаем все категории
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('*');
+
+    if (categoriesError) {
+      productionLogger.error('[CATEGORIES STATS] Categories fetch error:', categoriesError);
+      return NextResponse.json(
+        { success: false, error: 'Ошибка получения данных о категориях' },
+        { status: 500 }
+      );
+    }
+
+    // Получаем все подкатегории
+    const { data: allSubcategories, error: subcategoriesError } = await supabase
+      .from('subcategories')
+      .select('*');
+
+    if (subcategoriesError) {
+      productionLogger.error('[CATEGORIES STATS] Subcategories fetch error:', subcategoriesError);
+      return NextResponse.json(
+        { success: false, error: 'Ошибка получения данных о подкатегориях' },
+        { status: 500 }
+      );
+    }
+
+    const productsRows = ((products || []) as unknown) as Array<{ category_id?: string | null; subcategory_id?: string | null }>;
+    const categoryRows = ((categories || []) as unknown) as Array<{ id: string; legacy_id?: number | null; name?: string; slug?: string; is_active?: boolean; image_url?: string; image?: string }>;
+    const subcategoryRows = ((allSubcategories || []) as unknown) as Array<{ id: string; category_id?: string | null; name?: string; slug?: string; is_active?: boolean }>;
+
+    // Подсчитываем статистику продуктов по категориям
+    const categoryStatsMap = new Map<string, number>();
+    const subcategoryStatsMap = new Map<string, number>();
+
+    productsRows.forEach((product) => {
+      const categoryId = product.category_id;
+      const subcategoryId = product.subcategory_id;
+
+      if (categoryId) {
+        categoryStatsMap.set(categoryId, (categoryStatsMap.get(categoryId) || 0) + 1);
       }
-    ]);
 
-    const subcategoryStats = await Product.aggregate([
-      {
-        $match: { subcategoryId: { $ne: null } }
-      },
-      {
-        $group: {
-          _id: '$subcategoryId',
-          productCount: { $sum: 1 }
-        }
-      }
-    ]);
-
-    const categoryCountMap = new Map();
-    categoryStats.forEach(stat => {
-      if (stat._id) {
-        categoryCountMap.set(stat._id.toString(), stat.productCount);
+      if (subcategoryId) {
+        subcategoryStatsMap.set(subcategoryId, (subcategoryStatsMap.get(subcategoryId) || 0) + 1);
       }
     });
 
-    const subcategoryCountMap = new Map();
-    subcategoryStats.forEach(stat => {
-      if (stat._id) {
-        subcategoryCountMap.set(stat._id.toString(), stat.productCount);
+    // Группируем подкатегории по категориям
+    const subcategoriesByCategory = subcategoryRows.reduce((acc: Record<string, Array<typeof subcategoryRows[number] & { productCount: number }>>, sub) => {
+      const categoryId = sub.category_id;
+      if (!categoryId) return acc;
+      if (!acc[categoryId]) {
+        acc[categoryId] = [];
       }
-    });
-
-    const [categories, allSubcategories] = await Promise.all([
-      Category.find({}).lean(),
-      Subcategory.find({}).lean(),
-    ]);
-
-    const subcategoriesByCategory = allSubcategories.reduce((acc, subcategory) => {
-      const key = subcategory.categoryId.toString();
-      if (!acc[key]) {
-        acc[key] = [];
-      }
-      acc[key].push(subcategory);
+      acc[categoryId].push({
+        ...sub,
+        productCount: subcategoryStatsMap.get(sub.id) || 0
+      });
       return acc;
-    }, {} as Record<string, typeof allSubcategories>);
+    }, {} as Record<string, any[]>);
 
-    const enrichedCategories = categories.map(category => {
-      const categoryProductCount = categoryCountMap.get(category._id.toString()) || 0;
-      const enrichedSubcategories = (subcategoriesByCategory[category._id.toString()] || []).map((subcategory: any) => ({
-        ...subcategory,
-        productCount: subcategoryCountMap.get(subcategory._id.toString()) || 0
-      }));
+    // Обогащаем категории статистикой
+    const enrichedCategories = categoryRows.map((category) => {
+      const categoryProductCount = categoryStatsMap.get(category.id) || 0;
+      const enrichedSubcategories = subcategoriesByCategory[category.id] || [];
 
       const subcategoriesProductCount = enrichedSubcategories.reduce(
-        (sum, sub) => sum + sub.productCount, 0
+        (sum: number, sub: any) => sum + (sub.productCount || 0),
+        0
       );
+
       const totalProductCount = categoryProductCount + subcategoriesProductCount;
 
-      return {
-        ...category,
+       return {
+        _id: category.id,
+        id: category.legacy_id || category.id,
+        name: category.name,
+        slug: category.slug,
+        image: category.image_url || category.image || undefined,
+        isActive: category.is_active ?? true,
         productCount: categoryProductCount,
         subcategoriesProductCount,
         totalProductCount,
@@ -83,21 +109,9 @@ export async function GET(request: NextRequest) {
       success: true,
       categories: enrichedCategories,
       summary: {
-        totalCategories: categories.length,
-        totalSubcategories: allSubcategories.length,
-        totalProducts: categoryStats.reduce((sum, stat) => sum + stat.productCount, 0)
+        totalCategories: categoryRows.length,
+        totalSubcategories: subcategoryRows.length,
+        totalProducts: productsRows.length
       }
     });
-
-  } catch (error: any) {
-    console.error('Ошибка при получении статистики категорий:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Ошибка при получении статистики категорий',
-        details: error.message
-      },
-      { status: 500 }
-    );
-  }
-}
+});
