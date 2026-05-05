@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
-import { basename, join, normalize } from 'path';
-import { existsSync } from 'fs';
+import { basename, normalize } from 'path';
 import { withErrorHandler } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
 
@@ -21,10 +19,6 @@ function safeDecode(value: string): string {
   }
 }
 
-function resolveUploadDir(): string {
-  return process.env.UPLOAD_DIR || join(process.cwd(), 'public/uploads');
-}
-
 export const GET = withErrorHandler(async (
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -32,50 +26,34 @@ export const GET = withErrorHandler(async (
   const resolvedParams = await params;
   const parts = resolvedParams.path || [];
   const filePath = parts.join('/');
-  const uploadDir = resolveUploadDir();
   const normalizedPath = normalize(filePath).replace(/^([/\\])+/, '');
 
   if (!filePath || normalizedPath.includes('..')) {
     return new NextResponse('File not found', { status: 404 });
   }
 
-  const candidatePaths = Array.from(
-    new Set([
-      join(uploadDir, normalizedPath),
-      join(process.cwd(), 'public/uploads', normalizedPath),
-      join('/tmp/uploads', normalizedPath),
-    ])
+  const storageCandidates = Array.from(
+    new Set([normalizedPath, safeDecode(normalizedPath), basename(normalizedPath), safeDecode(basename(normalizedPath))])
   );
 
-  const existingPath = candidatePaths.find((candidate) => existsSync(candidate));
-  let fileBuffer: Buffer;
+  let fileBuffer: Buffer | null = null;
   let extension = normalizedPath.split('.').pop()?.toLowerCase();
 
-  if (existingPath) {
-    fileBuffer = await readFile(existingPath);
-  } else {
-    const storageCandidates = Array.from(
-      new Set([normalizedPath, safeDecode(normalizedPath), basename(normalizedPath), safeDecode(basename(normalizedPath))])
-    );
-
-    let downloaded: Uint8Array | null = null;
-    for (const bucket of STORAGE_BUCKET_CANDIDATES) {
-      for (const storagePath of storageCandidates) {
-        const { data, error } = await supabase.storage.from(bucket).download(storagePath);
-        if (!error && data) {
-          downloaded = new Uint8Array(await data.arrayBuffer());
-          extension = storagePath.split('.').pop()?.toLowerCase();
-          break;
-        }
+  for (const bucket of STORAGE_BUCKET_CANDIDATES) {
+    for (const storagePath of storageCandidates) {
+      const { data, error } = await supabase.storage.from(bucket).download(storagePath);
+      if (!error && data) {
+        const arrayBuffer = await data.arrayBuffer();
+        fileBuffer = Buffer.from(arrayBuffer);
+        extension = storagePath.split('.').pop()?.toLowerCase();
+        break;
       }
-      if (downloaded) break;
     }
+    if (fileBuffer) break;
+  }
 
-    if (!downloaded) {
-      return new NextResponse('Image not found', { status: 404 });
-    }
-
-    fileBuffer = Buffer.from(downloaded);
+  if (!fileBuffer) {
+    return new NextResponse('Image not found', { status: 404 });
   }
 
   let contentType = 'application/octet-stream';
