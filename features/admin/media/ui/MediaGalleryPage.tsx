@@ -26,6 +26,8 @@ export default function MediaGalleryPage() {
   const [deleteModal, setDeleteModal] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [actionSheet, setActionSheet] = useState<{ url: string; inLibrary: boolean } | null>(null);
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
+  const [syncingBucket, setSyncingBucket] = useState(false);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     const id = Date.now();
@@ -215,6 +217,65 @@ export default function MediaGalleryPage() {
       await loadMedia();
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Ошибка удаления', 'error');
+    }
+  };
+
+  const handleSyncBucket = async () => {
+    setSyncingBucket(true);
+    try {
+      const response = await fetch('/api/media-library', {
+        method: 'POST',
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ action: 'sync-bucket' }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Ошибка синхронизации bucket');
+      showToast(`Синхронизация завершена. Добавлено: ${Number(data.synced || 0)}`);
+      await loadMedia();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Ошибка синхронизации', 'error');
+    } finally {
+      setSyncingBucket(false);
+    }
+  };
+
+  const toggleSelection = (url: string) => {
+    setSelectedUrls((prev) => {
+      const next = new Set(prev);
+      if (next.has(url)) next.delete(url);
+      else next.add(url);
+      return next;
+    });
+  };
+
+  const toggleSelectAllFiltered = () => {
+    const allSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedUrls.has(item.url));
+    if (allSelected) {
+      setSelectedUrls(new Set());
+      return;
+    }
+    setSelectedUrls(new Set(filteredItems.map((item) => item.url)));
+  };
+
+  const handleBulkDelete = async () => {
+    const targets = Array.from(selectedUrls);
+    if (targets.length === 0) return;
+    const confirmed = window.confirm(`Удалить выбранные изображения (${targets.length})?`);
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch('/api/media-library', {
+        method: 'DELETE',
+        headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ urls: targets }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Ошибка массового удаления');
+      showToast(`Удалено: ${Number(data.deleted || targets.length)}`);
+      setSelectedUrls(new Set());
+      await loadMedia();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Ошибка массового удаления', 'error');
     }
   };
 
@@ -433,19 +494,52 @@ export default function MediaGalleryPage() {
             <h2 className="text-base font-semibold text-gray-700 sm:text-lg">
               Все изображения ({filteredItems.length}{searchQuery && ` из ${items.length}`})
             </h2>
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Поиск по URL..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-64"
-              />
-              <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={handleSyncBucket}
+                disabled={syncingBucket}
+                className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-60"
+              >
+                {syncingBucket ? 'Синхронизация...' : 'Синхронизировать Bucket'}
+              </button>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Поиск по URL..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:w-64"
+                />
+                <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
             </div>
           </div>
+
+          {filteredItems.length > 0 && (
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={filteredItems.length > 0 && filteredItems.every((item) => selectedUrls.has(item.url))}
+                  onChange={toggleSelectAllFiltered}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                />
+                Выбрать все на странице
+              </label>
+              {selectedUrls.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  className="rounded-lg bg-red-500 px-3 py-2 text-sm font-medium text-white hover:bg-red-600"
+                >
+                  Удалить выбранные ({selectedUrls.size})
+                </button>
+              )}
+            </div>
+          )}
 
           {filteredItems.length === 0 ? (
             <div className="rounded-lg bg-gray-50 p-8 text-center text-sm text-gray-500 sm:text-base">
@@ -455,6 +549,14 @@ export default function MediaGalleryPage() {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {filteredItems.map((item, index) => (
                 <div key={`${item.url}-${index}`} className="group relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
+                  <div className="absolute left-1 top-1 z-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedUrls.has(item.url)}
+                      onChange={() => toggleSelection(item.url)}
+                      className="h-4 w-4 rounded border-gray-300 bg-white/90 text-blue-600"
+                    />
+                  </div>
                   <div
                     className="relative aspect-square cursor-pointer"
                     onClick={() => {
