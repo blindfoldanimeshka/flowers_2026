@@ -13,6 +13,7 @@ interface PublicSettings {
 export default function CategoryGrid() {
   const { categories: rawCategories } = useCategoriesViewModel();
   const [settings, setSettings] = useState<PublicSettings | null>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // Сортируем категории по полю order (уже должны быть отсортированы с сервера, но на всякий случай)
   const categories = [...rawCategories].sort((a, b) => {
@@ -27,15 +28,23 @@ export default function CategoryGrid() {
     const fetchSettings = async () => {
       try {
         const response = await fetch('/api/settings', { cache: 'no-store' });
-        if (!response.ok) return;
+        if (!response.ok) {
+          if (isMounted) {
+            setSettings(null);
+            setSettingsLoaded(true);
+          }
+          return;
+        }
 
         const data = (await response.json()) as { settings?: PublicSettings };
         if (isMounted) {
           setSettings(data.settings || null);
+          setSettingsLoaded(true);
         }
       } catch {
         if (isMounted) {
           setSettings(null);
+          setSettingsLoaded(true);
         }
       }
     };
@@ -88,6 +97,11 @@ export default function CategoryGrid() {
               <div className="relative h-full w-full rounded-[20px] sm:rounded-[24px] overflow-hidden bg-[#FFE9E9] shadow-md hover:shadow-lg transition-all duration-300">
                 <div className="absolute inset-0 opacity-90 group-hover:opacity-100 transition-opacity duration-300">
                   {(() => {
+                    // Не показываем картинки пока не загрузились настройки из админки
+                    if (!settingsLoaded) {
+                      return <div className="h-full w-full bg-gradient-to-br from-[#ffdbe8] to-[#ffeef4]" />;
+                    }
+
                     const imageSrc =
                       settings?.homeCategoryCardBackgrounds?.[String(category._id)] ||
                       settings?.homeCategoryCardBackgrounds?.[category.slug] ||
