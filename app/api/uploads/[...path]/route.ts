@@ -98,11 +98,12 @@ export const GET = withErrorHandler(async (
       break;
   }
 
-  return new NextResponse(new Uint8Array(fileBuffer), {
+  return new NextResponse(fileBuffer, {
     status: 200,
     headers: {
       'Content-Type': contentType,
       'Cache-Control': 'public, max-age=31536000, immutable',
+      'Content-Length': String(fileBuffer.length),
     },
   });
 });
