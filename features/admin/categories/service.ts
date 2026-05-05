@@ -60,11 +60,11 @@ export async function createSubcategory(name: string, categoryId: string) {
   return parseJson(response);
 }
 
-export async function updateCategoryName(id: string, name: string) {
+export async function updateCategoryName(id: string, name: string, image?: string) {
   const response = await fetch(`/api/categories/${id}`, {
     method: 'PUT',
     headers: withCsrfHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, image }),
   });
   return parseJson(response);
 }

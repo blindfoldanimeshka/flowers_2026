@@ -12,6 +12,24 @@ type MediaItem = {
 
 type Toast = { id: number; message: string; type: 'success' | 'error' };
 
+function normalizeMediaUrl(raw: string): string {
+  const url = String(raw || '').trim();
+  if (!url) return '';
+  if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('/')) return url;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'http:' && parsed.hostname.endsWith('.supabase.co')) {
+      parsed.protocol = 'https:';
+      return parsed.toString();
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 export default function MediaGalleryPage() {
   const [items, setItems] = useState<MediaItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MediaItem[]>([]);
@@ -321,7 +339,7 @@ export default function MediaGalleryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
-              <Image src={viewModal} alt="Preview" width={1200} height={800} className="max-h-[95vh] w-auto rounded-lg object-contain" />
+              <Image src={normalizeMediaUrl(viewModal)} alt="Preview" width={1200} height={800} className="max-h-[95vh] w-auto rounded-lg object-contain" />
             </div>
           </div>
         )}
@@ -567,7 +585,7 @@ export default function MediaGalleryPage() {
                       }
                     }}
                   >
-                    <Image src={item.url} alt="Media" fill className="object-cover" />
+                    <Image src={normalizeMediaUrl(item.url)} alt="Media" fill className="object-cover" />
                   </div>
 
                   {/* Desktop hover actions */}

@@ -75,11 +75,11 @@ export function useAdminCategoriesViewModel() {
     }
   }, [fetchAllData, newSubcategoryName, selectedCategoryId, showToast]);
 
-  const handleUpdate = useCallback(async (type: 'category' | 'subcategory', id: string, name: string) => {
+  const handleUpdate = useCallback(async (type: 'category' | 'subcategory', id: string, name: string, image?: string) => {
     if (!name.trim()) return showToast('Название не может быть пустым', 'error');
     try {
       setSavingId(id);
-      if (type === 'category') await updateCategoryName(id, name.trim());
+      if (type === 'category') await updateCategoryName(id, name.trim(), image);
       else await updateSubcategoryName(id, name.trim());
       showToast(`${type === 'category' ? 'Категория' : 'Подкатегория'} "${name.trim()}" успешно обновлена!`);
       setEditingId(null);
