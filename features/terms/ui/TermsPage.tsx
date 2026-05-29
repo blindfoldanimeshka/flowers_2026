@@ -407,10 +407,10 @@ const sections = [
           8.3. Пользователь может актуализировать ПД, направив уведомление на
           email{" "}
           <a
-            href="mailto:matvei201357@gmail.com"
+            href="mailto:mkiricenko559@gmail.com"
             className="text-blue-600 hover:underline"
           >
-            matvei201357@gmail.com
+            mkiricenko559@gmail.com
           </a>{" "}
           с пометкой «Актуализация персональных данных».
         </p>
@@ -419,10 +419,10 @@ const sections = [
           были собраны ПД. Пользователь может отозвать согласие, направив
           уведомление на{" "}
           <a
-            href="mailto:matvei201357@gmail.com"
+            href="mailto:mkiricenko559@gmail.com"
             className="text-blue-600 hover:underline"
           >
-            matvei201357@gmail.com
+            mkiricenko559@gmail.com
           </a>{" "}
           с пометкой «Отзыв согласия на обработку персональных данных».
         </p>
@@ -509,10 +509,10 @@ const sections = [
           12.1. Пользователь может получить разъяснения по вопросам обработки
           ПД, обратившись к Оператору по электронной почте{" "}
           <a
-            href="mailto:matvei201357@gmail.com"
+            href="mailto:mkiricenko559@gmail.com"
             className="text-blue-600 hover:underline"
           >
-            matvei201357@gmail.com
+            mkiricenko559@gmail.com
           </a>
           .
         </p>
