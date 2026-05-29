@@ -108,6 +108,12 @@ export default function Footer({ settings }: { settings: any }) {
                             {address && (
                                 <p className="text-gray-700 text-sm mt-3">{address}</p>
                             )}
+                            <Link
+                                href="/terms"
+                                className="block text-gray-700 hover:text-gray-900 transition-colors text-base font-medium mt-3 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-700"
+                            >
+                                Пользовательское соглашение
+                            </Link>
                         </div>
                     </motion.div>
 
