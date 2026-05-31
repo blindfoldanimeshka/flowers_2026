@@ -51,6 +51,9 @@ export const metadata: Metadata = {
       },
     ],
   },
+  verification: {
+    google: '6zB6XfHUFXsXq0TcVLIfZtshkoA-hLAIi0yxeNoS4w4',
+  },
 };
 
 export const viewport: Viewport = {
