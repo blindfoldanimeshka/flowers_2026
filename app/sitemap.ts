@@ -12,25 +12,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: baseUrl,
       lastModified: new Date(),
       changeFrequency: 'daily',
-      priority: 1,
+      priority: 1.0,
     },
     {
-      url: `${baseUrl}/client/cart`,
+      url: `${baseUrl}/terms`,
       lastModified: new Date(),
-      changeFrequency: 'weekly',
-      priority: 0.5,
+      changeFrequency: 'monthly',
+      priority: 0.3,
     },
   ];
 
   try {
     // Получаем категории
-    const { data: categories, error } = await supabase
+    const { data: categories, error: catError } = await supabase
       .from('categories')
       .select('*')
       .eq('is_active', true);
 
-    if (error || !categories) {
-      console.error('Sitemap generation error:', error);
+    if (catError || !categories) {
+      console.error('Sitemap categories generation error:', catError);
       return staticPages;
     }
 
@@ -41,10 +41,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
 
+    // Получаем подкатегории
+    const { data: subcategories, error: subError } = await supabase
+      .from('subcategories')
+      .select('*')
+      .eq('is_active', true);
+
+    const subcategoryPages: MetadataRoute.Sitemap = [];
+    if (!subError && subcategories) {
+      const categoryMap = new Map<string, string>(); // id -> slug
+      categories.forEach((cat: any) => {
+        categoryMap.set(cat.id, cat.slug);
+      });
+
+      subcategories.forEach((sub: any) => {
+        const parentSlug = categoryMap.get(sub.category_id);
+        if (parentSlug) {
+          subcategoryPages.push({
+            url: `${baseUrl}/category/${encodeURIComponent(parentSlug)}/${encodeURIComponent(sub.slug)}`,
+            lastModified: new Date(sub.updated_at || sub.created_at),
+            changeFrequency: 'weekly' as const,
+            priority: 0.7,
+          });
+        }
+      });
+    } else if (subError) {
+      console.error('Sitemap subcategories generation error:', subError);
+    }
+
     // Товары не включены в sitemap, т.к. отдельные страницы товаров (/product/[id]) не существуют
     // Товары отображаются на страницах категорий
 
-    return [...staticPages, ...categoryPages];
+    return [...staticPages, ...categoryPages, ...subcategoryPages];
   } catch (error) {
     console.error('Sitemap generation error:', error);
     return staticPages;

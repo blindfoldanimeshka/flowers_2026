@@ -3,7 +3,9 @@ import { Metadata } from 'next';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Главная',
+  title: {
+    absolute: 'Floramix - Доставка цветов и букетов',
+  },
   description: 'Floramix - интернет-магазин цветов с доставкой. Широкий выбор свежих букетов, композиций и цветочных подарков. Быстрая доставка, гарантия качества.',
   openGraph: {
     title: 'Floramix - Доставка цветов и букетов',
