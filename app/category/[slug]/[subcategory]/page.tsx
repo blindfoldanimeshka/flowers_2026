@@ -36,10 +36,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: safeName,
-    description: `Купить ${safeName.toLowerCase()} с доставкой в Floramix. Широкий выбор свежих цветов и букетов. Гарантия качества и быстрая доставка.`,
+    description: `Купить ${safeName.toLowerCase()} с доставкой в Красноярске от Floramix. Широкий выбор свежих цветов и букетов. Гарантия качества и быстрая доставка.`,
     openGraph: {
       title: `${safeName} - Floramix`,
-      description: `Купить ${safeName.toLowerCase()} с доставкой. Широкий выбор свежих цветов и букетов.`,
+      description: `Купить ${safeName.toLowerCase()} с доставкой в Красноярске. Широкий выбор свежих цветов и букетов.`,
       type: 'website',
       url: `/category/${subcat.slug}`,
     },

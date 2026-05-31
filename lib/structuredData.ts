@@ -9,7 +9,12 @@ export function generateOrganizationSchema() {
     name: 'Floramix',
     url: baseUrl,
     logo: `${baseUrl}/image/logo.svg`,
-    description: 'Интернет-магазин цветов с доставкой',
+    description: 'Интернет-магазин цветов с доставкой в Красноярске',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Красноярск',
+      addressCountry: 'RU',
+    },
     contactPoint: {
       '@type': 'ContactPoint',
       contactType: 'customer service',
