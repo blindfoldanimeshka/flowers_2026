@@ -110,7 +110,6 @@ export const POST = withErrorHandler(async (request: NextRequest) => {
       category_id: categoryId,
       category_num_id: category.legacy_id,
       description: description || '',
-      image: image || '',
       is_active: isActive !== undefined ? isActive : true
     };
 

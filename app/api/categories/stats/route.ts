@@ -82,7 +82,15 @@ export const GET = withErrorHandler(async (request: NextRequest) => {
     // Обогащаем категории статистикой
     const enrichedCategories = categoryRows.map((category) => {
       const categoryProductCount = categoryStatsMap.get(category.id) || 0;
-      const enrichedSubcategories = subcategoriesByCategory[category.id] || [];
+      const enrichedSubcategories = (subcategoriesByCategory[category.id] || []).map((sub: any) => ({
+        _id: sub.id,
+        id: sub.id,
+        name: sub.name,
+        slug: sub.slug,
+        category_id: sub.category_id,
+        is_active: sub.is_active ?? true,
+        productCount: sub.productCount || 0
+      }));
 
       const subcategoriesProductCount = enrichedSubcategories.reduce(
         (sum: number, sub: any) => sum + (sub.productCount || 0),
