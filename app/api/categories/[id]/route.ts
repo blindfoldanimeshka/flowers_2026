@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { invalidateCategoriesCache } from '@/lib/cache';
 import { productionLogger } from '@/lib/productionLogger';
 import { withErrorHandler } from '@/lib/errorHandler';
@@ -37,6 +38,7 @@ export const PUT = withErrorHandler(async (request: NextRequest, { params }: { p
   }
 
   invalidateCategoriesCache();
+  revalidatePath('/admin/categories');
   return NextResponse.json(data);
 });
 
@@ -99,5 +101,6 @@ export const DELETE = withErrorHandler(async (request: NextRequest, { params }: 
   }
 
   invalidateCategoriesCache();
+  revalidatePath('/admin/categories');
   return NextResponse.json({ success: true, message: 'Категория успешно удалена' });
 });
