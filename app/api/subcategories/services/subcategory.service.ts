@@ -6,7 +6,6 @@ export interface CreateSubcategoryParams {
   name: string;
   categoryId: string;
   description?: string;
-  image?: string;
   isActive?: boolean;
 }
 
@@ -14,7 +13,6 @@ export interface UpdateSubcategoryParams {
   subcategoryId: string;
   name?: string;
   description?: string;
-  image?: string;
   isActive?: boolean;
   categoryId?: string;
 }
@@ -37,7 +35,6 @@ function mapSupabaseSubcategory(sub: any) {
     slug: sub.slug,
     categoryId: sub.category_id,
     description: sub.description,
-    image: sub.image,
     isActive: sub.is_active ?? true,
     createdAt: sub.created_at,
     updatedAt: sub.updated_at,
@@ -49,7 +46,6 @@ export const SubcategoryService = {
     name,
     categoryId,
     description,
-    image,
     isActive = true,
   }: CreateSubcategoryParams) {
     try {
@@ -87,7 +83,6 @@ export const SubcategoryService = {
           slug,
           category_id: categoryId,
           description,
-          image,
           is_active: isActive,
         })
         .select('*')
@@ -157,7 +152,6 @@ export const SubcategoryService = {
         updateData.slug = generateSlug(name);
       }
       if (description !== undefined) updateData.description = description;
-      if (image !== undefined) updateData.image = image;
       if (isActive !== undefined) updateData.is_active = isActive;
 
       const { data: updated, error } = await supabase

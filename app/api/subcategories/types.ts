@@ -14,7 +14,6 @@ export interface SubcategoryBase {
   slug: string;
   categoryId: string;
   description?: string;
-  image?: string;
   isActive?: boolean;
 }
 
@@ -28,7 +27,6 @@ export interface CreateSubcategoryDto {
   name: string;
   categoryId: string;
   description?: string;
-  image?: string;
   isActive?: boolean;
 }
 

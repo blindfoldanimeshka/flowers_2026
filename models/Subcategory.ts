@@ -8,7 +8,6 @@ export interface ISubcategory {
   slug: string;
   category_id: string;
   description?: string;
-  image?: string;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
