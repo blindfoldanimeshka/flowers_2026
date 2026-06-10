@@ -140,7 +140,6 @@ export const SubcategoryService = {
     subcategoryId,
     name,
     description,
-    image,
     isActive,
     categoryId,
   }: UpdateSubcategoryParams) {
